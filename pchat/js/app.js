@@ -252,6 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (unique.length) {
       Chat.appendMessages(unique);
+      try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
     }
   } catch { /* non-critical */ }
 
@@ -261,6 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const sheetMsgs = await Chat.loadSheetMessages();
       if (sheetMsgs && sheetMsgs.length) {
         Chat.appendMessages(sheetMsgs);
+      try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
       }
     }
   } catch (err) {
@@ -324,10 +326,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     Chat.setStatus(`${session.displayName}`, true);
   }
 
-  // ── Background room key (silent auto-E2EE) ─────────────────────
-  // Invite-link secret derives the AES-GCM key automatically — guests NEVER
-  // see a password prompt and no login is required. New messages are
-  // encrypted by default (Encryption.shouldEncrypt() === key exists).
+  // ── Background room key (decrypt-only) ─────────────────────────
+  // Invite-link secret derives the AES-GCM key automatically so OLD
+  // enc: messages stay readable — but new messages are sent as PLAINTEXT
+  // unless the owner sets a manual passphrase (shield button).
+  // Guests NEVER see a password prompt and no login is required.
   try {
     if (typeof Encryption !== 'undefined' && !Encryption.isActive()) {
       const roomSecret = session.roomSecret || room.secret;
@@ -339,6 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await Chat.refreshDecryption();
           }
         } catch {}
+        try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
       }
     } else if (typeof Encryption !== 'undefined' && Encryption.isManual
                && Encryption.isManual()
@@ -361,15 +365,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch { /* non-critical */ }
 
-  // ── Missing-key recovery banner: guest arrived with no room secret ──
-  // Shows a paste-link box; adopting the key decrypts all placeholders.
-  // Also covers browsers WITHOUT WebCrypto (some in-app WebViews): those
-  // can NEVER decrypt — say so plainly instead of silent placeholders.
-  try {
-    const hasSubtle = !!(window.crypto && window.crypto.subtle);
-    const hasKey = !!(session.roomSecret || room.secret || urlRoomSecret);
-    const keyBanner = document.getElementById('key-banner');
-    if (keyBanner && (!hasKey || !hasSubtle)) {
+  // ── Locked-message banner (only when actually needed) ──────────
+  // Shows a paste-link box IFF the feed holds enc: messages nobody here can
+  // decrypt (no active key) — e.g. owner enabled passphrase-E2EE. Normal
+  // readable chat never triggers it. Also covers browsers WITHOUT WebCrypto
+  // (http:// LAN, some in-app WebViews): those can NEVER decrypt.
+  // Global so message handlers below can re-check after every batch.
+  window.updateKeyBanner = function () {
+    try {
+      const keyBanner = document.getElementById('key-banner');
+      if (!keyBanner) return;
+      const hasSubtle = !!(window.crypto && window.crypto.subtle);
+      let needsKey = false;
+      try {
+        const keyActive = (typeof Encryption !== 'undefined' && Encryption.isActive) ? Encryption.isActive() : false;
+        if (!keyActive && typeof Chat !== 'undefined' && Chat.getMessages) {
+          needsKey = Chat.getMessages().some(m => m && !m.deleted &&
+            typeof m.message === 'string' && m.message.indexOf('enc:') === 0);
+        }
+      } catch {}
+      if (!needsKey) {
+        keyBanner.classList.add('hidden');
+        return;
+      }
       if (!hasSubtle) {
         const note = keyBanner.querySelector('div');
         if (note) {
@@ -379,51 +397,54 @@ document.addEventListener('DOMContentLoaded', async () => {
             : '🔒 <strong>Locked messages?</strong> This browser (in-app viewer?) cannot decrypt messages. Please open this room in <strong>Chrome</strong> and paste the full invite link below.';
         }
       }
-      keyBanner.classList.remove('hidden');
-      document.getElementById('key-banner-btn')?.addEventListener('click', async () => {
-        const raw = (document.getElementById('key-banner-input')?.value || '').trim();
-        if (!raw) return;
-        try {
-          const u = new URL(raw, window.location.origin);
-          if (u.searchParams.get('r') && u.searchParams.get('r') !== roomId) {
-            throw new Error('This link is for a different room.');
-          }
-          let freshSecret = null;
-          const hm = (u.hash || '').match(/[#&]k=([^&#]+)/);
-          if (hm && hm[1] && typeof InstantSecurity !== 'undefined') {
-            freshSecret = InstantSecurity.b64urlDecode(decodeURIComponent(hm[1]));
-          }
-          if (!freshSecret) {
-            const kP = u.searchParams.get('k');
-            if (kP && typeof InstantSecurity !== 'undefined') freshSecret = InstantSecurity.b64urlDecode(kP);
-          }
-          if (!freshSecret) throw new Error('No room key in that link. Copy the FULL invite link (Invite → Copy).');
-          session.roomSecret = freshSecret;
-          Storage.setSession(session);
-          room.secret = freshSecret;
-          try { Rooms.updateRoom(roomId, { secret: freshSecret }); } catch {}
-          const thP = u.searchParams.get('th');
-          if (thP && typeof RoomTheme !== 'undefined' && !room.theme) {
-            const th = RoomTheme.normalize(thP);
-            room.theme = th;
-            try { Rooms.updateRoom(roomId, { theme: th }); } catch {}
-            RoomTheme.apply(th);
-          }
-          if (typeof Encryption !== 'undefined' && Encryption.deriveKeyFromRoomSecret) {
-            await Encryption.deriveKeyFromRoomSecret(freshSecret, roomId);
-            if (typeof Chat !== 'undefined' && Chat.refreshDecryption) await Chat.refreshDecryption();
-          }
-          try {
-            const frag = (window.location.hash ? window.location.hash + '&' : '#') + 'k=' + InstantSecurity.b64urlEncode(freshSecret);
-            history.replaceState(null, '', window.location.pathname + window.location.search + frag);
-          } catch {}
-          keyBanner.classList.add('hidden');
-          UI.toast('success', 'Unlocked', 'Messages decrypted.');
-        } catch (e) {
-          UI.toast('error', 'Invalid link', (e && e.message) || 'Could not read that link.');
+      keyBanner.classList.toggle('hidden', !needsKey);
+    } catch { /* non-critical */ }
+  };
+  try {
+    document.getElementById('key-banner-btn')?.addEventListener('click', async () => {
+      const keyBanner = document.getElementById('key-banner');
+      const raw = (document.getElementById('key-banner-input')?.value || '').trim();
+      if (!raw) return;
+      try {
+        const u = new URL(raw, window.location.origin);
+        if (u.searchParams.get('r') && u.searchParams.get('r') !== roomId) {
+          throw new Error('This link is for a different room.');
         }
-      });
-    }
+        let freshSecret = null;
+        const hm = (u.hash || '').match(/[#&]k=([^&#]+)/);
+        if (hm && hm[1] && typeof InstantSecurity !== 'undefined') {
+          freshSecret = InstantSecurity.b64urlDecode(decodeURIComponent(hm[1]));
+        }
+        if (!freshSecret) {
+          const kP = u.searchParams.get('k');
+          if (kP && typeof InstantSecurity !== 'undefined') freshSecret = InstantSecurity.b64urlDecode(kP);
+        }
+        if (!freshSecret) throw new Error('No room key in that link. Copy the FULL invite link (Invite → Copy).');
+        session.roomSecret = freshSecret;
+        Storage.setSession(session);
+        room.secret = freshSecret;
+        try { Rooms.updateRoom(roomId, { secret: freshSecret }); } catch {}
+        const thP = u.searchParams.get('th');
+        if (thP && typeof RoomTheme !== 'undefined' && !room.theme) {
+          const th = RoomTheme.normalize(thP);
+          room.theme = th;
+          try { Rooms.updateRoom(roomId, { theme: th }); } catch {}
+          RoomTheme.apply(th);
+        }
+        if (typeof Encryption !== 'undefined' && Encryption.deriveKeyFromRoomSecret) {
+          await Encryption.deriveKeyFromRoomSecret(freshSecret, roomId);
+          if (typeof Chat !== 'undefined' && Chat.refreshDecryption) await Chat.refreshDecryption();
+        }
+        try {
+          const frag = (window.location.hash ? window.location.hash + '&' : '#') + 'k=' + InstantSecurity.b64urlEncode(freshSecret);
+          history.replaceState(null, '', window.location.pathname + window.location.search + frag);
+        } catch {}
+        if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner();
+        UI.toast('success', 'Unlocked', 'Messages decrypted.');
+      } catch (e) {
+        UI.toast('error', 'Invalid link', (e && e.message) || 'Could not read that link.');
+      }
+    });
   } catch { /* non-critical */ }
 
   // ── Load members ──────────────────────────────────────────────
@@ -490,6 +511,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       displayName: session.displayName,
       onMessage: async (msgs) => {
         Chat.appendMessages(msgs);
+          try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
         try {
           if (typeof IDBStorage !== 'undefined') {
             await IDBStorage.putMessages(msgs.map(m => ({ ...m, roomId: room.id })));
@@ -553,6 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (already) return;
           }
           Chat.appendMessages([msg]);
+          try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
           try {
             if (typeof IDBStorage !== 'undefined') {
               IDBStorage.putMessages([{ ...msg, roomId: room.id }]).catch(() => {});

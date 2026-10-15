@@ -87,11 +87,10 @@ const Encryption = (() => {
   }
 
   function isActive() { return _key !== null; }
-  // Auto-E2EE: ANY derived key (invite-link secret OR manual passphrase)
-  // encrypts new messages. Guests never see a prompt — the key comes
-  // silently from the invite link fragment (#k=). Manual mode is kept
-  // only for UI status (extra passphrase layer on top).
-  function shouldEncrypt() { return _key !== null; }
+  // Encrypt new messages ONLY with an explicit manual passphrase.
+  // The automatic invite-link key is decrypt-only (reads old enc: history)
+  // so guests are never blocked and normal chat stays readable.
+  function shouldEncrypt() { return _manual === true && _key !== null; }
   function isManual() { return _manual === true; }
   function clearKey() { _key = null; _manual = false; }
 

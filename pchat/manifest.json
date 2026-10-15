@@ -1,7 +1,7 @@
 {
   "name": "Pchat shepu",
   "short_name": "Pchat shepu",
-  "description": "Pchat shepu: end-to-end encrypted peer-to-peer chat. Quick rooms need no login; Saved rooms back up to your Google Sheet.",
+  "description": "Pchat shepu: private peer-to-peer chat. Quick rooms need no login; Saved rooms back up to your Google Sheet. Optional passphrase E2EE.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#090d16",
