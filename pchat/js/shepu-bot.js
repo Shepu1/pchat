@@ -17,6 +17,8 @@
 
 const ShepuBot = (() => {
   const BOT_NAME    = 'Shepu-AI';
+  const BOT_DISPLAY = 'Shepu-AI 3.1';
+  const BOT_PIC     = 'ai/pai.png';
   const BOT_ID      = 'shepu_ai_bot';
   const MENTION_RE  = /@shepu-ai\b/i;
   const TRIGGER_RE  = /@shepu-ai\b\s*(.*)/is;   // capture the question after the mention
@@ -94,8 +96,8 @@ const ShepuBot = (() => {
       id:             msgId,
       createdAt:      nowTs,
       senderId:       BOT_ID,
-      senderName:     BOT_NAME,
-      senderPicture:  '',
+      senderName:     BOT_DISPLAY,
+      senderPicture:  BOT_PIC,
       messageType:    'text',
       message:        text,
       replyTo:        null,
@@ -115,8 +117,8 @@ const ShepuBot = (() => {
         await RoomAPI.sendMessage(_room.deploymentUrl, {
           memberId:     _session.memberId,
           sessionToken: _session.sessionToken,
-          displayName:  BOT_NAME,
-          picture:      '',
+          displayName:  BOT_DISPLAY,
+          picture:      BOT_PIC,
           messageId:    msgId,
           message:      text,
           messageType:  'text',
@@ -193,7 +195,7 @@ const ShepuBot = (() => {
   }
 
   function showMentionSuggestion() {
-    const items = [{ label: '@shepu-ai', desc: 'Shepu-AI bot', _mention: true, insert: '@shepu-ai ' }];
+    const items = [{ label: '@shepu-ai', desc: 'Shepu-AI 3.1 bot', _mention: true, insert: '@shepu-ai ' }];
     _renderPopup(items, true);
   }
 
@@ -269,10 +271,8 @@ const ShepuBot = (() => {
   return {
     init,
     respond,
-    sendBotMessage,
     isMention,
     extractQuestion,
-    hidePopup,
   };
 })();
 

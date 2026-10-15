@@ -40,7 +40,7 @@
         </div>
         <h1 style="font-size:1.6rem;letter-spacing:-0.02em;">Create a Private Room</h1>
         <p style="color:var(--text-2);margin-top:0.35rem;font-size:0.9rem;">
-          Instant link and QR code will be generated for your friends.
+          A share link and QR code will be generated for your friends.
         </p>
       </div>
 
@@ -62,7 +62,7 @@
           </div>
         </div>
 
-        <!-- ── Connection Mode: Instant (P2P) vs Secure (Google Sheet) ── -->
+        <!-- ── Connection Mode: Quick (P2P) vs Saved (Sheet backup) ── -->
         <div class="form-group">
           <label class="form-label" style="font-size:0.8125rem;font-weight:600;margin-bottom:0.5rem;display:block;">
             Connection Mode
@@ -74,7 +74,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
               </span>
               <span>
-                <span style="display:block;font-weight:700;font-size:0.95rem;">Instant</span>
+                <span style="display:block;font-weight:700;font-size:0.95rem;">Quick</span>
                 <span style="display:block;font-size:0.72rem;color:var(--text-2);">Peer-to-peer · no login</span>
               </span>
             </button>
@@ -84,12 +84,12 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
               </span>
               <span>
-                <span style="display:block;font-weight:700;font-size:0.95rem;">Secure</span>
+                <span style="display:block;font-weight:700;font-size:0.95rem;">Saved</span>
                 <span style="display:block;font-size:0.72rem;color:var(--text-2);">Google Sheet backup</span>
               </span>
             </button>
           </div>
-          <p class="form-hint" id="mode-hint" style="margin-top:0.5rem;">Instant rooms connect devices directly over peer-to-peer — no sign-in needed.</p>
+          <p class="form-hint" id="mode-hint" style="margin-top:0.5rem;">Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.</p>
         </div>
 
         <div class="form-group">
@@ -167,7 +167,7 @@
       </form>
     </div>
 
-    <!-- ── Step 2: Instant Loader ──────────────────────────────── -->
+    <!-- ── Step 2: Loader ──────────────────────────────── -->
     <div id="step-progress" class="panel" style="background:var(--surface);border:1px solid var(--border-2);padding:3rem 2rem;border-radius:var(--r-xl);text-align:center;display:none;">
       <div class="spinner" style="margin:0 auto 1.25rem;"></div>
       <h2 style="font-size:1.35rem;font-weight:700;margin-bottom:0.25rem;" id="progress-title">Creating your room…</h2>
@@ -210,7 +210,7 @@
           <div class="troubleshoot-content" id="troubleshoot-content" style="display:none;">
             <ol style="padding-left:1.2rem;margin-bottom:0.5rem;display:flex;flex-direction:column;gap:0.35rem;">
               <li>Make sure your mobile phone is connected to the <strong>same Wi-Fi router</strong> as your computer (not mobile data/4G).</li>
-              <li>Instant rooms sync across devices over peer-to-peer &amp; the cloud — no local server needed.</li>
+              <li>Rooms sync across devices over peer-to-peer &amp; the cloud — no local server needed.</li>
               <li><strong>Universal access anywhere:</strong> Host on GitHub Pages (<code>https://shepu1.github.io/s/index/pchat/</code>) or run <code>npx localtunnel --port 5500</code> in terminal!</li>
             </ol>
           </div>
@@ -243,7 +243,7 @@
 <script src="js/google.js"></script>
 <script src="js/drive.js"></script>
 <script src="js/sheets.js"></script>
-<script src="js/apps-script.js"></script>
+<script src="js/instant-security.js"></script>
 <script src="js/rooms.js"></script>
 <script src="js/create-room.js"></script>
 <script>

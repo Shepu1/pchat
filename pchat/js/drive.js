@@ -42,34 +42,9 @@ const Drive = (() => {
     return file; // { id, name, webViewLink, ... }
   }
 
-  // ── Get file metadata ─────────────────────────────────────────
-  async function getFile(fileId, fields = 'id,name,webViewLink,createdTime') {
-    return GoogleAPI.get(`${BASE}/files/${fileId}?fields=${fields}`);
-  }
-
-  // ── Get web view link ─────────────────────────────────────────
-  async function getWebViewLink(fileId) {
-    const file = await getFile(fileId, 'webViewLink');
-    return file.webViewLink;
-  }
-
-  // ── Delete a file ─────────────────────────────────────────────
-  async function deleteFile(fileId) {
-    await GoogleAPI.delete(`${BASE}/files/${fileId}`);
-  }
-
-  // ── Move file to trash (soft delete) ─────────────────────────
-  async function trashFile(fileId) {
-    return GoogleAPI.patch(`${BASE}/files/${fileId}`, { trashed: true });
-  }
-
   return {
     getOrCreateFolder,
     createSpreadsheet,
-    getFile,
-    getWebViewLink,
-    deleteFile,
-    trashFile,
   };
 })();
 

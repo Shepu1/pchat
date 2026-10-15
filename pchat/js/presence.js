@@ -12,15 +12,17 @@ const Presence = (() => {
   let _membersTimer  = null;
   let _onMembersUpdate = null;
   let _roomId        = null;
+  let _announce      = null;
   let _running       = false;
 
   // ── Start presence system ─────────────────────────────────────
-  function start({ endpointUrl, memberId, sessionToken, onMembersUpdate, roomId }) {
+  function start({ endpointUrl, memberId, sessionToken, onMembersUpdate, roomId, announce }) {
     _endpointUrl     = endpointUrl;
     _memberId        = memberId;
     _sessionToken    = sessionToken;
     _onMembersUpdate = onMembersUpdate;
     _roomId          = roomId;
+    _announce        = (typeof announce === 'function') ? announce : null;
     _running         = true;
 
     // Immediate presence + member refresh
@@ -38,12 +40,6 @@ const Presence = (() => {
     }, 30000);
   }
 
-  // ── Stop presence ─────────────────────────────────────────────
-  function stop() {
-    _running = false;
-    clearInterval(_heartbeatTimer);
-    clearInterval(_membersTimer);
-  }
 
   // ── Send heartbeat ────────────────────────────────────────────
   async function heartbeat(status = 'online') {
@@ -55,6 +51,8 @@ const Presence = (() => {
         status,
       });
     } catch { /* silent fail */ }
+    // Cross-device announce (ntfy beacon) — best-effort, never throws.
+    try { if (_announce) _announce(status); } catch {}
   }
 
   // ── Refresh member list ───────────────────────────────────────

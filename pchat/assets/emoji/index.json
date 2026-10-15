@@ -1474,5 +1474,41 @@
   "unicode": "🚕",
   "category": "vehicle",
   "name": "yellow taxi"
+ },
+ {
+  "file": "blushing_desire.png",
+  "unicode": "🥰",
+  "category": "romantic",
+  "name": "blushing desire"
+ },
+ {
+  "file": "intense_attraction.png",
+  "unicode": "😻",
+  "category": "romantic",
+  "name": "intense attraction"
+ },
+ {
+  "file": "naughty_smirk.png",
+  "unicode": "😈",
+  "category": "romantic",
+  "name": "naughty smirk"
+ },
+ {
+  "file": "steamy_kiss_mark.png",
+  "unicode": "👄",
+  "category": "romantic",
+  "name": "steamy kiss mark"
+ },
+ {
+  "file": "teasing_tongue_out.png",
+  "unicode": "😜",
+  "category": "romantic",
+  "name": "teasing tongue out"
+ },
+ {
+  "file": "whispering_couple.png",
+  "unicode": "👩‍❤️‍👨",
+  "category": "romantic",
+  "name": "whispering couple"
  }
 ]

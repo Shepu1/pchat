@@ -24,12 +24,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let createdRoom    = null;  // The final room object
   let roomMode       = 'instant';  // 'instant' (P2P) | 'secure' (Google Sheet)
 
-  // ── Connection Mode selector (Instant P2P vs Secure Google Sheet) ──
+  // ── Connection Mode selector (Quick P2P vs Saved Sheet-backup) ──
   const modeBtns = document.querySelectorAll('#room-mode-picker .room-mode-btn');
   const modeHint = document.getElementById('mode-hint');
   const MODE_HINTS = {
-    instant: 'Instant rooms connect devices directly over peer-to-peer — no sign-in needed.',
-    secure:  'Secure rooms back up every message to a Google Sheet in your Drive. Google sign-in required.',
+    instant: 'Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.',
+    secure:  'Saved rooms auto-save every message to a Google Sheet in your Drive. Google sign-in required.',
   };
   modeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -92,20 +92,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       createdRoom = await createRoom(roomName, roomDesc);
+      if (!createdRoom) {
+        // Name prompt cancelled — back to the form, no error.
+        document.getElementById('step-progress').style.display = 'none';
+        document.getElementById('step-form').style.display     = '';
+        return;
+      }
       showSuccess(createdRoom);
     } catch (err) {
       console.error('Room creation failed:', err);
-      // In Secure mode, never silently fall back to Instant — surface the error
+      // In Saved mode, never silently fall back to Quick — surface the error
       // and return the user to the form so they can retry or switch mode.
       if (roomMode === 'secure') {
         document.getElementById('step-progress').style.display = 'none';
         document.getElementById('step-form').style.display     = '';
         errorEl.style.display = '';
-        errorText.textContent = err.message || 'Secure room creation failed. Please try again.';
-        if (window.UI?.toast) UI.toast('error', 'Secure room failed', err.message || 'Please try again.');
+        errorText.textContent = err.message || 'Saved room creation failed. Please try again.';
+        if (window.UI?.toast) UI.toast('error', 'Saved room failed', err.message || 'Please try again.');
         return;
       }
-      // Fallback (Instant mode): create instant room immediately
+      // Fallback (Quick mode): create instant room immediately
       createdRoom = Rooms.createInstantRoom(roomName, roomDesc);
       showSuccess(createdRoom);
     }
@@ -113,6 +119,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Main creation flow ────────────────────────────────────────
   async function createRoom(roomName, roomDesc) {
+    // One rule (all modes): logged-in → Gmail name; logged-out → one-time
+    // name prompt. Null = user cancelled → abort quietly (caller shows form).
+    let ownerDisplayName = await UI.resolveDisplayName();
+    if (!ownerDisplayName) return null;
+
     const customScriptUrl = document.getElementById('custom-script-url')?.value?.trim();
     if (customScriptUrl && customScriptUrl.startsWith('https://script.google.com')) {
       const roomId = Rooms.generateRoomId();
@@ -127,10 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
         createdAt: now,
         isOwner: true,
         deploymentUrl: customScriptUrl,
+        theme: (typeof RoomTheme !== 'undefined') ? RoomTheme.pick() : 1,
       };
       Rooms.addMyRoom(room);
 
-      const ownerDisplayName = Storage.getAuth()?.user?.name || localStorage.getItem('shepu_display_name') || 'Owner';
       const memberId = 'u_owner_' + roomId.slice(0, 8);
       Storage.setSession({
         roomId,
@@ -143,6 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
         roomName:     roomName,
         roomDesc:     roomDesc,
         roomSecret:   roomSecret,
+        theme:        room.theme,
+        picture:      ((typeof UI !== 'undefined' && UI.effectivePicture) ? UI.effectivePicture() : ''),
       });
       Storage.setCurrentRoom(roomId);
       localStorage.setItem('shepu_display_name', ownerDisplayName);
@@ -150,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return room;
     }
 
-    // ── Instant (P2P) mode — no Google sign-in required ──
+    // ── Quick (P2P) mode — no Google sign-in required ──
     if (roomMode === 'instant') {
       await sleep(150);
       // ps-* progress steps only exist on some pages; UI.setStep no-ops safely.
@@ -164,22 +177,29 @@ document.addEventListener('DOMContentLoaded', () => {
       return Rooms.createInstantRoom(roomName, roomDesc);
     }
 
-    // ── Secure (Google Sheet) mode — requires Google sign-in ──
+    // ── Saved (Sheet backup) mode — requires Google sign-in ──
     setStep('ps-auth', 'active');
+    console.log('[createRoom] secure flow: auth check…');
+    // Per-step timeout so a stuck Google call becomes a VISIBLE error
+    // instead of a dead button. googleStep() lives in rooms.js (loaded above).
+    const step = (typeof googleStep === 'function')
+      ? googleStep
+      : (p) => p;
     let auth = Storage.getAuth() || {};
 
     if (!CONFIG.isGoogleConfigured()) {
-      showProgressError('Secure mode needs a Google Client ID. Configure it in Settings, or switch to Instant mode.');
+      showProgressError('Saved mode needs a Google Client ID. Configure it in Settings, or switch to Quick mode.');
       throw new Error('Google Client ID not configured');
     }
 
     // Prompt Google sign-in if the user is not already authenticated
     if (!Auth.isAuthenticated()) {
       try {
-        await Auth.signIn();
+        console.log('[createRoom] secure flow: requesting Google sign-in…');
+        await step(Auth.signIn(), 180000, 'Google sign-in');
         auth = Storage.getAuth() || {};
       } catch (err) {
-        showProgressError('Google sign-in is required for Secure rooms: ' + err.message);
+        showProgressError('Google sign-in is required for Saved rooms: ' + err.message);
         throw err;
       }
     }
@@ -187,17 +207,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasGoogle = CONFIG.isGoogleConfigured() && Auth.isAuthenticated();
 
     if (!hasGoogle) {
-      showProgressError('Google sign-in is required for Secure rooms. Please try again or switch to Instant mode.');
-      throw new Error('Google sign-in required for Secure rooms');
+      showProgressError('Google sign-in is required for Saved rooms. Please try again or switch to Quick mode.');
+      throw new Error('Google sign-in required for Saved rooms');
     }
 
     setStep('ps-auth', 'done');
 
+    // Login just happened (or already authed) → Gmail name wins over the
+    // one-time prompt name, per the one-name rule.
+    ownerDisplayName = Storage.getAuth()?.user?.name || ownerDisplayName;
+
     // Step: Folder
     setStep('ps-folder', 'active');
+    console.log('[createRoom] secure flow: Drive folder…');
     let folderId;
     try {
-      folderId = await Drive.getOrCreateFolder();
+      folderId = await step(Drive.getOrCreateFolder(), 30000, 'Drive folder তৈরি');
     } catch (err) {
       setStep('ps-folder', 'error');
       showProgressError('Failed to create Drive folder: ' + err.message);
@@ -207,10 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Step: Sheet
     setStep('ps-sheet', 'active');
+    console.log('[createRoom] secure flow: create spreadsheet…');
     let spreadsheetFile;
     try {
       const sheetName = `${CONFIG.SHEET_PREFIX}${roomName}`;
-      spreadsheetFile = await Drive.createSpreadsheet(sheetName, folderId);
+      spreadsheetFile = await step(Drive.createSpreadsheet(sheetName, folderId), 30000, 'Sheet তৈরি');
     } catch (err) {
       setStep('ps-sheet', 'error');
       showProgressError('Failed to create Google Sheet: ' + err.message);
@@ -241,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     try {
-      await Sheets.initializeSpreadsheet(spreadsheetId, roomConfigData);
+      await step(Sheets.initializeSpreadsheet(spreadsheetId, roomConfigData), 60000, 'Sheet ট্যাব তৈরি');
     } catch (err) {
       setStep('ps-tabs', 'error');
       showProgressError('Failed to initialize sheet tabs: ' + err.message);
@@ -249,84 +275,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setStep('ps-tabs', 'done');
 
-    // Step: Apps Script
+    // Step: Backend — P2P mesh + automatic Sheet backup (ZERO user setup).
+    // Programmatic Apps Script deploy is intentionally SKIPPED: it forces EVERY
+    // room owner to flip a per-account toggle (script.google.com/home/usersettings),
+    // which normal users will never do. Chat runs on the P2P mesh (mock endpoint)
+    // and the owner's device auto-logs every message to the Sheet
+    // (see Chat.appendMessages sheet-backup hook). No per-user toggles needed.
     setStep('ps-script', 'active');
-    let deployResult;
-    let deploymentUrl = null;
-    let isManualSetup = false;
+    setStep('ps-deploy', 'active');
+    console.log('[createRoom] secure flow: sheet-backup mode (deploy skipped by design)…');
+    let deploymentUrl = `mock://local/${roomId}`;
+    setStep('ps-script', 'done');
+    setStep('ps-deploy', 'done');
 
+    // Record the backup backend in sheet config (best-effort)
     try {
-      setStep('ps-deploy', 'active');
-      deployResult = await AppsScriptAPI.fullyDeploy(
-        spreadsheetId,
-        roomId,
-        roomSecret,
-        `SHEPU-${roomName}-Backend`
-      );
-      deploymentUrl = deployResult.webAppUrl;
-      setStep('ps-script', 'done');
-      setStep('ps-deploy', 'done');
+      await step(Sheets.updateRoomConfigKey(spreadsheetId, 'deployment_url', deploymentUrl), 30000, 'Sheet config update');
+      await step(Sheets.updateRoomConfigKey(spreadsheetId, 'backend_mode', 'sheet-backup'), 30000, 'Sheet config update');
+    } catch (e) { /* non-critical */ }
 
-      // Update deployment_url in sheet config
-      await Sheets.updateRoomConfigKey(spreadsheetId, 'deployment_url', deploymentUrl);
-
-    } catch (err) {
-      console.warn('Automatic deploy failed, falling back to manual:', err);
-      setStep('ps-script', 'error');
-      setStep('ps-deploy', 'error');
-      isManualSetup = true;
-
-      // Show fallback notice (guard: create.html has no manual wizard elements)
-      const fallbackReason = document.getElementById('fallback-reason');
-      if (fallbackReason) {
-        fallbackReason.textContent =
-          `Automatic deployment failed: ${err.message}. Use the manual setup wizard below.`;
-      }
-      const fallbackNotice = document.getElementById('fallback-notice');
-      if (fallbackNotice) fallbackNotice.style.display = '';
-
-      // If no manual wizard exists on this page, surface the error instead of crashing
-      if (!document.getElementById('step-manual')) {
-        showProgressError('Automatic deployment failed: ' + err.message);
-        throw err;
-      }
-
-      // Build the room object with null deploymentUrl for now
-      const partialRoom = {
-        id:              roomId,
-        secret:          roomSecret,
-        name:            roomName,
-        description:     roomDesc,
-        spreadsheetId,
-        status:          'setup_pending',
-        createdAt:       now,
-        isOwner:         true,
-        deploymentUrl:   null,
-      };
-
-      await showManualWizard(partialRoom, spreadsheetId);
-      return; // Wait for manual completion
-    }
+    // NOTE: programmatic Apps Script deploy was removed on purpose (it needs a
+    // per-account toggle from every owner). Owners who want the advanced
+    // server-side backend can deploy manually in the Apps Script editor and
+    // paste the URL in the "custom script URL" box (handled at flow start).
 
     // Step: Generate link
     setStep('ps-link', 'active');
+    const roomTheme = (typeof RoomTheme !== 'undefined') ? RoomTheme.pick() : 1;
     const room = {
       id:              roomId,
       secret:          roomSecret,
       name:            roomName,
       description:     roomDesc,
       spreadsheetId,
+      sheetUrl:        `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
+      backendMode:     'google-sheets',
       status:          'active',
       createdAt:       now,
       isOwner:         true,
       deploymentUrl,
-      scriptId:        deployResult?.scriptId,
-      deploymentId:    deployResult?.deploymentId,
+      theme:           roomTheme,
     };
 
     Rooms.addMyRoom(room);
 
-    const ownerDisplayName = ownerUser.name || localStorage.getItem('shepu_display_name') || 'Owner';
     const memberId = 'u_owner_' + roomId.slice(0, 8);
     Storage.setSession({
       roomId,
@@ -339,6 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
       roomName:     roomName,
       roomDesc:     roomDesc,
       roomSecret:   roomSecret,
+      theme:        roomTheme,
+      picture:      ((typeof UI !== 'undefined' && UI.effectivePicture) ? UI.effectivePicture() : ''),
     });
     Storage.setCurrentRoom(roomId);
     localStorage.setItem('shepu_display_name', ownerDisplayName);
@@ -346,86 +340,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setStep('ps-link', 'done');
 
     return room;
-  }
-
-  // ── Manual Wizard ─────────────────────────────────────────────
-  async function showManualWizard(partialRoom, spreadsheetId) {
-    const progressStep = document.getElementById('step-progress');
-    if (progressStep) progressStep.style.display = 'none';
-    const manualStep = document.getElementById('step-manual');
-    if (!manualStep) {
-      showProgressError('Automatic deployment failed and manual setup is not available on this page.');
-      throw new Error('Manual setup wizard not available on this page');
-    }
-    manualStep.style.display = '';
-
-    // Script link
-    const scriptLink = document.getElementById('manual-script-link');
-    if (scriptLink) {
-      scriptLink.href = `https://script.google.com/home/projects`;
-      scriptLink.textContent = 'Open Apps Script ↗';
-    }
-
-    // Show generated code
-    const code = AppsScriptAPI.getScriptCodeForManualSetup(
-      partialRoom.id, partialRoom.secret, spreadsheetId
-    );
-    const codeBlock = document.getElementById('manual-code-block');
-    if (codeBlock) codeBlock.textContent = code;
-
-    // Copy button (bind once)
-    const copyBtn = document.getElementById('copy-script-btn');
-    if (copyBtn && !copyBtn.dataset.bound) {
-      copyBtn.dataset.bound = '1';
-      copyBtn.addEventListener('click', async () => {
-        await UI.copyText(code);
-        UI.toast('success', 'Copied', 'Script code copied to clipboard.');
-      });
-    }
-
-    // Finish button (bind once)
-    const finishBtn = document.getElementById('manual-finish-btn');
-    if (!finishBtn || finishBtn.dataset.bound) return;
-    finishBtn.dataset.bound = '1';
-    finishBtn.addEventListener('click', async () => {
-      const urlEl = document.getElementById('manual-deploy-url');
-      const urlInput = (urlEl ? urlEl.value : '').trim();
-      if (!urlInput || !urlInput.startsWith('https://script.google.com/macros/')) {
-        UI.toast('error', 'Invalid URL', 'Please paste the Apps Script web app URL.');
-        return;
-      }
-
-      // Update room with deployment URL
-      partialRoom.deploymentUrl = urlInput;
-      partialRoom.status        = 'active';
-
-      try {
-        await Sheets.updateRoomConfigKey(spreadsheetId, 'deployment_url', urlInput);
-        await Sheets.updateRoomConfigKey(spreadsheetId, 'room_status',    'active');
-      } catch (e) { /* non-critical */ }
-
-      Rooms.addMyRoom(partialRoom);
-
-      const ownerDisplayName = Storage.getAuth()?.user?.name || localStorage.getItem('shepu_display_name') || 'Owner';
-      const memberId = 'u_owner_' + partialRoom.id.slice(0, 8);
-      Storage.setSession({
-        roomId:       partialRoom.id,
-        memberId,
-        sessionToken: 'owner_sess_' + (partialRoom.secret || partialRoom.id),
-        displayName:  ownerDisplayName,
-        role:         'owner',
-        joinedAt:     partialRoom.createdAt || new Date().toISOString(),
-        deploymentUrl: urlInput,
-        roomName:     partialRoom.name,
-        roomDesc:     partialRoom.description,
-        roomSecret:   partialRoom.secret || '',
-      });
-      Storage.setCurrentRoom(partialRoom.id);
-      localStorage.setItem('shepu_display_name', ownerDisplayName);
-
-      showSuccess(partialRoom);
-      document.getElementById('step-manual').style.display = 'none';
-    });
   }
 
   // ── Success View ──────────────────────────────────────────────

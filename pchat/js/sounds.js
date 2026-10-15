@@ -2,9 +2,8 @@
  * SHEPU ROOMS — sounds.js
  * Chat sound effects (assets/sounds):
  * - emoji.mp3        → someone sends a message containing any emoji
- * - notification.mp3 → new message arrives while the chat is in the
- *                      background (hidden tab / unfocused window).
- *                      Never plays while actively chatting.
+ * - notification.mp3 → any other incoming message (foreground or background).
+ *                      History older than 2 min never beeps (chat.js filters).
  * Autoplay-safe: unlocks on the first user gesture; all plays are
  * promise-guarded with per-sound cooldowns.
  */

@@ -511,12 +511,6 @@ const RoomMusic = (() => {
   return {
     init,
     handleSyncEvent,
-    togglePlayPause: _togglePlayPause,
-    startSyncedPlayback: _startSyncedPlayback,
-    nextTrack: () => _advanceNext(false),
-    prevTrack: _advancePrev,
-    isPlaying: () => _isPlaying,
-    getCurrentTrack: () => _playlist[_currentIndex] || null,
   };
 })();
 

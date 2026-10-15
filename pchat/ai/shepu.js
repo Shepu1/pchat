@@ -10,10 +10,8 @@
  *
  * Public API (window.Shepu):
  *   Shepu.init()               -> loads the knowledge .txt files (async)
- *   Shepu.isReady()            -> true once data is loaded
  *   Shepu.findAnswer(query)    -> string reply (same algorithm as v3.1)
  *   Shepu.suggest(prefix)      -> array of matching question strings (autocomplete)
- *   Shepu.getQuestions()       -> array of all known questions
  */
 
 const Shepu = (() => {
@@ -70,8 +68,6 @@ const Shepu = (() => {
     return init._promise;
   }
   init._promise = null;
-
-  function isReady() { return database.length > 0; }
 
   // ── String similarity (verbatim from v3.1) ───────────────────────
   function similarity(s1, s2) {
@@ -242,16 +238,10 @@ const Shepu = (() => {
       .map(item => item.q);
   }
 
-  function getQuestions() {
-    return database.map(item => item.q);
-  }
-
   return {
     init,
-    isReady,
     findAnswer,
     suggest,
-    getQuestions,
   };
 })();
 

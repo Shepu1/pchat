@@ -12,17 +12,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const params  = new URLSearchParams(location.search);
   const roomId  = params.get('r');
-  // Room secret / endpoint may arrive via invite params (?k=, ?ep=), e.g.
-  // when room.html is opened directly from a shared link. Decode once here
-  // so session + registry can be patched even if join.html was skipped.
+  // Room secret may arrive via invite fragment (#k=, preferred) or legacy
+  // query (?k=), e.g. when room.html is opened directly from a shared link.
+  // Fragment never reaches servers/logs. Decode once here so session +
+  // registry can be patched even if join.html was skipped.
   let urlRoomSecret = null;
   try {
-    const kParam = params.get('k');
-    if (kParam) {
-      const b64 = kParam.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - kParam.length % 4) % 4);
-      urlRoomSecret = atob(b64) || null;
-    }
+    urlRoomSecret = (typeof InstantSecurity !== 'undefined')
+      ? InstantSecurity.getInviteSecret()
+      : null;
   } catch { urlRoomSecret = null; }
+  if (!urlRoomSecret) {
+    try {
+      const kParam = params.get('k');
+      if (kParam) {
+        const b64 = kParam.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - kParam.length % 4) % 4);
+        urlRoomSecret = atob(b64) || null;
+      }
+    } catch { urlRoomSecret = null; }
+  }
   let urlDeployment = null;
   try {
     const epParam = params.get('ep');
@@ -31,6 +39,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       urlDeployment = atob(b64) || null;
     }
   } catch { urlDeployment = null; }
+  // Room theme (?th=) — public wallpaper digit shared via invite link.
+  // Null when absent so stored session/registry themes are never clobbered.
+  let urlTheme = null;
+  try {
+    const thP = params.get('th');
+    if (thP && typeof RoomTheme !== 'undefined') urlTheme = RoomTheme.normalize(thP);
+  } catch { urlTheme = null; }
 
   if (!roomId) {
     window.location.href = 'index.html';
@@ -47,7 +62,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (myRoom) {
       const authUser = Storage.getAuth()?.user || {};
       const ownerName = authUser.name || localStorage.getItem('shepu_display_name') || 'Owner';
-      const ownerPicture = authUser.picture || '';
+      const ownerPicture = (typeof UI !== 'undefined' && UI.effectivePicture)
+        ? UI.effectivePicture()
+        : (authUser.picture || '');
       session = {
         roomId,
         memberId:     'u_owner_' + roomId.slice(0, 8),
@@ -70,13 +87,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const knownName = Storage.getAuth()?.user?.name || localStorage.getItem('shepu_display_name');
 
       if (joinedRoom && knownName) {
-        const authUser2 = Storage.getAuth()?.user || {};
+        const memberPicture = (typeof UI !== 'undefined' && UI.effectivePicture)
+          ? UI.effectivePicture()
+          : ((Storage.getAuth()?.user || {}).picture || '');
         session = {
           roomId,
           memberId:     'u_' + Date.now().toString(36),
           sessionToken: 'member_sess_' + Date.now(),
           displayName:  knownName,
-          picture:      authUser2.picture || '',
+          picture:      memberPicture,
           role:         'member',
           joinedAt:     joinedRoom.joinedAt || new Date().toISOString(),
           deploymentUrl: urlDeployment || joinedRoom.deploymentUrl || `mock://local/${roomId}`,
@@ -107,7 +126,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         session.deploymentUrl = urlDeployment;
         patched = true;
       }
+      if (urlTheme && !session.theme) {
+        // Fresh join via link adopts the link theme; an already-stored
+        // theme (explicit user pick) is NEVER silently overridden.
+        session.theme = urlTheme;
+        patched = true;
+      }
       if (patched) Storage.setSession(session);
+    }
+  } catch { /* non-critical */ }
+
+  // Refresh session picture from the effective profile (e.g. user set a
+  // Settings photo or logged in after joining) so new messages carry it.
+  try {
+    if (session && session.roomId === roomId && typeof UI !== 'undefined' && UI.effectivePicture) {
+      const eff = UI.effectivePicture() || '';
+      if ((session.picture || '') !== eff) {
+        session.picture = eff;
+        Storage.setSession(session);
+      }
     }
   } catch { /* non-critical */ }
 
@@ -125,6 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       isOwner:       session.role === 'owner',
       createdAt:     session.joinedAt || new Date().toISOString(),
       secret:        session.roomSecret || urlRoomSecret || '',
+      theme:         session.theme || urlTheme || 1,
     };
     // Save back to registry so future loads don't have to rebuild
     if (session.role === 'owner') {
@@ -149,6 +187,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       try { Rooms.updateRoom(roomId, { secret: sec }); } catch {}
     }
   }
+  // Theme: URL (?th=) wins, then session/registry; apply wallpaper now.
+  try {
+    const th = (typeof RoomTheme !== 'undefined')
+      ? RoomTheme.normalize(urlTheme || room.theme || (session && session.theme) || 1)
+      : 1;
+    room.theme = th;
+    if (typeof RoomTheme !== 'undefined') RoomTheme.apply(th);
+    try {
+      const reg = Rooms.getRoom(roomId);
+      if (reg && !reg.theme) Rooms.updateRoom(roomId, { theme: th });
+    } catch {}
+  } catch { /* non-critical */ }
 
   // ── Populate header ───────────────────────────────────────────
   document.title = `${room.name} — Pchat shepu`;
@@ -274,10 +324,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     Chat.setStatus(`${session.displayName}`, true);
   }
 
-  // ── Background room key (decrypt-only) ──────────────────────────
-  // New messages are sent as plaintext so guests NEVER need a passphrase.
-  // The invite-link room key is derived only to read OLD enc: history,
-  // then already-rendered placeholders are retried.
+  // ── Background room key (silent auto-E2EE) ─────────────────────
+  // Invite-link secret derives the AES-GCM key automatically — guests NEVER
+  // see a password prompt and no login is required. New messages are
+  // encrypted by default (Encryption.shouldEncrypt() === key exists).
   try {
     if (typeof Encryption !== 'undefined' && !Encryption.isActive()) {
       const roomSecret = session.roomSecret || room.secret;
@@ -298,6 +348,83 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (err) {
     console.warn('[app] Could not initialize encryption:', err && err.message);
   }
+
+  // ── Address-bar key mirror: if WE hold the secret, ensure #k= is in the
+  // URL fragment so copying the address bar shares a WORKING link.
+  // Fragments never reach servers/logs. Fixes "guest sees only placeholders"
+  // caused by sharing the bare room.html?r= URL.
+  try {
+    const sec = session.roomSecret || room.secret || urlRoomSecret;
+    if (sec && typeof InstantSecurity !== 'undefined' && !/[#&]k=/.test(window.location.hash || '')) {
+      const frag = (window.location.hash ? window.location.hash + '&' : '#') + 'k=' + InstantSecurity.b64urlEncode(sec);
+      history.replaceState(null, '', window.location.pathname + window.location.search + frag);
+    }
+  } catch { /* non-critical */ }
+
+  // ── Missing-key recovery banner: guest arrived with no room secret ──
+  // Shows a paste-link box; adopting the key decrypts all placeholders.
+  // Also covers browsers WITHOUT WebCrypto (some in-app WebViews): those
+  // can NEVER decrypt — say so plainly instead of silent placeholders.
+  try {
+    const hasSubtle = !!(window.crypto && window.crypto.subtle);
+    const hasKey = !!(session.roomSecret || room.secret || urlRoomSecret);
+    const keyBanner = document.getElementById('key-banner');
+    if (keyBanner && (!hasKey || !hasSubtle)) {
+      if (!hasSubtle) {
+        const note = keyBanner.querySelector('div');
+        if (note) {
+          const onHttp = window.location.protocol === 'http:';
+          note.innerHTML = onHttp
+            ? '🔒 <strong>Locked messages?</strong> This page is on insecure <strong>http://</strong> — browsers disable decryption here. Open the <strong>https://</strong> link of this site (e.g. GitHub Pages) in Chrome instead.'
+            : '🔒 <strong>Locked messages?</strong> This browser (in-app viewer?) cannot decrypt messages. Please open this room in <strong>Chrome</strong> and paste the full invite link below.';
+        }
+      }
+      keyBanner.classList.remove('hidden');
+      document.getElementById('key-banner-btn')?.addEventListener('click', async () => {
+        const raw = (document.getElementById('key-banner-input')?.value || '').trim();
+        if (!raw) return;
+        try {
+          const u = new URL(raw, window.location.origin);
+          if (u.searchParams.get('r') && u.searchParams.get('r') !== roomId) {
+            throw new Error('This link is for a different room.');
+          }
+          let freshSecret = null;
+          const hm = (u.hash || '').match(/[#&]k=([^&#]+)/);
+          if (hm && hm[1] && typeof InstantSecurity !== 'undefined') {
+            freshSecret = InstantSecurity.b64urlDecode(decodeURIComponent(hm[1]));
+          }
+          if (!freshSecret) {
+            const kP = u.searchParams.get('k');
+            if (kP && typeof InstantSecurity !== 'undefined') freshSecret = InstantSecurity.b64urlDecode(kP);
+          }
+          if (!freshSecret) throw new Error('No room key in that link. Copy the FULL invite link (Invite → Copy).');
+          session.roomSecret = freshSecret;
+          Storage.setSession(session);
+          room.secret = freshSecret;
+          try { Rooms.updateRoom(roomId, { secret: freshSecret }); } catch {}
+          const thP = u.searchParams.get('th');
+          if (thP && typeof RoomTheme !== 'undefined' && !room.theme) {
+            const th = RoomTheme.normalize(thP);
+            room.theme = th;
+            try { Rooms.updateRoom(roomId, { theme: th }); } catch {}
+            RoomTheme.apply(th);
+          }
+          if (typeof Encryption !== 'undefined' && Encryption.deriveKeyFromRoomSecret) {
+            await Encryption.deriveKeyFromRoomSecret(freshSecret, roomId);
+            if (typeof Chat !== 'undefined' && Chat.refreshDecryption) await Chat.refreshDecryption();
+          }
+          try {
+            const frag = (window.location.hash ? window.location.hash + '&' : '#') + 'k=' + InstantSecurity.b64urlEncode(freshSecret);
+            history.replaceState(null, '', window.location.pathname + window.location.search + frag);
+          } catch {}
+          keyBanner.classList.add('hidden');
+          UI.toast('success', 'Unlocked', 'Messages decrypted.');
+        } catch (e) {
+          UI.toast('error', 'Invalid link', (e && e.message) || 'Could not read that link.');
+        }
+      });
+    }
+  } catch { /* non-critical */ }
 
   // ── Load members ──────────────────────────────────────────────
   try {
@@ -325,19 +452,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
   });
 
-  // ── Presence heartbeat ────────────────────────────────────────
+  // ── Presence heartbeat (+ cross-device announce) ─────────────
+  // Each heartbeat also publishes a tiny presence beacon to the relay so
+  // every device's member list stays truthful without any login.
+  const announcePresence = (status = 'online') => {
+    try {
+      if (typeof NtfySync === 'undefined' || !NtfySync.publish) return;
+      let pic = session.picture || '';
+      if (typeof pic === 'string' && pic.startsWith('data:')) pic = ''; // keep relay light
+      NtfySync.publish({
+        type: 'presence',
+        member: {
+          memberId: session.memberId,
+          displayName: session.displayName,
+          picture: pic,
+          role: session.role || 'member',
+        },
+      });
+    } catch {}
+  };
   Presence.start({
     roomId:       roomId,
     endpointUrl:  room.deploymentUrl,
     memberId:     session.memberId,
     sessionToken: session.sessionToken,
     onMembersUpdate: (members) => Chat.renderMembers(members),
+    announce: announcePresence,
   });
 
   // ── P2P Real-time WebRTC Mesh (PeerJS) ────────────────────────
   if (typeof P2PSync !== 'undefined') {
     P2PSync.init({
       roomId:      room.id,
+      roomSecret: session.roomSecret || room.secret || urlRoomSecret || null,
       isHost:      session.role === 'owner',
       memberId:    session.memberId,
       displayName: session.displayName,
@@ -370,13 +517,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ── Ntfy cloud history + realtime relay (Instant room resilience) ──
+  // ── Ntfy cloud history + realtime relay (Quick room resilience) ──
   // Keeps messages flowing (and gives new joiners history) even when the
-  // host's browser is offline. Harmless for Secure rooms (Apps Script also polls).
+  // host's browser is offline. Harmless for Saved rooms (sheet backup also polls).
   if (typeof NtfySync !== 'undefined') {
     NtfySync.init({
       roomId: room.id,
-      onEvent: ({ kind, msg, member }) => {
+      roomSecret: session.roomSecret || room.secret || urlRoomSecret || null,
+      onEvent: ({ kind, msg, member, theme }) => {
+        // Room-wide wallpaper change from another device (no echo loop:
+        // setTheme with broadcast=false only applies + persists).
+        if (kind === 'theme' && theme) {
+          const th = (typeof RoomTheme !== 'undefined') ? RoomTheme.normalize(theme) : 0;
+          if (th && room.theme !== th) {
+            room.theme = th;
+            try { Rooms.updateRoom(room.id, { theme: th }); } catch {}
+            try {
+              const s = Storage.getSession();
+              if (s && s.roomId === room.id) { s.theme = th; Storage.setSession(s); }
+            } catch {}
+            if (typeof Chat !== 'undefined' && Chat.setTheme) {
+              try { Chat.setTheme(th, false); } catch {}
+            } else if (typeof RoomTheme !== 'undefined') {
+              RoomTheme.apply(th);
+            }
+          }
+          return;
+        }
         if (kind === 'message' && msg) {
           // Skip our own messages (we already appended them optimistically)
           if (msg.senderId && msg.senderId === session.memberId) return;
@@ -395,9 +562,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
           } catch { /* non-critical */ }
         }
+        // Cross-device presence beacon → merge into the member directory
+        // (marked "seen now"), so online status is truthful everywhere.
+        if (kind === 'presence' && member && member.memberId) {
+          if (member.memberId === session.memberId) return; // self seeded already
+          if (typeof Chat !== 'undefined' && Chat.mergeMembers) {
+            try { Chat.mergeMembers([member], { touch: true }); } catch {}
+          }
+          return;
+        }
       },
     });
     NtfySync.start();
+    // Announce immediately (first heartbeat otherwise waits ~15s)
+    try { announcePresence('online'); } catch {}
   }
 
   // ── Web push / desktop notifications ───────────────────────────
@@ -434,7 +612,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const urlDisplay  = document.getElementById('modal-share-url');
 
       if (shareTitle) shareTitle.innerHTML = emoName(room.name);
-      if (qrImg)      qrImg.src = urls.qrCodeUrl;
+      // Local QR first (secret never leaves device), remote fallback.
+      try {
+        const qrBox = document.getElementById('share-qr-box');
+        if (typeof InstantSecurity !== 'undefined') {
+          InstantSecurity.renderQR({ qrImg, qrBox, text: urls.qrText || activeUrl });
+        } else if (qrImg) qrImg.src = urls.qrCodeUrl;
+      } catch {
+        if (qrImg) qrImg.src = urls.qrCodeUrl;
+      }
       if (urlDisplay) urlDisplay.textContent = activeUrl;
 
       const sheetBox  = document.getElementById('modal-sheet-link-box');
@@ -462,6 +648,44 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (copyBtn) copyBtn.onclick = async () => {
         await UI.copyText(activeUrl);
         UI.toast('success', 'Copied', 'Room link copied to clipboard!');
+      };
+
+      // Revoke old link → new secret, new topic, new key. Old links die for new joins.
+      const rotateBtn = document.getElementById('btn-rotate-link');
+      if (rotateBtn) rotateBtn.onclick = async () => {
+        try {
+          const fresh = Rooms.rotateRoomSecret(room.id);
+          if (!fresh) return;
+          room.secret = fresh;
+          const sess = Storage.getSession();
+          if (sess && sess.roomId === room.id) {
+            sess.roomSecret = fresh;
+            Storage.setSession(sess);
+          }
+          try {
+            if (typeof Encryption !== 'undefined' && Encryption.deriveKeyFromRoomSecret) {
+              await Encryption.deriveKeyFromRoomSecret(fresh, room.id);
+            }
+          } catch {}
+          const urls2 = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
+          const url2 = urls2.defaultUrl;
+          const urlDisplay2 = document.getElementById('modal-share-url');
+          if (urlDisplay2) urlDisplay2.textContent = url2;
+          try {
+            const qrImg2 = document.getElementById('share-qr-img');
+            const qrBox2 = document.getElementById('share-qr-box');
+            if (typeof InstantSecurity !== 'undefined') {
+              InstantSecurity.renderQR({ qrImg: qrImg2, qrBox: qrBox2, text: urls2.qrText || url2 });
+            }
+          } catch {}
+          if (copyBtn) copyBtn.onclick = async () => {
+            await UI.copyText(url2);
+            UI.toast('success', 'Copied', 'New room link copied!');
+          };
+          UI.toast('success', 'Link rotated', 'Old invite links no longer work for new joins.');
+        } catch (e) {
+          UI.toast('error', 'Failed', 'Could not rotate link.');
+        }
       };
 
       shareModal.classList.remove('hidden');

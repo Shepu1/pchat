@@ -191,9 +191,8 @@ Optimizations:
 
 ```
 PCHAT/
-├── index.html          — Landing page
+├── index.html          — Home + dashboard (chats, create, join)
 ├── login.html          — Sign-in page
-├── app.html            — Dashboard (My Rooms / Joined Rooms)
 ├── create.html         — Create room flow
 ├── join.html           — Join room by link
 ├── room.html           — Chat interface
@@ -280,7 +279,7 @@ PCHAT/
 | 8 — Privacy | ✅ Done | Minimal logging, E2EE key derived from room secret |
 | 9 — Files | ⏳ Planned | Image/file upload via Drive |
 | 10 — PWA | ⏳ Planned | Service worker, offline shell |
-| 11 — Instant Rooms | ✅ Done | PeerJS P2P mode, no local server / no sign-in |
+| 11 — Quick Rooms | ✅ Done | PeerJS P2P mode, no local server / no sign-in |
 | 12 — Resilience | ✅ Done | Ntfy cloud history relay (works when host is offline) |
 | 13 — Engagement | ✅ Done | Web push notifications, typing indicator, seen receipts |
 

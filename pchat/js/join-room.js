@@ -45,15 +45,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // ── Room secret from invite link (?k=) — used for E2EE key derivation ──
+  // ── Room theme (?th=) — public wallpaper digit, default 1 ──────
+  // Null when absent so a stored registry theme is never clobbered.
+  let inviteTheme = null;
+  try {
+    const thP = params.get('th');
+    if (thP && typeof RoomTheme !== 'undefined') inviteTheme = RoomTheme.normalize(thP);
+  } catch { inviteTheme = null; }
+
+  // ── Room secret from invite link (#k= new, ?k= legacy) — E2EE key ──
+  // Fragment (#k=) is preferred: it never reaches servers/logs.
   let roomSecret = null;
-  const kParam = params.get('k');
-  if (kParam) {
-    try {
-      const b64 = kParam.replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0, (4 - kParam.length % 4) % 4);
-      roomSecret = atob(b64);
-    } catch (e) {
-      console.warn('Could not decode k (room secret) param:', e);
+  try {
+    roomSecret = (typeof InstantSecurity !== 'undefined')
+      ? InstantSecurity.getInviteSecret()
+      : null;
+  } catch { roomSecret = null; }
+  if (!roomSecret) {
+    const kParam = params.get('k');
+    if (kParam) {
+      try {
+        const b64 = kParam.replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0, (4 - kParam.length % 4) % 4);
+        roomSecret = atob(b64);
+      } catch (e) {
+        console.warn('Could not decode k (room secret) param:', e);
+      }
     }
   }
 
@@ -130,11 +146,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('join-form-error').style.display = 'none';
 
     try {
-      // Get Google picture if logged in
-      const authUser = (typeof Auth !== 'undefined' && Auth.isAuthenticated && Auth.isAuthenticated())
-        ? (Auth.getUser ? Auth.getUser() : null)
-        : null;
-      const picture = authUser?.picture || '';
+      // Effective picture: manual Settings photo → Google photo → ''
+      const picture = (typeof UI !== 'undefined' && UI.effectivePicture)
+        ? UI.effectivePicture()
+        : (authUser?.picture || '');
 
       const res = await RoomAPI.join(deploymentUrl, { displayName, picture });
 
@@ -163,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         roomName:     roomInfo.name || 'Private Room',
         roomDesc:     roomInfo.description || '',
         roomSecret:   roomSecret || (room && room.secret) || undefined,
+        theme:        inviteTheme || (room && room.theme) || 1,
       };
 
       Storage.setSession(sessionData);
@@ -178,11 +194,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         joinedAt:    sessionData.joinedAt,
         isOwner:     false,
         secret:      roomSecret || (room && room.secret) || undefined,
+        theme:       inviteTheme || (room && room.theme) || 1,
       };
       Storage.addJoinedRoom(localRoom);
 
-      // Redirect to chat
-      window.location.href = `room.html?r=${roomId}`;
+      // Redirect to chat — FORWARD the full invite params (r/ep/n/th/k + #k=)
+      // so room.html can recover the key even if session save hiccups.
+      // (This is the "URL crop" users notice; the key travels in session AND url.)
+      window.location.href = `room.html${window.location.search || `?r=${roomId}`}${window.location.hash || ''}`;
 
     } catch (err) {
       UI.setLoading(submitBtn, false);
@@ -235,6 +254,14 @@ function showJoinForm(roomInfo) {
   } else {
     badges.innerHTML = '<span class="badge badge-success">● Active</span>';
   }
+  // Early warning: this invite carries NO room key (fragment stripped or
+  // partial link). Joining anyway means locked messages — tell them now.
+  try {
+    const storedSecret = (room && room.secret) ? room.secret : null;
+    if (!roomSecret && !storedSecret && badges) {
+      badges.innerHTML += ' <span class="badge badge-warning">⚠ No key in link — ask owner for the FULL invite link</span>';
+    }
+  } catch {}
 
   // Prefill known display name if available
   const knownName = Storage.getAuth()?.user?.name || localStorage.getItem('shepu_display_name') || '';
@@ -258,15 +285,22 @@ function showRejoin(roomInfo, session) {
   // when a session already exists — adopt them so the room key never goes stale.
   try {
     const qp = new URLSearchParams(location.search);
-    const kP = qp.get('k');
     const epP = qp.get('ep');
     let freshSecret = null;
     let freshDep = null;
-    if (kP) {
-      try {
-        const b64 = kP.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - kP.length % 4) % 4);
-        freshSecret = atob(b64) || null;
-      } catch {}
+    try {
+      freshSecret = (typeof InstantSecurity !== 'undefined')
+        ? InstantSecurity.getInviteSecret()
+        : null;
+    } catch {}
+    if (!freshSecret) {
+      const kP = qp.get('k');
+      if (kP) {
+        try {
+          const b64 = kP.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - kP.length % 4) % 4);
+          freshSecret = atob(b64) || null;
+        } catch {}
+      }
     }
     if (epP) {
       try {
@@ -277,12 +311,24 @@ function showRejoin(roomInfo, session) {
     let touched = false;
     if (freshSecret && session.roomSecret !== freshSecret) { session.roomSecret = freshSecret; touched = true; }
     if (freshDep && session.deploymentUrl !== freshDep) { session.deploymentUrl = freshDep; touched = true; }
+    try {
+      const thP = qp.get('th');
+      if (thP && typeof RoomTheme !== 'undefined' && !session.theme) {
+        // Adopt link theme only when nothing stored yet — explicit picks win.
+        session.theme = RoomTheme.normalize(thP);
+        touched = true;
+      }
+    } catch {}
     if (touched) Storage.setSession(session);
     const reg = Rooms.getRoom(session.roomId);
     if (reg) {
       const patch = {};
       if (freshSecret && !reg.secret) patch.secret = freshSecret;
       if (freshDep && reg.deploymentUrl !== freshDep) patch.deploymentUrl = freshDep;
+      try {
+        const thP = qp.get('th');
+        if (thP && typeof RoomTheme !== 'undefined' && !reg.theme) patch.theme = RoomTheme.normalize(thP);
+      } catch {}
       if (Object.keys(patch).length) { try { Rooms.updateRoom(session.roomId, patch); } catch {} }
     }
   } catch { /* non-critical */ }
@@ -303,6 +349,7 @@ function showRejoin(roomInfo, session) {
         joinedAt:     session.joinedAt || new Date().toISOString(),
         isOwner:      session.role === 'owner',
         secret:       session.roomSecret || '',
+        theme:        session.theme || 1,
       };
       if (session.role === 'owner') {
         Storage.addMyRoom(recoveredRoom);
@@ -311,7 +358,8 @@ function showRejoin(roomInfo, session) {
       }
     }
     Storage.setCurrentRoom(session.roomId);
-    window.location.href = `room.html?r=${session.roomId}`;
+    // Forward full invite params (see note above) so the key survives.
+    window.location.href = `room.html${window.location.search || `?r=${session.roomId}`}${window.location.hash || ''}`;
   });
 
   document.getElementById('rejoin-different-btn').addEventListener('click', () => {

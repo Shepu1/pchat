@@ -157,6 +157,15 @@ const Auth = (() => {
           if (profile.name) {
             localStorage.setItem('shepu_display_name', profile.name);
           }
+          // A manually-set Settings photo wins over the Google photo —
+          // login must NEVER wipe a photo the user chose before logging in.
+          try {
+            const custom = localStorage.getItem('shepu_pic_custom') === '1';
+            if (!custom) {
+              if (profile.picture) localStorage.setItem('shepu_profile_pic', profile.picture);
+              else localStorage.removeItem('shepu_profile_pic');
+            }
+          } catch {}
           resolve(fullAuth);
         } catch (e) {
           // Even if userinfo fails, auth is still valid
@@ -169,6 +178,11 @@ const Auth = (() => {
           const fullAuth = { ...authData, user: fallbackProfile };
           Storage.setAuth(fullAuth);
           localStorage.setItem('shepu_display_name', fallbackProfile.name);
+          // No photo from fallback: clear a previous Google photo, but keep
+          // a manually-chosen one (same custom-photo rule as above).
+          try {
+            if (localStorage.getItem('shepu_pic_custom') !== '1') localStorage.removeItem('shepu_profile_pic');
+          } catch {}
           resolve(fullAuth);
         }
       };
@@ -193,6 +207,11 @@ const Auth = (() => {
     };
     Storage.setAuth(demoAuth);
     localStorage.setItem('shepu_display_name', name);
+    // Email/demo logins carry no photo: drop a previous Google photo unless
+    // the user manually chose one (custom photos survive every login).
+    try {
+      if (localStorage.getItem('shepu_pic_custom') !== '1') localStorage.removeItem('shepu_profile_pic');
+    } catch {}
     return demoAuth;
   }
 
@@ -245,16 +264,6 @@ const Auth = (() => {
     return auth ? auth.user : null;
   }
 
-  // ── Require auth (redirect to login if not) ───────────────────
-  function requireAuth(reason = 'required', redirect = window.location.href) {
-    if (!isAuthenticated()) {
-      const params = new URLSearchParams({ reason, redirect });
-      window.location.href = `login.html?${params}`;
-      return false;
-    }
-    return true;
-  }
-
   // ── Sign In with Gmail / Email directly ───────────────────────
   function signInWithEmail(email, name) {
     if (!email || !email.includes('@')) {
@@ -276,6 +285,9 @@ const Auth = (() => {
     };
     Storage.setAuth(authData);
     localStorage.setItem('shepu_display_name', cleanName);
+    try {
+      if (localStorage.getItem('shepu_pic_custom') !== '1') localStorage.removeItem('shepu_profile_pic');
+    } catch {}
     return authData;
   }
 
@@ -288,7 +300,6 @@ const Auth = (() => {
     isAuthenticated,
     hasGoogleToken,
     getUser,
-    requireAuth,
     loadGISScript,
     initGIS,
     resetTokenClient,

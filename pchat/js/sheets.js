@@ -143,34 +143,6 @@ const Sheets = (() => {
     );
   }
 
-  // ── Clear sheet content (keep headers) ────────────────────────
-  async function clearSheet(spreadsheetId, sheetName) {
-    // Read header row first
-    const headers = await readValues(spreadsheetId, `${sheetName}!1:1`);
-    // Clear all
-    await GoogleAPI.post(
-      `${BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName)}:clear`,
-      {}
-    );
-    // Restore header
-    if (headers.length) {
-      await GoogleAPI.put(
-        `${BASE}/${spreadsheetId}/values/${encodeURIComponent(sheetName + '!A1')}?valueInputOption=USER_ENTERED`,
-        { values: headers }
-      );
-    }
-  }
-
-  // ── Read config values from room_config sheet ─────────────────
-  async function readRoomConfig(spreadsheetId) {
-    const rows = await readValues(spreadsheetId, `${CONFIG.SHEETS.ROOM_CONFIG}!A:B`);
-    const config = {};
-    rows.slice(1).forEach(row => {
-      if (row[0]) config[row[0]] = row[1] || '';
-    });
-    return config;
-  }
-
   // ── Update a config key ───────────────────────────────────────
   async function updateRoomConfigKey(spreadsheetId, key, value) {
     // Read current config rows to find the key's row number.
@@ -198,8 +170,6 @@ const Sheets = (() => {
     appendRows,
     readValues,
     updateCell,
-    clearSheet,
-    readRoomConfig,
     updateRoomConfigKey,
     SHEET_TABS,
   };

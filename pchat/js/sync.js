@@ -28,12 +28,6 @@ const Sync = (() => {
     scheduleNext(0); // First poll immediately
   }
 
-  // ── Stop sync loop ────────────────────────────────────────────
-  function stop() {
-    _isRunning = false;
-    if (_syncTimer) { clearTimeout(_syncTimer); _syncTimer = null; }
-    _clearOfflineIndicator();
-  }
 
   // ── Schedule next poll ────────────────────────────────────────
   function scheduleNext(delayMs) {
@@ -133,7 +127,7 @@ const Sync = (() => {
     Storage.setSyncCursor(_roomId, { lastRow: n });
   }
 
-  return { start, stop, forceSync, getLastRow, setLastRow };
+  return { start, forceSync, getLastRow, setLastRow };
 })();
 
 window.Sync = Sync;

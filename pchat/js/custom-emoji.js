@@ -207,8 +207,6 @@ const CustomEmoji = (() => {
     lookup,
     emojifyEscaped,
     twemojifyEscaped,
-    toOpenmojiUrl,
-    toTwemojiUrl,
     isLoaded: () => _loaded,
     count: () => _items.length,
   };

@@ -38,6 +38,7 @@ const Chat = (() => {
     _bindInput();
     _bindContextMenu();
     _bindModals();
+    _bindTheme();
     _bindScroll();
     _bindHeaderMenu();
     _bindSidebar();
@@ -46,6 +47,20 @@ const Chat = (() => {
     _bindEmojis();
     _bindEncryption();
     _bindNotifications();
+    // Seed the member directory with self so the roster is never empty —
+    // real presence/beacons refine it afterwards.
+    try {
+      if (_session && _session.memberId) {
+        mergeMembers([{
+          memberId: _session.memberId,
+          displayName: _session.displayName || 'You',
+          picture: _session.picture || '',
+          role: _session.role || 'member',
+          status: 'online',
+          lastSeen: Date.now(),
+        }], { touch: true });
+      }
+    } catch {}
     _soundsArmedAt = Date.now() + 3000;
 
     // Synced Room Radio / Music Player
@@ -86,6 +101,9 @@ const Chat = (() => {
   async function _saveMessageToSheet(msg) {
     if (!_room || !_room.spreadsheetId || !msg || !msg.id) return;
     if (_sheetSavedIds.has(msg.id)) return;
+    // ONLY the owner's device writes to the Sheet (owner's Drive/token).
+    // Guests never touch it — no Google login, no per-user API toggles.
+    if (!_session || _session.role !== 'owner') return;
     if (typeof Auth === 'undefined' || !Auth.isAuthenticated() || typeof Sheets === 'undefined') return;
 
     _sheetSavedIds.add(msg.id);
@@ -221,6 +239,20 @@ const Chat = (() => {
       }
     }
 
+    // ── Sheet backup (Saved rooms): the owner's device logs EVERY message
+    // it sees (own sends + guests via P2P/ntfy) to the room's Google Sheet.
+    // Fire-and-forget — never blocks UI; _sheetSavedIds dedupes replays.
+    if (sortedMsgs.length && _room?.spreadsheetId && _session?.role === 'owner') {
+      sortedMsgs.forEach(m => {
+        if (m && m.id && !m.deleted && !m._optimistic && !m._seenEvent && !m._reactionEvent && !m._musicEvent) {
+          try {
+            const r = _saveMessageToSheet(m);
+            if (r && typeof r.catch === 'function') r.catch(() => {});
+          } catch {}
+        }
+      });
+    }
+
     // Fire background notifications for genuinely new incoming messages
     if (addedCount > 0 && typeof Notify !== 'undefined') {
       sortedMsgs.forEach(m => {
@@ -229,20 +261,27 @@ const Chat = (() => {
     }
 
     // ── Sound effects ───────────────────────────────────────────
-    // emoji.mp3        → someone sends an emoji-only message (never own)
-    // notification.mp3 → new message while chat is in background only
+    // emoji.mp3        → any incoming message containing an emoji (never own)
+    // notification.mp3 → any OTHER incoming message (never own), whether the
+    //                    chat is in the foreground or background.
+    // Cooldowns inside RoomSounds prevent spam; history older than 2 min
+    // never beeps so room-open backfill stays silent.
     if (addedCount > 0 && Date.now() > _soundsArmedAt && typeof RoomSounds !== 'undefined') {
       const incoming = sortedMsgs.filter(m =>
         !m.deleted && !m._optimistic && m.senderId && _session && m.senderId !== _session.memberId
       );
-      if (incoming.length) {
-        const hasEmoji = incoming.some(m =>
+      const fresh = incoming.filter(m => {
+        const t = new Date(m.createdAt || m.timestamp || 0).getTime();
+        return Number.isFinite(t) && (Date.now() - t < 120000);
+      });
+      if (fresh.length) {
+        const hasEmoji = fresh.some(m =>
           m.messageType !== 'image' && m.messageType !== 'file' &&
           _containsEmoji(m.message)
         );
         if (hasEmoji) {
           RoomSounds.playEmoji();
-        } else if (RoomSounds.isBackground()) {
+        } else {
           RoomSounds.playNotification();
         }
       }
@@ -528,9 +567,11 @@ const Chat = (() => {
       const av = document.createElement('div');
       av.className = 'msg-avatar';
       av.setAttribute('aria-hidden', 'true');
-      const senderPic = (typeof msg.senderPicture === 'string' && msg.senderPicture.startsWith('data:image/'))
-        ? msg.senderPicture
-        : '';
+      // Avatar images: uploads (data:image), remote https pics, or bundled
+      // relative assets (e.g. the Shepu-AI bot's ai/pai.png). Anything else
+      // (e.g. javascript:/data:text URLs) falls back to initials.
+      const _sp = (typeof msg.senderPicture === 'string') ? msg.senderPicture.trim() : '';
+      const senderPic = (/^(data:image\/|https?:\/\/|ai\/|assets\/)/i.test(_sp)) ? _sp : '';
       if (senderPic) {
         const img = document.createElement('img');
         img.alt = msg.senderName || '';
@@ -1520,6 +1561,110 @@ const Chat = (() => {
     });
   }
 
+  // ── Theme (wallpaper) picker ──────────────────────────────────
+  function _bindTheme() {
+    document.getElementById('room-theme-btn')?.addEventListener('click', () => openThemePicker());
+    document.getElementById('menu-theme')?.addEventListener('click', () => openThemePicker());
+    document.getElementById('theme-modal-close')?.addEventListener('click', closeThemePicker);
+    document.getElementById('theme-modal')?.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'theme-modal') closeThemePicker();
+    });
+    _bindWallpaperLongPress();
+  }
+
+  function openThemePicker() {
+    const grid = document.getElementById('theme-grid');
+    if (grid) {
+      const count = (typeof RoomTheme !== 'undefined') ? RoomTheme.count : 5;
+      const current = (_room && _room.theme) || 1;
+      grid.innerHTML = '';
+      for (let n = 1; n <= count; n++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.title = 'Theme ' + n;
+        b.setAttribute('aria-label', 'Theme ' + n);
+        b.style.backgroundImage = `url('assets/themes/theme${n}.webp')`;
+        if (n === current) b.classList.add('active');
+        b.addEventListener('click', () => setTheme(n));
+        grid.appendChild(b);
+      }
+    }
+    document.getElementById('theme-modal')?.classList.remove('hidden');
+  }
+
+  function closeThemePicker() {
+    document.getElementById('theme-modal')?.classList.add('hidden');
+  }
+
+  // Set wallpaper for everyone: apply + persist + relay via ntfy.
+  // broadcast=false when absorbing a relayed change (no echo loop).
+  async function setTheme(n, broadcast = true) {
+    if (!_room) return;
+    const th = (typeof RoomTheme !== 'undefined') ? RoomTheme.normalize(n) : 1;
+    if (typeof RoomTheme !== 'undefined') RoomTheme.apply(th);
+    _room.theme = th;
+    try { Rooms.updateRoom(_room.id, { theme: th }); } catch {}
+    try {
+      const s = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+      if (s && s.roomId === _room.id) { s.theme = th; Storage.setSession(s); }
+    } catch {}
+    document.querySelectorAll('#theme-grid button').forEach((b, i) => {
+      b.classList.toggle('active', i + 1 === th);
+    });
+    if (broadcast && typeof NtfySync !== 'undefined' && NtfySync.publish) {
+      try { NtfySync.publish({ type: 'theme', roomId: _room.id, theme: th }); } catch {}
+    }
+    closeThemePicker();
+  }
+
+  // Phone-style 3s long-press on empty wallpaper → theme picker.
+  // Ignores presses starting on messages or interactive elements so the
+  // message reaction picker / context menu never conflicts.
+  function _bindWallpaperLongPress() {
+    const feed = document.getElementById('chat-feed');
+    if (!feed || feed.dataset.themeLpBound) return;
+    feed.dataset.themeLpBound = '1';
+    let timer = null, sx = 0, sy = 0, fired = false;
+    const LONG_MS = 3000;
+    const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    const isWallpaper = (t) => {
+      if (!t || !t.closest) return true;
+      return !t.closest('.msg-row, button, a, input, textarea, select, img, video, audio, .modal, .dropdown-menu');
+    };
+    const start = (x, y, target) => {
+      if (!isWallpaper(target)) return;
+      fired = false; sx = x; sy = y;
+      cancel();
+      timer = setTimeout(() => {
+        timer = null; fired = true;
+        try { if (navigator.vibrate) navigator.vibrate(30); } catch {}
+        openThemePicker();
+      }, LONG_MS);
+    };
+    const moved = (x, y) => {
+      if (timer && Math.hypot(x - sx, y - sy) > 12) cancel();
+    };
+    feed.addEventListener('touchstart', (e) => {
+      const t = e.touches[0]; if (t) start(t.clientX, t.clientY, e.target);
+    }, { passive: true });
+    feed.addEventListener('touchmove', (e) => {
+      const t = e.touches[0]; if (t) moved(t.clientX, t.clientY);
+    }, { passive: true });
+    feed.addEventListener('touchend', cancel);
+    feed.addEventListener('touchcancel', cancel);
+    feed.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      start(e.clientX, e.clientY, e.target);
+    });
+    feed.addEventListener('mousemove', (e) => { if (timer) moved(e.clientX, e.clientY); });
+    feed.addEventListener('mouseup', cancel);
+    feed.addEventListener('mouseleave', cancel);
+    // Swallow the synthetic contextmenu some browsers fire after long-press
+    feed.addEventListener('contextmenu', (e) => {
+      if (fired) { e.preventDefault(); fired = false; }
+    });
+  }
+
   // ── Sidebar ───────────────────────────────────────────────────
   function openSidebar() {
     document.getElementById('chat-sidebar')?.classList.add('open');
@@ -1538,58 +1683,124 @@ const Chat = (() => {
   }
 
   // ── Render members list ───────────────────────────────────────
-  function renderMembers(members) {
+  // ── Member directory: merged roster from ALL sources ──────────
+  // fetch (local store) + P2P host roster + ntfy presence beacons.
+  // Keyed by memberId, keeps the freshest sighting → list is truthful
+  // even when members are on different devices.
+  const _memberDir = new Map(); // memberId -> { memberId, displayName, picture, role, status, lastSeenMs }
+  const ONLINE_WINDOW_MS = 45000; // seen within 45s = online
+
+  function _normTs(v) {
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number') return v < 1e12 ? v * 1000 : v; // sec → ms
+    const t = new Date(v).getTime();
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  function _isOnlineEntry(e) {
+    if (!e) return false;
+    if (e.status === 'online' && Date.now() - (e.lastSeenMs || 0) < 120000) return true;
+    return Date.now() - (e.lastSeenMs || 0) < ONLINE_WINDOW_MS;
+  }
+
+  // Merge a member list into the directory. touch=true marks every entry
+  // as "seen right now" (used for live presence beacons).
+  function mergeMembers(members, { touch = false } = {}) {
     if (!Array.isArray(members)) return;
+    const now = Date.now();
     members.forEach(m => {
-      if (m.memberId && m.displayName) _memberMap.set(m.memberId, m.displayName);
+      if (!m) return;
+      const id = m.memberId || m.id;
+      if (!id) return;
+      const incoming = {
+        memberId:    id,
+        displayName: m.displayName || m.name || 'Unknown',
+        picture:     m.picture || '',
+        role:        m.role || 'member',
+        status:      m.status || '',
+        lastSeenMs:  touch ? now : (_normTs(m.lastSeen) || _normTs(m.lastActive) || 0),
+      };
+      const prev = _memberDir.get(id);
+      // Never lose a name/picture to an emptier update; never go backwards in time.
+      if (prev) {
+        if (!incoming.displayName || incoming.displayName === 'Unknown') incoming.displayName = prev.displayName;
+        if (!incoming.picture) incoming.picture = prev.picture;
+        if (prev.role === 'owner') incoming.role = 'owner';
+        if ((prev.lastSeenMs || 0) > (incoming.lastSeenMs || 0) && !touch) {
+          incoming.lastSeenMs = prev.lastSeenMs;
+          if (!incoming.status) incoming.status = prev.status;
+        }
+      }
+      _memberDir.set(id, incoming);
+      if (incoming.displayName) _memberMap.set(id, incoming.displayName);
     });
+    _renderMemberDir();
+  }
+
+  function renderMembers(members) {
+    mergeMembers(members);
+  }
+
+  function _renderMemberDir() {
     const list = document.getElementById('member-list');
     if (!list) return;
 
-    const onlineCount = members.filter(m => {
-      const last = m.lastSeen ? new Date(m.lastSeen).getTime() : 0;
-      return m.status === 'online' || Date.now() - last < 120000;
-    }).length;
+    const all = Array.from(_memberDir.values()).map(e => ({
+      ...e, online: _isOnlineEntry(e),
+    })).sort((a, b) => {
+      if (!!a.online !== !!b.online) return a.online ? -1 : 1;
+      if ((a.role === 'owner') !== (b.role === 'owner')) return a.role === 'owner' ? -1 : 1;
+      return String(a.displayName || '').localeCompare(String(b.displayName || ''));
+    });
 
-    document.getElementById('online-count').textContent = onlineCount;
+    const onlineCount = all.filter(e => e.online).length;
+    const countEl = document.getElementById('online-count');
+    if (countEl) countEl.textContent = onlineCount;
 
     list.innerHTML = '';
-    members.forEach(m => {
-      const isOnline = m.status === 'online' || (m.lastSeen && Date.now() - new Date(m.lastSeen).getTime() < 120000);
-      const el = document.createElement('div');
-      el.className = 'member-row';
-      el.setAttribute('role', 'listitem');
-
-      const lastSeenText = isOnline ? 'Online' : (m.lastSeen ? `Last seen ${UI.relativeTime(m.lastSeen)}` : 'Never');
-      const isMe = m.memberId === _session.memberId;
+    let offlineHeaderShown = false;
+    all.forEach(m => {
+      // Subtle section divider between online and offline groups
+      if (!m.online && !offlineHeaderShown && all.some(e => e.online)) {
+        offlineHeaderShown = true;
+        const div = document.createElement('div');
+        div.className = 'member-section-label';
+        div.textContent = 'Offline';
+        list.appendChild(div);
+      }
+      const isMe = _session && m.memberId === _session.memberId;
       const name = m.displayName || 'Unknown';
       const pic  = m.picture || '';
 
-      // Build avatar HTML — image if available, otherwise initial letter
-      const safePic = (typeof pic === 'string' && /^(https:\/\/|data:image\/)/i.test(pic)) ? pic : '';
+      const safePic = (typeof pic === 'string' && /^(data:image\/|https?:\/\/|ai\/|assets\/)/i.test(pic.trim())) ? pic.trim() : '';
       const avatarHtml = safePic
-        ? `<div class="member-avatar" aria-hidden="true" style="padding:0;overflow:hidden;"><img src="${escapeHtml(safePic)}" alt="${escapeHtml(name)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" /></div>`
-        : `<div class="member-avatar" aria-hidden="true">${escapeHtml(UI.getInitial(name))}</div>`;
+        ? `<div class="member-avatar has-img ${m.online ? 'is-online' : ''}" aria-hidden="true"><img src="${escapeHtml(safePic)}" alt="${escapeHtml(name)}" loading="lazy" onerror="this.parentElement.classList.remove('has-img');this.remove();" /></div>`
+        : `<div class="member-avatar ${m.online ? 'is-online' : ''}" aria-hidden="true">${escapeHtml(UI.getInitial(name))}</div>`;
 
+      const lastSeenText = m.online
+        ? (m.role === 'owner' ? 'Owner · Online' : 'Online')
+        : (m.lastSeenMs ? `Last seen ${UI.relativeTime(m.lastSeenMs)}` : 'Offline');
+
+      const el = document.createElement('div');
+      el.className = 'member-row' + (m.online ? '' : ' is-offline');
+      el.setAttribute('role', 'listitem');
       el.innerHTML = `
         ${avatarHtml}
         <div class="member-info">
-          <div class="member-name">${escapeHtml(name)}${isMe ? ' <span style="font-size:0.65rem;color:var(--accent-2);font-weight:500;">(you)</span>' : ''}
-            ${m.role === 'owner' ? '<span class="badge badge-accent" style="font-size:0.65rem;padding:0.1rem 0.4rem;">Owner</span>' : ''}
+          <div class="member-name">${escapeHtml(name)}${isMe ? '<span class="member-pill me">you</span>' : ''}
+            ${m.role === 'owner' ? '<span class="member-pill owner">Owner</span>' : ''}
           </div>
           <div class="member-status">
-            <span class="status-dot ${isOnline ? 'online' : 'offline'}" aria-hidden="true"></span>
-            <span>${lastSeenText}</span>
+            <span class="status-dot ${m.online ? 'online' : 'offline'}" aria-hidden="true"></span>
+            <span>${escapeHtml(lastSeenText)}</span>
           </div>
         </div>
-        ${_session.role === 'owner' && m.memberId !== _session.memberId ? `
-          <button class="btn btn-icon btn-ghost member-kick-btn" data-member-id="${m.memberId}" title="Remove" aria-label="Remove member"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        ${_session && _session.role === 'owner' && m.memberId !== _session.memberId ? `
+          <button class="btn btn-icon btn-ghost member-kick-btn" data-member-id="${escapeHtml(m.memberId)}" title="Remove" aria-label="Remove member"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         ` : ''}
       `;
 
-      const kickBtn = el.querySelector('.member-kick-btn');
-      kickBtn?.addEventListener('click', () => ownerKickMember(m.memberId, m.displayName));
-
+      el.querySelector('.member-kick-btn')?.addEventListener('click', () => ownerKickMember(m.memberId, name));
       list.appendChild(el);
     });
   }
@@ -2431,10 +2642,11 @@ const Chat = (() => {
     setStatus,
     showUnavailable,
     loadSheetMessages,
-    saveMessageToSheet: _saveMessageToSheet,
     setEncryptionStatus,
     handleTypingEvent,
     getMessages: () => _messages,
+    mergeMembers,
+    setTheme,
   };
 })();
 

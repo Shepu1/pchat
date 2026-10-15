@@ -1149,9 +1149,17 @@
   z-index: 15;
 }
 
+/* Topbar Settings gear: PC-only (phones already have Settings in bottom-nav) */
+#top-settings-btn {
+  display: none !important;
+}
+
 @media (min-width: 860px) {
   .bottom-nav {
     display: none !important;
+  }
+  #top-settings-btn {
+    display: inline-flex !important;
   }
   .fab-create {
     bottom: 2rem !important;

@@ -8,6 +8,7 @@
 const P2PSync = (() => {
   let _peer = null;
   let _roomId = null;
+  let _roomSecret = null;
   let _isHost = false;
   let _memberId = null;
   let _displayName = null;
@@ -32,7 +33,7 @@ const P2PSync = (() => {
     return `pchat_g_${cleanRoom}_${cleanMember}_${rand}`;
   }
 
-  function init({ roomId, isHost, memberId, displayName, onMessage, onHistoryRequest, onMembersUpdate, onTyping }) {
+  function init({ roomId, roomSecret, isHost, memberId, displayName, onMessage, onHistoryRequest, onMembersUpdate, onTyping }) {
     if (typeof Peer === 'undefined') {
       console.warn('[P2PSync] PeerJS library not loaded.');
       return;
@@ -42,6 +43,7 @@ const P2PSync = (() => {
     destroy();
 
     _roomId = roomId;
+    _roomSecret = roomSecret || null;
     _isHost = !!isHost;
     _memberId = memberId;
     _displayName = displayName;
@@ -156,6 +158,24 @@ const P2PSync = (() => {
 
   function _handleHostIncomingData(conn, data) {
     if (!data || typeof data !== 'object') return;
+
+    // Invisible capability check: guests prove invite-link knowledge.
+    // No password prompt — proof is computed silently from #k= secret.
+    // Legacy clients without proof are still allowed (transition period).
+    const _proofOf = (d) => (d && (d.proof || (d.member && d.member.proof))) || '';
+    if (_roomSecret && (data.type === 'join' || data.type === 'message')) {
+      const proof = _proofOf(data);
+      const midProbe = (data.member && (data.member.memberId || data.member.id)) || data.memberId || (data.message && data.message.senderId) || '';
+      if (proof && midProbe) {
+        try {
+          const ok = (typeof InstantSecurity !== 'undefined')
+            ? InstantSecurity.verifyJoinProof(_roomSecret, midProbe, proof)
+            : true;
+          if (!ok) { try { conn.close(); } catch {} return; }
+        } catch { return; }
+      }
+      // no proof → legacy client: allow (messages are E2EE anyway)
+    }
 
     if (data.type === 'join') {
       const mem = data.member;
@@ -287,10 +307,17 @@ const P2PSync = (() => {
       console.log('[P2PSync] Connected to Host successfully!');
       _connections.set('host', conn);
 
-      // Announce identity
+      // Announce identity + invisible capability proof (no user prompt)
+      let proof = '';
+      try {
+        proof = (typeof InstantSecurity !== 'undefined' && _roomSecret)
+          ? InstantSecurity.joinProof(_roomSecret, _memberId)
+          : '';
+      } catch {}
       conn.send({
         type: 'join',
-        member: { id: _memberId, memberId: _memberId, name: _displayName, displayName: _displayName }
+        proof,
+        member: { id: _memberId, memberId: _memberId, name: _displayName, displayName: _displayName, proof }
       });
     });
 
@@ -342,6 +369,13 @@ const P2PSync = (() => {
 
   function broadcastMessage(msg) {
     if (!msg) return;
+    // Attach invisible proof so host can drop spoofed packets
+    let proof = '';
+    try {
+      proof = (typeof InstantSecurity !== 'undefined' && _roomSecret && _memberId)
+        ? InstantSecurity.joinProof(_roomSecret, _memberId)
+        : '';
+    } catch {}
 
     if (_isHost) {
       // Host broadcasts to all connected guests
@@ -354,7 +388,7 @@ const P2PSync = (() => {
       // Guest sends message to host
       const hostConn = _connections.get('host');
       if (hostConn && hostConn.open) {
-        try { hostConn.send({ type: 'message', message: msg }); } catch {}
+        try { hostConn.send({ type: 'message', message: msg, proof, memberId: _memberId }); } catch {}
       }
     }
   }

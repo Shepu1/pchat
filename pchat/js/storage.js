@@ -64,7 +64,6 @@ const Storage = {
 
   // ── Current Room ─────────────────────────────────────────────
   setCurrentRoom(roomId) { this.set(CONFIG.LS_CURRENT_ROOM, roomId); },
-  getCurrentRoom()       { return this.get(CONFIG.LS_CURRENT_ROOM); },
   clearCurrentRoom()     { this.remove(CONFIG.LS_CURRENT_ROOM); },
 
   // ── Pending Messages (offline queue) ─────────────────────────
@@ -79,9 +78,6 @@ const Storage = {
   removePendingMessage(roomId, messageId) {
     const q = this.getPendingMessages(roomId).filter(m => m.id !== messageId);
     this.set(`pending_${roomId}`, q);
-  },
-  clearPendingMessages(roomId) {
-    this.remove(`pending_${roomId}`);
   },
 
   // ── Sync cursors ─────────────────────────────────────────────

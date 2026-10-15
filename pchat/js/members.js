@@ -33,16 +33,7 @@ const Members = (() => {
     }
   }
 
-  // ── Get online count ──────────────────────────────────────────
-  function onlineCount(members) {
-    return members.filter(m => {
-      if (m.status === 'online') return true;
-      if (m.lastSeen) return Date.now() - new Date(m.lastSeen).getTime() < 120000;
-      return false;
-    }).length;
-  }
-
-  return { fetchAndCache, onlineCount };
+  return { fetchAndCache };
 })();
 
 window.Members = Members;

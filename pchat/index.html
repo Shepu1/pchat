@@ -393,8 +393,8 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.07);
       box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
     }
-    #top-join-btn { transition: background-color 0.15s ease, color 0.15s ease !important; }
-    #top-join-btn:hover {
+    #top-join-btn, #top-settings-btn { transition: background-color 0.15s ease, color 0.15s ease !important; }
+    #top-join-btn:hover, #top-settings-btn:hover {
       background: rgba(99, 102, 241, 0.16) !important;
       color: var(--accent-2) !important;
     }
@@ -506,6 +506,17 @@
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
             </svg>
           </button>
+          <button class="btn btn-icon btn-ghost" id="top-settings-btn" title="Settings"
+            onclick="window.location.href='settings.html'"
+            style="width:38px;height:38px;border-radius:var(--r-full);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+              </path>
+            </svg>
+          </button>
           <!-- User Avatar / logout -->
           <button id="user-avatar-btn" title="Account / Logout"
             style="width:34px;height:34px;border-radius:50%;background:var(--accent-gradient);border:2px solid rgba(255,255,255,0.15);color:#fff;font-weight:700;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0;flex-shrink:0;">
@@ -581,12 +592,18 @@
             Create a private room in 1 tap or join using your friend's invite code.
           </p>
           <button class="btn btn-primary" id="empty-create-btn"
-            style="padding:0.75rem 1.5rem;font-size:0.9rem;margin:0 auto;">
+            style="padding:0.75rem 1.5rem;font-size:0.9rem;margin:0 auto 1.5rem;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
               stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg> Start New Chat
           </button>
+          <div
+            style="display:flex;justify-content:center;gap:1rem;flex-wrap:wrap;font-size:0.72rem;color:var(--muted);">
+            <span><strong style="color:var(--accent-2);">1.</strong> Tap + to create</span>
+            <span><strong style="color:#34d399;">2.</strong> Share the link</span>
+            <span><strong style="color:#c084fc;">3.</strong> Chat, no login</span>
+          </div>
         </div>
       </main>
 
@@ -642,7 +659,7 @@
           style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 0.9rem;border-radius:var(--r-full);background:var(--accent-dim);border:1px solid rgba(37, 99, 235, 0.25);font-size:0.8rem;font-weight:600;color:var(--accent);margin-bottom:1rem;">
           <span
             style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;"></span>
-          Google Drive & Sheets Cloud Sync &middot; High Performance Web App
+          End-to-end encrypted &middot; Peer-to-peer &middot; No sign-up needed
         </div>
 
         <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:0.75rem;">
@@ -654,8 +671,39 @@
               Pchat shepu
             </h1>
             <p style="color:var(--text-2);font-size:0.95rem;margin:0.2rem 0 0;">
-              Fast, private messaging powered by your Google Sheet & Apps Script backend.
+              Fast, private messaging — encrypted on your device. Saved rooms auto-back up to your Google Sheet.
             </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- How it works (first-timer guidance) -->
+      <div
+        style="max-width:900px;display:flex;align-items:stretch;gap:0;margin-top:0.25rem;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1rem 1.25rem;overflow-x:auto;">
+        <div style="flex:1;min-width:180px;display:flex;gap:0.7rem;align-items:flex-start;">
+          <span
+            style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--accent-gradient);color:#fff;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">1</span>
+          <div>
+            <div style="font-weight:700;font-size:0.85rem;">Create a room</div>
+            <div style="font-size:0.75rem;color:var(--muted);">Pick a name, tap Create. No account.</div>
+          </div>
+        </div>
+        <div style="width:1px;align-self:stretch;background:var(--border);margin:0 1rem;flex-shrink:0;"></div>
+        <div style="flex:1;min-width:180px;display:flex;gap:0.7rem;align-items:flex-start;">
+          <span
+            style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.4);color:#34d399;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">2</span>
+          <div>
+            <div style="font-weight:700;font-size:0.85rem;">Share the link or QR</div>
+            <div style="font-size:0.75rem;color:var(--muted);">Friends open it on phone or PC.</div>
+          </div>
+        </div>
+        <div style="width:1px;align-self:stretch;background:var(--border);margin:0 1rem;flex-shrink:0;"></div>
+        <div style="flex:1;min-width:180px;display:flex;gap:0.7rem;align-items:flex-start;">
+          <span
+            style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:rgba(168,85,247,0.16);border:1px solid rgba(168,85,247,0.4);color:#c084fc;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">3</span>
+          <div>
+            <div style="font-weight:700;font-size:0.85rem;">Chat instantly</div>
+            <div style="font-size:0.75rem;color:var(--muted);">Everyone picks a nickname. Done.</div>
           </div>
         </div>
       </div>
@@ -688,24 +736,24 @@
           </div>
 
           <form id="desktop-create-form" style="display:flex;flex-direction:column;gap:1.15rem;">
-            <!-- Connection Mode: Instant (P2P) vs Secure (Google Sheet) -->
+            <!-- Connection Mode: Quick (P2P) vs Saved (Sheet backup) -->
             <div>
               <label class="hub-label">Connection Mode</label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;" id="desktop-mode-picker">
                 <button type="button" class="hub-mode-btn active" data-mode="instant">
                   <span class="hub-mode-title" style="color:var(--accent);">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Instant
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Quick
                   </span>
                   <span class="hub-mode-desc">Peer-to-peer · no login</span>
                 </button>
                 <button type="button" class="hub-mode-btn" data-mode="secure">
                   <span class="hub-mode-title" style="color:#10b981;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Secure
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Saved
                   </span>
                   <span class="hub-mode-desc">Google Sheet backup</span>
                 </button>
               </div>
-              <p id="desktop-mode-hint" style="margin-top:0.5rem;font-size:0.72rem;color:var(--muted);">Instant rooms connect devices directly over peer-to-peer — no sign-in needed.</p>
+              <p id="desktop-mode-hint" style="margin-top:0.5rem;font-size:0.72rem;color:var(--muted);">Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.</p>
             </div>
 
             <!-- Room name -->
@@ -938,18 +986,18 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;" id="sheet-mode-picker">
             <button type="button" class="hub-mode-btn active" data-mode="instant">
               <span class="hub-mode-title" style="color:var(--accent);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Instant
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Quick
               </span>
               <span class="hub-mode-desc">Peer-to-peer · no login</span>
             </button>
             <button type="button" class="hub-mode-btn" data-mode="secure">
               <span class="hub-mode-title" style="color:#10b981;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Secure
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Saved
               </span>
               <span class="hub-mode-desc">Google Sheet backup</span>
             </button>
           </div>
-          <p id="sheet-mode-hint" style="margin-top:0.45rem;font-size:0.75rem;color:var(--text-2);">Instant rooms connect devices directly over peer-to-peer — no sign-in needed.</p>
+          <p id="sheet-mode-hint" style="margin-top:0.45rem;font-size:0.75rem;color:var(--text-2);">Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.</p>
         </div>
 
         <div class="form-group">
@@ -1030,6 +1078,7 @@
 
       <!-- QR Code container -->
       <div class="qr-container" style="margin:1rem auto 0.75rem;">
+        <div id="share-qr-box" style="display:none;"></div>
         <img id="share-qr-img" src="" alt="Room QR Code" />
         <p
           style="font-size:0.75rem;color:#1e293b;margin-top:0.4rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
@@ -1067,7 +1116,7 @@
             style="padding-left:1.2rem;margin-bottom:0.5rem;display:flex;flex-direction:column;gap:0.35rem;font-size:0.8rem;color:var(--text-2);text-align:left;">
             <li>Make sure your mobile phone is connected to the <strong>same Wi-Fi router</strong> as your computer (not
               4G/5G).</li>
-            <li>Instant rooms sync across devices over peer-to-peer &amp; the cloud — no local server needed.</li>
+            <li>Rooms sync across devices over peer-to-peer &amp; the cloud — no local server needed.</li>
             <li><strong>Universal access from anywhere:</strong> Host on GitHub Pages
               (<code>https://shepu1.github.io/s/index/pchat/</code>) or run <code>npx localtunnel --port 5500</code> in
               terminal!</li>
@@ -1154,35 +1203,37 @@
     <script src="js/google.js"></script>
     <script src="js/drive.js"></script>
     <script src="js/sheets.js"></script>
-    <script src="js/apps-script.js"></script>
-    <script src="js/peerjs.min.js"></script>
+        <script src="js/peerjs.min.js"></script>
     <script src="js/p2p-sync.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="js/instant-security.js"></script>
     <script src="js/rooms.js"></script>
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
-        // ── Auth Guard: login required before anything ────────────────
-        if (!Auth.isAuthenticated()) {
-          window.location.href = `login.html?redirect=${encodeURIComponent(location.href)}&reason=required`;
-          return;
-        }
+        // ── Login is OPTIONAL. Quick rooms + joining work logged-out.
+        // Google sign-in is asked on demand only when creating a Saved room.
 
         // ── Show user profile in header ───────────────────────────────
         const user = Auth.getUser();
         const avatarBtn = document.getElementById('user-avatar-btn');
         const avatarInitials = document.getElementById('user-avatar-initials');
         const avatarImg = document.getElementById('user-avatar-img');
-        if (user) {
-          const initials = (user.name || user.email || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-          if (avatarInitials) avatarInitials.textContent = initials;
-          if (avatarImg && user.picture) {
-            avatarImg.src = user.picture;
-            avatarImg.style.display = 'block';
-            if (avatarInitials) avatarInitials.style.display = 'none';
-          }
+        // Effective identity: manual Settings photo → Google photo; name likewise.
+        const savedName = (typeof localStorage !== 'undefined' && localStorage.getItem('shepu_display_name')) || '';
+        const shownName = (user && (user.name || user.email)) || savedName || '?';
+        const initials = shownName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        if (avatarInitials) avatarInitials.textContent = initials;
+        const effPic = (typeof UI !== 'undefined' && UI.effectivePicture) ? UI.effectivePicture() : ((user && user.picture) || '');
+        if (avatarImg && effPic) {
+          avatarImg.src = effPic;
+          avatarImg.style.display = 'block';
+          if (avatarInitials) avatarInitials.style.display = 'none';
         }
         if (avatarBtn) {
-          avatarBtn.onclick = async () => {
+          if (user) {
+            avatarBtn.title = 'Account / Logout';
+            avatarBtn.onclick = async () => {
               const ok = await UI.confirmDialog({
                 title: 'Log out?',
                 message: `Logged in as ${user?.name || user?.email || 'User'}`,
@@ -1192,9 +1243,16 @@
               });
               if (ok) {
                 Auth.signOut();
-                window.location.href = 'login.html';
+                window.location.reload();
               }
             };
+          } else {
+            // Logged out: avatar becomes an optional Login entry point
+            avatarBtn.title = 'Log in (optional)';
+            avatarBtn.onclick = () => {
+              window.location.href = 'login.html?redirect=' + encodeURIComponent(location.href);
+            };
+          }
         }
 
         const chatListContainer = document.getElementById('chats-items');
@@ -1249,11 +1307,11 @@
         setupEmojiRow('sheet-emoji-row');
         setupEmojiRow('desktop-emoji-row');
 
-        // ── Connection Mode selector (Instant P2P vs Secure Google Sheet) ──
+        // ── Connection Mode selector (Quick P2P vs Saved Sheet-backup) ──
         let roomMode = 'instant';
         const MODE_HINTS = {
-          instant: 'Instant rooms connect devices directly over peer-to-peer — no sign-in needed.',
-          secure:  'Secure rooms back up every message to a Google Sheet in your Drive. Google sign-in required.',
+          instant: 'Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.',
+          secure:  'Saved rooms auto-save every message to a Google Sheet in your Drive. Google sign-in required.',
         };
         const syncModePickers = (pickers) => {
           pickers.forEach(btns => {
@@ -1424,15 +1482,10 @@
         const handleCreate = async (rawName, inputEl, sheetToClose) => {
           if (!rawName) return;
 
-          const ownerUser = Auth.getUser();
-          const savedName = localStorage.getItem('shepu_display_name') || ownerUser?.name;
-          if (!Auth.isAuthenticated() && !savedName) {
-            UI.toast('error', 'Login Required', 'Please enter your name or login to create a room.');
-            setTimeout(() => window.location.href = 'login.html?redirect=' + encodeURIComponent(location.href), 1200);
-            return;
-          }
-
-          const ownerName = ownerUser?.name || savedName || 'Owner';
+          // One rule: logged-in → Gmail name; logged-out → one-time name prompt.
+          // Saved rooms trigger Google sign-in on demand below.
+          const ownerName = await UI.resolveDisplayName();
+          if (!ownerName) return; // user cancelled the name prompt
           const name = rawName.includes(selectedEmoji) ? rawName : `${selectedEmoji} ${rawName}`;
 
           // Close sheet & disable inputs
@@ -1452,40 +1505,40 @@
           let newRoom;
           try {
             if (roomMode === 'instant') {
-              // Instant (P2P) mode — no Google sign-in required
+              // Quick (P2P) mode — no Google sign-in required
               updateProgress('Creating room (instant peer-to-peer mode)…');
               newRoom = Rooms.createInstantRoom(name, 'Private Room', ownerName);
               UI.toast('success', 'Room Created!', `"${name}" is live. Share the link to invite people!`);
             } else {
-              // Secure mode — Google Sheet backend, requires sign-in
+              // Saved mode — Google Sheet backend, requires sign-in
               if (!CONFIG.isGoogleConfigured() || typeof Drive === 'undefined') {
-                throw new Error('Secure mode needs a Google Client ID configured. Switch to Instant mode.');
+                throw new Error('Saved mode needs a Google Client ID configured. Switch to Quick mode.');
               }
               if (!Auth.isAuthenticated()) {
                 updateProgress('Waiting for Google sign-in…');
                 try {
                   await Auth.signIn();
                 } catch (e) {
-                  throw new Error('Google sign-in is required for Secure rooms. Please try again or switch to Instant.');
+                  throw new Error('Google sign-in is required for Saved rooms. Please try again or switch to Quick.');
                 }
               }
               if (!Auth.isAuthenticated()) {
-                throw new Error('Google sign-in is required for Secure rooms.');
+                throw new Error('Google sign-in is required for Saved rooms.');
               }
-              newRoom = await Rooms.createRoomWithSheet(name, 'Private Room', ownerName, updateProgress);
+              newRoom = await Rooms.createRoomWithSheet(name, 'Private Room', ownerName, updateProgress, { strict: true });
               UI.toast('success', 'Room + Google Sheet Created!', `Your chat is backed by Google Sheets.`);
             }
           } catch (err) {
             console.error('Room creation error:', err);
             if (roomMode === 'secure') {
-              // Never silently downgrade a Secure room to Instant
-              UI.toast('error', 'Secure room failed', err.message || 'Please try again.');
+              // Never silently downgrade a Saved room to Quick
+              UI.toast('error', 'Saved room failed', err.message || 'Please try again.');
               if (overlay) overlay.classList.add('hidden');
               return;
             }
-            // Emergency fallback (Instant mode only)
+            // Emergency fallback (Quick mode only)
             newRoom = Rooms.createInstantRoom(name, 'Private Room', ownerName);
-            UI.toast('warning', 'Room Created (Instant)', 'Created instant room.');
+            UI.toast('warning', 'Room Created (Quick)', 'Created quick room.');
           } finally {
             if (overlay) overlay.classList.add('hidden');
           }
@@ -1551,6 +1604,23 @@
         let activeShareRoom = null;
         let activeShareUrl = '';
 
+        // ── App URL for the cross-device strip (never hardcoded) ──
+        function getAppUrl() {
+          let basePath = '';
+          try {
+            const p = window.location.pathname || '';
+            if (p && !p.startsWith('/mnt') && !p.startsWith('/run') && !p.startsWith('/tmp')) {
+              basePath = p.split('/').slice(0, -1).join('/') || '';
+            }
+          } catch {}
+          const origin = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file'))
+            ? window.location.origin
+            : 'https://shepu1.github.io';
+          return origin + basePath + '/index.html';
+        }
+        const connDisplay = document.getElementById('connectivity-url-display');
+        if (connDisplay) connDisplay.textContent = getAppUrl();
+
         // Single universal invite link (no device tabs — one link for all)
         function openShareModal(room) {
           activeShareRoom = room;
@@ -1559,26 +1629,45 @@
           const qrImg = document.getElementById('share-qr-img');
           const urlDisplay = document.getElementById('modal-share-url');
           const linkHint = document.getElementById('modal-link-hint');
+          const chatBtn = document.getElementById('share-modal-chat');
+          if (chatBtn) chatBtn.style.display = '';
 
           const urls = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
           activeShareUrl = urls.defaultUrl;
 
           modalTitle.innerHTML = emoName(room.name);
           urlDisplay.textContent = activeShareUrl;
-          qrImg.src = urls.qrCodeUrl;
+          try {
+            if (typeof InstantSecurity !== 'undefined') {
+              InstantSecurity.renderQR({ qrImg, qrBox: document.getElementById('share-qr-box'), text: urls.qrText || activeShareUrl });
+            } else qrImg.src = urls.qrCodeUrl;
+          } catch { qrImg.src = urls.qrCodeUrl; }
 
           UI.openModal('share-modal');
         }
 
         if (desktopShowQr) {
           desktopShowQr.onclick = () => {
-            if (allRooms.length > 0) {
-              openShareModal(allRooms[0]);
-            } else {
-              const tempRoom = Rooms.createInstantRoom('Hangout Lounge', 'General chat room');
-              loadRooms();
-              openShareModal(tempRoom);
-            }
+            // QR encodes the APP url (what the strip promises) — never
+            // invents a junk room just to show a code.
+            const appUrl = getAppUrl();
+            activeShareRoom = null;
+            activeShareUrl = appUrl;
+            const modalTitle = document.getElementById('share-modal-title');
+            const qrImg = document.getElementById('share-qr-img');
+            const urlDisplay = document.getElementById('modal-share-url');
+            const chatBtn = document.getElementById('share-modal-chat');
+            if (modalTitle) modalTitle.textContent = 'Open on your phone';
+            if (urlDisplay) urlDisplay.textContent = appUrl;
+            try {
+              if (typeof InstantSecurity !== 'undefined') {
+                InstantSecurity.renderQR({ qrImg, qrBox: document.getElementById('share-qr-box'), text: appUrl });
+              } else if (qrImg) {
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(appUrl)}`;
+              }
+            } catch {}
+            if (chatBtn) chatBtn.style.display = 'none';
+            UI.openModal('share-modal');
           };
         }
 

@@ -373,6 +373,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (msg.includes('popup') || msg.includes('closed')) {
         errorHelp.textContent = 'Google sign-in popup was closed.';
+      } else if (/access_denied|verification|not completed|testers|developers/i.test(msg)) {
+        // Testing-mode gate: this Gmail isn't a tester on the Cloud project.
+        // Guests don't need Google at all — point them to the email form.
+        errorHelp.textContent = 'This Google account is not registered as a tester. No problem — just enter any Gmail address in the form above to continue (Google login is only needed for Saved Sheet rooms).';
       } else {
         errorHelp.innerHTML = 'You can also continue by entering your Gmail address directly above!';
       }

@@ -41,43 +41,6 @@ const UI = {
     return id;
   },
 
-  // ── Toast alias (legacy showToast API) ────────────────────────
-  // create-room.js historically calls UI.showToast(message, type).
-  // Normalizes both (message,type) and (type,title,message) shapes.
-  showToast(a, b, c) {
-    if (typeof a === 'string' && typeof b === 'string' && !c) {
-      // Heuristic: if first arg looks like a type, treat as toast(type, title)
-      const types = ['success', 'error', 'warning', 'info'];
-      if (types.includes(a)) return UI.toast(a, b, '');
-      return UI.toast(b, '', a);
-    }
-    if (typeof a === 'string' && !b) return UI.toast('info', '', a);
-    return UI.toast(a, b, c);
-  },
-
-  // Add missing helper used by chat.js
-  formatBytes(bytes) {
-    if (!bytes && bytes !== 0) return '';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    let i = 0;
-    let n = Number(bytes) || 0;
-    while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
-    return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
-  },
-
-  // ── Error Field ───────────────────────────────────────────────
-  showError(containerId, textId, message) {
-    const container = document.getElementById(containerId);
-    const text      = document.getElementById(textId);
-    if (container) container.style.display = '';
-    if (text)      text.textContent = message;
-  },
-
-  hideError(containerId) {
-    const el = document.getElementById(containerId);
-    if (el) el.style.display = 'none';
-  },
-
   // ── Loading Button ────────────────────────────────────────────
   setLoading(btnId, loading = true, loadingText) {
     const btn = typeof btnId === 'string' ? document.getElementById(btnId) : btnId;
@@ -312,6 +275,127 @@ UI.confirmDialog = function ({ title = 'Are you sure?', message = '', confirmTex
     } catch {
       resolve(false);
     }
+  });
+};
+
+// ── One-time display-name prompt (logged-out users) ────────────
+// Styled modal with a text input. Resolves the typed name or null on cancel.
+UI.promptName = function ({ title = 'Your name?', message = 'Pick a display name for chat. Asked only once — saved on this device until you log in.', placeholder = 'e.g. Shepu', defaultValue = '' } = {}) {
+  return new Promise((resolve) => {
+    try {
+      let overlay = document.getElementById('ui-name-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'ui-name-overlay';
+        overlay.className = 'ui-confirm-overlay hidden';
+        overlay.innerHTML = `
+          <div class="ui-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="ui-name-title">
+            <div class="ui-confirm-title" id="ui-name-title"></div>
+            <div class="ui-confirm-message" id="ui-name-message" style="margin-bottom:0.9rem;"></div>
+            <input type="text" id="ui-name-input" class="form-input" maxlength="30" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:1rem;" />
+            <div class="ui-confirm-actions">
+              <button type="button" class="btn btn-ghost" id="ui-name-cancel">Cancel</button>
+              <button type="button" class="btn btn-primary" id="ui-name-ok">Continue</button>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+      }
+      overlay.querySelector('#ui-name-title').textContent = title;
+      overlay.querySelector('#ui-name-message').textContent = message;
+      const input = overlay.querySelector('#ui-name-input');
+      input.placeholder = placeholder;
+      input.value = defaultValue || '';
+      const okBtn = overlay.querySelector('#ui-name-ok');
+      const cancelBtn = overlay.querySelector('#ui-name-cancel');
+      const done = (val) => {
+        overlay.classList.add('hidden');
+        document.removeEventListener('keydown', onKey, true);
+        resolve(val);
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); done(null); }
+        else if (e.key === 'Enter') { e.stopPropagation(); okBtn.click(); }
+      };
+      okBtn.onclick = () => {
+        const v = (input.value || '').trim();
+        done(v || null);
+      };
+      cancelBtn.onclick = () => done(null);
+      overlay.onclick = (e) => { if (e.target === overlay) done(null); };
+      document.addEventListener('keydown', onKey, true);
+      overlay.classList.remove('hidden');
+      setTimeout(() => { try { input.focus({ preventScroll: true }); } catch {} }, 30);
+    } catch {
+      resolve(null);
+    }
+  });
+};
+
+// ── Effective display name (one rule everywhere) ────────────────
+// Logged-in      → Gmail/profile name (also refreshes the saved name).
+// Logged-out     → saved name from the one-time prompt.
+// First-time out → one-time prompt; persists until login.
+// Resolves null when the user cancels the prompt.
+UI.resolveDisplayName = async function (opts = {}) {
+  try {
+    const authed = (typeof Auth !== 'undefined' && Auth.isAuthenticated) ? Auth.isAuthenticated() : false;
+    const profile = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+    if (authed) {
+      const n = (profile?.name || '').trim() || (profile?.email?.split('@')[0] || '').trim();
+      if (n) {
+        try { localStorage.setItem('shepu_display_name', n); } catch {}
+        return n;
+      }
+    }
+    let saved = null;
+    try { saved = localStorage.getItem('shepu_display_name'); } catch {}
+    if (saved && saved.trim()) return saved.trim();
+    if (authed) return 'Owner';
+    const picked = await UI.promptName(opts);
+    if (!picked) return null;
+    try { localStorage.setItem('shepu_display_name', picked); } catch {}
+    return picked;
+  } catch { return null; }
+};
+
+// ── Effective profile picture (one rule everywhere) ───────────
+// Priority: manually-set Settings photo → Google account photo → ''.
+// Login NEVER overwrites a manually-set photo (see shepu_pic_custom).
+UI.effectivePicture = function () {
+  try {
+    const custom = localStorage.getItem('shepu_profile_pic');
+    if (custom && custom.trim()) return custom.trim();
+    const u = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
+    return (u && u.picture) || '';
+  } catch { return ''; }
+};
+
+// Shrink an uploaded image to a tiny square avatar (96px JPEG) so it stays
+// cheap in localStorage, relay payloads and sheets. Resolves dataURL.
+UI.processAvatarFile = function (file) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!file || !file.type.startsWith('image/')) {
+        reject(new Error('Please choose an image file.'));
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const S = 96;
+          const side = Math.min(img.width, img.height) || 1;
+          const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+          const cv = document.createElement('canvas');
+          cv.width = S; cv.height = S;
+          cv.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, S, S);
+          URL.revokeObjectURL(url);
+          resolve(cv.toDataURL('image/jpeg', 0.72));
+        } catch (e) { URL.revokeObjectURL(url); reject(e); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
+      img.src = url;
+    } catch (e) { reject(e); }
   });
 };
 

@@ -8,6 +8,24 @@
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 window.sleep = sleep;
 
+// Timeout guard: Google API calls must NEVER hang silently (blocked popup,
+// expired token re-auth, offline, API disabled). Converts a hang into a
+// visible error naming the stuck step.
+async function googleStep(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(
+      label + ' আটকে গেছে (' + Math.round(ms / 1000) + 's timeout)। পপআপ ব্লকার / নেট / Google API সেটিং দেখো।'
+    )), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+window.googleStep = googleStep;
+
 // ── Crypto Utilities ──────────────────────────────────────────────
 const Crypto = {
   // Cryptographically secure random base62 string
@@ -25,10 +43,46 @@ const Crypto = {
 
   generateRoomId()  { return Crypto.randomBase62(CONFIG.ROOM_ID_LENGTH); },
   generateSecret()  { return Crypto.randomBase62(CONFIG.TOKEN_LENGTH); },
-  generateMemberId(){ return 'u_' + Crypto.randomBase62(16); },
 };
 
 window.Crypto = Crypto;
+
+// ── Room Theme (weighted random: theme1=30%, theme2-5=17.5% each) ───
+// Theme travels with the room (?th= in the invite link) so every device
+// shows the same chat wallpaper. Not secret — just a digit 1-5.
+const RoomTheme = (() => {
+  const WEIGHTS = [30, 17.5, 17.5, 17.5, 17.5];
+
+  function pick() {
+    const r = Math.random() * 100;
+    let acc = 0;
+    for (let i = 0; i < WEIGHTS.length; i++) {
+      acc += WEIGHTS[i];
+      if (r < acc) return i + 1;
+    }
+    return 1;
+  }
+
+  function normalize(v) {
+    const n = parseInt(v, 10);
+    return (n >= 1 && n <= WEIGHTS.length) ? n : 1;
+  }
+
+  // Apply to the chat wallpaper element (desktop + mobile variants
+  // are handled in CSS via .theme-N classes + media queries).
+  function apply(n) {
+    try {
+      const el = document.querySelector('.chat-main');
+      if (!el) return;
+      el.classList.remove('theme-1', 'theme-2', 'theme-3', 'theme-4', 'theme-5');
+      el.classList.add('theme-' + normalize(n));
+    } catch {}
+  }
+
+  return { pick, normalize, apply, count: WEIGHTS.length };
+})();
+
+window.RoomTheme = RoomTheme;
 
 // ── Room Registry ─────────────────────────────────────────────────
 const Rooms = {
@@ -58,6 +112,7 @@ const Rooms = {
     const mockEndpoint = `mock://local/${roomId}`;
     const name = (roomName && roomName.trim()) || 'Private Room';
     const description = (roomDesc && roomDesc.trim()) || 'Private chat room';
+    const theme = RoomTheme.pick();
 
     const room = {
       id: roomId,
@@ -68,6 +123,7 @@ const Rooms = {
       createdAt: now,
       isOwner: true,
       deploymentUrl: mockEndpoint,
+      theme,
     };
     this.addMyRoom(room);
 
@@ -88,6 +144,8 @@ const Rooms = {
       roomName: name,
       roomDesc: description,
       roomSecret: roomSecret,
+      theme,
+      picture: ((typeof UI !== 'undefined' && UI.effectivePicture) ? UI.effectivePicture() : ''),
     };
     Storage.setSession(sessionData);
     Storage.setCurrentRoom(roomId);
@@ -100,31 +158,59 @@ const Rooms = {
       description,
       status: 'active',
       created_at: now,
+      theme,
       members: [{ id: memberId, name: resolvedOwner, role: 'owner', status: 'online', lastActive: Date.now() }],
       messages: []
     };
     localStorage.setItem(mockStorageKey, JSON.stringify(initialData));
 
     // Announce to cross-device relay (so mobile phone gets room details)
+    // Publish to BOTH private (secret-derived) + legacy topics for compatibility.
+    // Secret itself is never sent — only the room name/meta (no messages here).
     try {
-      fetch(`https://ntfy.sh/shepu_pchat_${roomId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'room_meta', data: initialData }),
-      }).catch(() => {});
+      const topics = (typeof InstantSecurity !== 'undefined')
+        ? InstantSecurity.topicsFor(roomId, roomSecret)
+        : [`shepu_pchat_${roomId}`];
+      topics.forEach(t => {
+        fetch(`https://ntfy.sh/${t}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'room_meta', data: initialData }),
+        }).catch(() => {});
+      });
     } catch {}
 
     return room;
   },
 
+  // ── Rotate invite link (revoke old links, zero friction) ──────
+  // Owner one click → new secret. Old links stop working for NEW joins
+  // (P2P proof + ntfy topic both change). No password, no login needed.
+  rotateRoomSecret(roomId) {
+    const reg = this.getRoom(roomId);
+    if (!reg) return null;
+    const fresh = Crypto.generateSecret();
+    this.updateRoom(roomId, { secret: fresh });
+    try {
+      const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+      if (sess && sess.roomId === roomId) {
+        sess.roomSecret = fresh;
+        Storage.setSession(sess);
+      }
+    } catch {}
+    return fresh;
+  },
+
   // ── Create room with Google Sheet backend (async) ─────────────
-  // Full flow:
+  // Sheet-backup mode (no per-user setup):
   //   1. Create Google Sheet in user's Drive (inside SHEPU ROOMS folder)
   //   2. Initialize sheet tabs (messages, members, room_config, ...)
-  //   3. Deploy Apps Script as web app → get endpoint URL
-  //   4. Save room with that endpoint URL
-  //   5. Open the Google Sheet in a new tab
-  async createRoomWithSheet(roomName, roomDesc, ownerName, onProgress) {
+  //   3. Chat runs on the P2P mesh (mock endpoint); the owner's device
+  //      auto-logs every message to the Sheet. No Apps Script toggle needed.
+  // Pass {strict:true} to throw (instead of P2P fallback) when Drive/Sheets
+  // fail, {deploy:true} to attempt the advanced Apps Script backend.
+  async createRoomWithSheet(roomName, roomDesc, ownerName, onProgress, options = {}) {
+    const strict = !!(options && options.strict);
     const progress = (msg) => { if (onProgress) onProgress(msg); };
 
     const roomId = Crypto.generateRoomId();
@@ -145,46 +231,50 @@ const Rooms = {
     // ── Step 1: Create Google Sheet ─────────────────────────────
     try {
       progress('Creating Google Sheet in your Google Drive…');
-      const folderId = await Drive.getOrCreateFolder();
+      console.log('[createRoomWithSheet] step: Drive folder…');
+      const folderId = await googleStep(Drive.getOrCreateFolder(), 30000, 'Drive folder তৈরি');
       const sheetTitle = `${CONFIG.SHEET_PREFIX}${name}`;
-      const file = await Drive.createSpreadsheet(sheetTitle, folderId);
+      console.log('[createRoomWithSheet] step: create spreadsheet…');
+      progress('Creating spreadsheet…');
+      const file = await googleStep(Drive.createSpreadsheet(sheetTitle, folderId), 30000, 'Sheet তৈরি');
       spreadsheetId = file.id;
       sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
       progress('Initializing spreadsheet structure…');
 
       // ── Step 2: Initialize sheet tabs ────────────────────────
-      await Sheets.initializeSpreadsheet(spreadsheetId, {
-        roomId,
-        roomName: name,
+      // Keys MUST be snake_case — Apps Script Code.gs handleGetRoom reads
+      // room_id / room_name / description / room_status / created_at.
+      console.log('[createRoomWithSheet] step: init tabs…');
+      await googleStep(Sheets.initializeSpreadsheet(spreadsheetId, {
+        room_id: roomId,
+        room_name: name,
         description,
-        createdAt: now,
-        ownerId: resolvedOwner,
-        roomSecret,
-      });
+        owner_id: resolvedOwner,
+        created_at: now,
+        room_status: 'active',
+        config_version: '1',
+        room_secret: roomSecret,
+        deployment_url: '',
+      }), 60000, 'Sheet ট্যাব তৈরি');
 
-      // ── Step 3: Deploy Apps Script ───────────────────────────
-      try {
-        progress('Deploying chat backend (Apps Script)…');
-        const deployed = await AppsScriptAPI.fullyDeploy(
-          spreadsheetId, roomId, roomSecret,
-          `Pchat shepu — ${name}`
-        );
-        if (deployed && deployed.webAppUrl) {
-          deploymentUrl = deployed.webAppUrl;
-          progress('Backend deployed successfully!');
-        }
-      } catch (deployErr) {
-        console.warn('[createRoomWithSheet] Apps Script auto-deploy skipped:', deployErr.message);
-        progress('Spreadsheet ready in Google Drive!');
-      }
+      // ── Step 3: Backend — P2P mesh + Sheet backup (zero user setup) ──
+      // Chat runs on the P2P mesh; the owner's device auto-logs every message
+      // to the Sheet. (Programmatic Apps Script deploy was removed: it needs
+      // a per-account toggle from every owner. Manual deploy via the Apps
+      // Script editor + "custom script URL" box remains available.)
+      progress('Sheet backup ready — no extra setup needed!');
 
     } catch (err) {
+      // Strict (Saved) mode: কখনো চুপচাপ P2P-তে ফলব্যাক নয় — আসল এরর উপরে পাঠাও
+      // যাতে UI সত্যিকারের কারণ দেখাতে পারে (Drive 403 / API disabled / scope)।
+      if (strict) throw err;
       console.warn('[createRoomWithSheet] Google setup failed, using instant P2P mode:', err.message);
       progress('Google setup failed — using instant P2P mode.');
       // Fall through with mock endpoint
     }
 
     // ── Step 4: Save room with final endpoint ────────────────────
+    const theme = RoomTheme.pick();
     const room = {
       id: roomId,
       secret: roomSecret,
@@ -194,6 +284,7 @@ const Rooms = {
       createdAt: now,
       isOwner: true,
       deploymentUrl,
+      theme,
       spreadsheetId: spreadsheetId || null,
       sheetUrl: sheetUrl || null,
       backendMode: spreadsheetId ? 'google-sheets' : 'p2p',
@@ -212,6 +303,8 @@ const Rooms = {
       roomName: name,
       roomDesc: description,
       roomSecret: roomSecret,
+      theme,
+      picture: ((typeof UI !== 'undefined' && UI.effectivePicture) ? UI.effectivePicture() : ''),
     };
     Storage.setSession(sessionData);
     Storage.setCurrentRoom(roomId);
@@ -220,7 +313,7 @@ const Rooms = {
     const mockStorageKey = 'shepu_mock_room_' + roomId;
     localStorage.setItem(mockStorageKey, JSON.stringify({
       id: roomId, name, description, status: 'active',
-      created_at: now,
+      created_at: now, theme,
       members: [{ id: memberId, name: resolvedOwner, role: 'owner', status: 'online', lastActive: Date.now() }],
       messages: []
     }));
@@ -292,11 +385,30 @@ const Rooms = {
     const encodedKey = roomSecret
       ? btoa(roomSecret).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
       : '';
-    const keyParam = encodedKey ? `&k=${encodedKey}` : '';
+    // Secret travels TWO ways (belt + suspenders):
+    //   1. ?k= query — survives browsers/WebViews that strip #fragments
+    //      (some in-app browsers drop everything after # on navigation).
+    //   2. #k= fragment — never reaches servers/logs.
+    // Tradeoff: ?k= appears in browser history + own server logs, but messages
+    // stay E2EE (only ciphertext ever touches ntfy/Google). Reliability wins.
+    // Links with only one of them still work (join-room reads both).
+    const keyQuery = encodedKey ? `&k=${encodedKey}` : '';
+    const keyFrag = encodedKey ? `#k=${encodedKey}` : '';
 
-    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyParam}`;
-    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyParam}`;
-    let githubUrl = `https://shepu1.github.io/s/index/pchat/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyParam}`;
+    // Theme is public (just a wallpaper digit) → plain ?th= query param
+    // BEFORE the fragment, so every device shows the same chat theme.
+    let theme = (room && room.theme) ? room.theme : 0;
+    if (!theme) {
+      try {
+        const sess2 = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+        if (sess2 && sess2.roomId === roomId && sess2.theme) theme = sess2.theme;
+      } catch {}
+    }
+    const themeParam = `&th=${RoomTheme.normalize(theme || 1)}`;
+
+    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}${keyFrag}`;
+    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}${keyFrag}`;
+    let githubUrl = `https://shepu1.github.io/s/index/pchat/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}${keyFrag}`;
 
     if (isGithub) {
       phoneUrl = githubUrl;
@@ -304,6 +416,8 @@ const Rooms = {
     }
 
     const primaryUrl = isGithub ? githubUrl : (isLocalhost ? phoneUrl : localUrl);
+    // Fallback remote QR (used only if local QR lib is missing).
+    // NOTE: prefer InstantSecurity.renderQR() so the secret never leaves the device.
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(primaryUrl)}`;
 
     return {
@@ -311,6 +425,7 @@ const Rooms = {
       localUrl,
       githubUrl,
       qrCodeUrl,
+      qrText: primaryUrl,
       defaultUrl: primaryUrl,
     };
   },
@@ -446,15 +561,38 @@ const RoomAPI = {
     return this.post(endpointUrl, { action: 'room_op', memberId, sessionToken, op, ...extra });
   },
 
-  // ── Mock Fetch with Universal Cross-Device Cloud Sync (Instant P2P mode) ──
+  // ── Mock Fetch with Universal Cross-Device Cloud Sync (Quick P2P mode) ──
   async _mockFetch(endpointUrl, method, body) {
     const rawUrl = endpointUrl.replace('mock://local/', '');
     const roomId = rawUrl.split('?')[0];
     const params = method === 'GET' ? body : body;
     const action = params?.action || 'room';
     const mockStorageKey = 'shepu_mock_room_' + roomId;
-    const ntfyTopic = `shepu_pchat_${roomId}`;
-    const ntfyUrl = `https://ntfy.sh/${ntfyTopic}`;
+    // Private (secret-derived) + legacy topics. Best-effort secret lookup —
+    // falls back to legacy topic so old clients keep working.
+    const _sec = (() => {
+      try {
+        const reg = (typeof Rooms !== 'undefined' && Rooms.getRoom) ? Rooms.getRoom(roomId) : null;
+        if (reg && reg.secret) return reg.secret;
+        const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+        if (sess && sess.roomId === roomId && sess.roomSecret) return sess.roomSecret;
+      } catch {}
+      return null;
+    })();
+    const _topics = (typeof InstantSecurity !== 'undefined')
+      ? InstantSecurity.topicsFor(roomId, _sec)
+      : [`shepu_pchat_${roomId}`];
+    const _relay = (payload) => {
+      _topics.forEach(t => {
+        try {
+          fetch(`https://ntfy.sh/${t}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          }).catch(() => {});
+        } catch {}
+      });
+    };
 
     let roomData;
     try {
@@ -495,13 +633,8 @@ const RoomAPI = {
       const role = existingMember ? (existingMember.role || 'member') : 'member';
 
       // Broadcast join to public relay (works on GitHub Pages & phones)
-      try {
-        fetch(ntfyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'join', memberId, displayName, role, picture }),
-        }).catch(() => {});
-      } catch (e) {}
+      // NOTE: join carries no secret — P2P proof is verified separately.
+      _relay({ type: 'join', memberId, displayName, role, picture });
 
       const existingIdx = roomData.members.findIndex(m => m.id === memberId);
       if (existingIdx >= 0) {
@@ -564,14 +697,9 @@ const RoomAPI = {
         localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
       }
 
-      // 1. Broadcast to public cloud relay (ntfy.sh) so phones & other browsers receive it instantly
-      try {
-        fetch(ntfyUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'message', msg: newMsg }),
-        }).catch(() => {});
-      } catch (e) {}
+      // 1. Broadcast to cloud relay (ntfy.sh) so phones & other browsers receive it instantly.
+      // Messages are already E2EE ciphertext (enc:...) when a room key exists.
+      _relay({ type: 'message', msg: newMsg });
 
       return { success: true, messageId: newMsg.id };
     }
@@ -595,7 +723,32 @@ const RoomAPI = {
       return { success: true };
     }
 
-    if (action === 'presence' || action === 'leave') {
+    if (action === 'presence') {
+      // Record heartbeat so same-device rosters + last-seen are truthful.
+      const mid = params.memberId;
+      if (mid) {
+        const ix = roomData.members.findIndex(m => (m.id || m.memberId) === mid);
+        if (ix >= 0) {
+          roomData.members[ix] = {
+            ...roomData.members[ix],
+            status: params.status || 'online',
+            lastActive: Date.now(),
+          };
+          localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        }
+      }
+      return { success: true };
+    }
+
+    if (action === 'leave') {
+      const mid = params.memberId;
+      if (mid) {
+        const ix = roomData.members.findIndex(m => (m.id || m.memberId) === mid);
+        if (ix >= 0) {
+          roomData.members[ix] = { ...roomData.members[ix], status: 'offline', lastActive: Date.now() };
+          localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        }
+      }
       return { success: true };
     }
 

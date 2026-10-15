@@ -82,7 +82,7 @@
   min-height: 0;
   position: relative;
   background-color: #070a13;
-  /* PC / Desktop Theme */
+  /* Default = theme1 (rooms created before themes existed) */
   background-image:
     linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
     url('../assets/themes/theme1.webp');
@@ -92,9 +92,38 @@
   background-attachment: fixed;
 }
 
-/* Phone / Mobile Screen Theme (theme1_and.webp) */
+/* Room wallpapers — picked at creation (theme1=30%, theme2-5=17.5% each).
+   Applied via RoomTheme.apply() as .theme-N on .chat-main. */
+.chat-main.theme-1 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
+    url('../assets/themes/theme1.webp');
+}
+.chat-main.theme-2 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
+    url('../assets/themes/theme2.webp');
+}
+.chat-main.theme-3 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
+    url('../assets/themes/theme3.webp');
+}
+.chat-main.theme-4 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
+    url('../assets/themes/theme4.webp');
+}
+.chat-main.theme-5 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
+    url('../assets/themes/theme5.webp');
+}
+
+/* Phone / Mobile Screen Themes (*_and.webp) */
 @media (max-width: 900px), (hover: none) and (pointer: coarse) {
-  .chat-main {
+  .chat-main,
+  .chat-main.theme-1 {
     background-image:
       linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
       url('../assets/themes/theme1_and.webp') !important;
@@ -103,10 +132,47 @@
     background-repeat: no-repeat !important;
     background-attachment: scroll !important;
   }
+  .chat-main.theme-2 {
+    background-image:
+      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+      url('../assets/themes/theme2_and.webp') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: scroll !important;
+  }
+  .chat-main.theme-3 {
+    background-image:
+      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+      url('../assets/themes/theme3_and.webp') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: scroll !important;
+  }
+  .chat-main.theme-4 {
+    background-image:
+      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+      url('../assets/themes/theme4_and.webp') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: scroll !important;
+  }
+  .chat-main.theme-5 {
+    background-image:
+      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+      url('../assets/themes/theme5_and.webp') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: scroll !important;
+  }
 }
 
+/* JS-driven mobile fallback (same images as the media query above) */
 .is-mobile .chat-main,
-.chat-main.mobile-theme {
+.is-mobile .chat-main.theme-1 {
   background-image:
     linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
     url('../assets/themes/theme1_and.webp') !important;
@@ -114,6 +180,69 @@
   background-position: center center !important;
   background-repeat: no-repeat !important;
   background-attachment: scroll !important;
+}
+.is-mobile .chat-main.theme-2 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+    url('../assets/themes/theme2_and.webp') !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+}
+.is-mobile .chat-main.theme-3 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+    url('../assets/themes/theme3_and.webp') !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+}
+.is-mobile .chat-main.theme-4 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+    url('../assets/themes/theme4_and.webp') !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+}
+.is-mobile .chat-main.theme-5 {
+  background-image:
+    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
+    url('../assets/themes/theme5_and.webp') !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: scroll !important;
+}
+
+/* ── Theme button: PC-only (phones use 3s long-press on wallpaper) ── */
+#room-theme-btn {
+  display: none;
+}
+@media (min-width: 860px) {
+  #room-theme-btn {
+    display: inline-flex;
+  }
+}
+
+/* ── Theme picker grid ─────────────────────────────────────────── */
+#theme-grid button {
+  border: 2px solid transparent;
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  height: 64px;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+#theme-grid button:hover { transform: scale(1.05); }
+#theme-grid button.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
 }
 
 /* ── Chat Header ────────────────────────────────────────────────── */
@@ -1152,6 +1281,60 @@
   transition: opacity var(--t-fast);
 }
 .member-row:hover .member-kick-btn { opacity: 1; }
+
+/* ── Member list polish: presence ring, pills, sections ────────── */
+.member-avatar {
+  position: relative;
+}
+.member-avatar.is-online {
+  border-color: rgba(34, 197, 94, 0.7);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.member-avatar.has-img {
+  padding: 0;
+  overflow: hidden;
+}
+.member-avatar.has-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+.member-row.is-offline {
+  opacity: 0.62;
+}
+.member-row.is-offline:hover {
+  opacity: 1;
+}
+.member-pill {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.08rem 0.45rem;
+  border-radius: var(--r-full);
+  margin-left: 0.35rem;
+  vertical-align: 1px;
+}
+.member-pill.me {
+  background: rgba(59, 130, 246, 0.14);
+  color: var(--accent-2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.member-pill.owner {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.member-section-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.6rem 0.625rem 0.15rem;
+}
 
 /* Reply quote inner elements */
 .reply-quote-name {

@@ -38,37 +38,6 @@ const Encryption = (() => {
     return _key;
   }
 
-  // ── Generate a new random AES-GCM key ─────────────────────────
-  async function generateKey() {
-    _key = await crypto.subtle.generateKey(
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    return _key;
-  }
-
-  // ── Export key as base64 ──────────────────────────────────────
-  async function exportKeyBase64(cryptoKey) {
-    const k = cryptoKey || _key;
-    if (!k) throw new Error("No key available");
-    const raw = await crypto.subtle.exportKey("raw", k);
-    return _arrayBufferToBase64(raw);
-  }
-
-  // ── Import key from base64 ────────────────────────────────────
-  async function importKeyBase64(base64) {
-    const raw = _base64ToArrayBuffer(base64);
-    _key = await crypto.subtle.importKey(
-      "raw",
-      raw,
-      { name: "AES-GCM" },
-      true,
-      ["encrypt", "decrypt"]
-    );
-    return _key;
-  }
-
   // ── Encrypt plaintext → base64 ciphertext with prefix ─────────
   async function encrypt(plaintext) {
     if (!_key) return plaintext; // If not encrypted, return as is
@@ -118,12 +87,15 @@ const Encryption = (() => {
   }
 
   function isActive() { return _key !== null; }
-  // True only for explicit passphrase mode (encrypt new messages).
-  function shouldEncrypt() { return _manual === true && _key !== null; }
+  // Auto-E2EE: ANY derived key (invite-link secret OR manual passphrase)
+  // encrypts new messages. Guests never see a prompt — the key comes
+  // silently from the invite link fragment (#k=). Manual mode is kept
+  // only for UI status (extra passphrase layer on top).
+  function shouldEncrypt() { return _key !== null; }
   function isManual() { return _manual === true; }
   function clearKey() { _key = null; _manual = false; }
 
-  // ── Derive AES-GCM key from a room secret (Instant rooms) ───────
+  // ── Derive AES-GCM key from a room secret (Quick rooms) ───────
   // Every member who has the room secret (embedded in the invite link)
   // derives the SAME key, so messages are encrypted at rest
   // (localStorage + ntfy cloud) without any server-side key exchange.
@@ -151,7 +123,7 @@ const Encryption = (() => {
       true,
       ["encrypt", "decrypt"]
     );
-    _manual = false; // auto room key = decrypt-only, never blocks guests
+    _manual = false; // auto room key = silent E2EE, no prompt for guests
     return _key;
   }
 
@@ -172,9 +144,6 @@ const Encryption = (() => {
   return {
     deriveKeyFromPassword,
     deriveKeyFromRoomSecret,
-    generateKey,
-    exportKeyBase64,
-    importKeyBase64,
     encrypt,
     decrypt,
     isActive,

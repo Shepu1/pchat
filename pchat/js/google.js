@@ -106,8 +106,6 @@ const GoogleAPI = (() => {
     get:    (url, opts)  => request(url, { method: 'GET',    ...opts }),
     post:   (url, body, opts) => request(url, { method: 'POST',   body: JSON.stringify(body), ...opts }),
     put:    (url, body, opts) => request(url, { method: 'PUT',    body: JSON.stringify(body), ...opts }),
-    patch:  (url, body, opts) => request(url, { method: 'PATCH',  body: JSON.stringify(body), ...opts }),
-    delete: (url, opts)  => request(url, { method: 'DELETE',  ...opts }),
     request,
   };
 })();
