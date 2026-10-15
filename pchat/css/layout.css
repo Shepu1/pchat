@@ -1,0 +1,419 @@
+/* ================================================================
+   SHEPU ROOMS — layout.css
+   Page-level layout: containers, grids, panels, auth wrappers
+   ================================================================ */
+
+/* ── Page Wrapper ───────────────────────────────────────────────── */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ── Noise / Grain overlay ───────────────────────────────────────── */
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+/* ── Gradient Mesh Background ───────────────────────────────────── */
+.bg-mesh {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bg-mesh::before,
+.bg-mesh::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+}
+
+.bg-mesh::before {
+  width: 700px; height: 700px;
+  background: radial-gradient(circle, #6c63ff 0%, transparent 70%);
+  top: -200px; left: -200px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.bg-mesh::after {
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, #8f49d4 0%, transparent 70%);
+  bottom: -150px; right: -150px;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+/* ── Container ──────────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.container-sm { max-width: 540px; }
+.container-md { max-width: 780px; }
+
+/* ── Navbar ─────────────────────────────────────────────────────── */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-dropdown);
+  background: rgba(10,11,15,0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.875rem 0;
+}
+
+.navbar .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-family: var(--font-brand);
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  transition: opacity var(--t-fast);
+}
+
+.navbar-brand:hover { opacity: 0.85; }
+
+.navbar-brand .logo-mark {
+  width: 34px; height: 34px;
+  background: var(--accent-gradient);
+  border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  font-size: 0.875rem;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: 0 4px 14px var(--accent-glow);
+  overflow: hidden;
+}
+
+.app-logo-img, .brand-logo-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: block;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ── Hero Section ───────────────────────────────────────────────── */
+.hero {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 5rem 0 4rem;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-content {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem;
+  background: var(--accent-dim);
+  border: 1px solid rgba(108,99,255,0.25);
+  border-radius: var(--r-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent-2);
+  margin-bottom: 1.75rem;
+  animation: fadeIn 0.5s ease;
+}
+
+.hero-badge .dot {
+  width: 6px; height: 6px;
+  background: var(--success);
+  border-radius: 50%;
+  animation: pulse 2s ease infinite;
+}
+
+.hero-title {
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: 1.25rem;
+  animation: fadeInUp 0.5s ease 0.1s both;
+}
+
+.hero-title .gradient-text {
+  background: linear-gradient(135deg, #fff 30%, #60a5fa 70%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-tagline {
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  color: var(--text-2);
+  margin-bottom: 2.5rem;
+  animation: fadeInUp 0.5s ease 0.2s both;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.875rem;
+  justify-content: center;
+  animation: fadeInUp 0.5s ease 0.3s both;
+}
+
+/* ── Feature Cards Grid ─────────────────────────────────────────── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-top: 4rem;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Auth Layout ────────────────────────────────────────────────── */
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  position: relative;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 2.5rem 2rem;
+  animation: scaleIn 0.3s ease;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  z-index: 1;
+}
+
+.auth-card .logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.auth-card .logo-mark-lg {
+  width: 60px; height: 60px;
+  background: var(--accent-gradient);
+  border-radius: var(--r-md);
+  display: grid; place-items: center;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: var(--shadow-glow);
+  overflow: hidden;
+}
+
+/* ── App Layout (Dashboard, etc.) ───────────────────────────────── */
+.app-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: 60px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.25rem;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  z-index: var(--z-dropdown);
+}
+
+.app-sidebar {
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-main {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ── Chat Layout ────────────────────────────────────────────────── */
+.chat-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 64px 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Panel ──────────────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Modal Overlay ──────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-overlay.hidden { display: none !important; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-xl);
+  padding: 2rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-lg);
+  animation: scaleIn 0.2s ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.modal-close {
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  color: var(--muted);
+  transition: all var(--t-fast);
+  font-size: 1.25rem;
+}
+
+.modal-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ── Progress Steps ─────────────────────────────────────────────── */
+.progress-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  transition: all var(--t-base);
+}
+
+.progress-step.active  { background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.2); }
+.progress-step.done    { background: var(--success-dim); border: 1px solid rgba(34,212,122,0.2); }
+.progress-step.error   { background: var(--danger-dim);  border: 1px solid rgba(255,79,110,0.2); }
+
+.step-icon {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.progress-step.active  .step-icon { background: var(--accent);  color: #fff; }
+.progress-step.done    .step-icon { background: var(--success); color: #fff; }
+.progress-step.error   .step-icon { background: var(--danger);  color: #fff; }
+.progress-step.pending .step-icon { background: var(--surface-3); color: var(--muted); }
+
+/* ── Section ────────────────────────────────────────────────────── */
+.section {
+  padding: 4rem 0;
+  position: relative;
+  z-index: 1;
+}
+
+.section-title {
+  text-align: center;
+  margin-bottom: 0.625rem;
+}
+
+.section-subtitle {
+  text-align: center;
+  color: var(--text-2);
+  margin-bottom: 3rem;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────── */
+.footer {
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  position: relative;
+  z-index: 1;
+}

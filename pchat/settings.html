@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Pchat shepu</title>
+  <meta name="description" content="Pchat shepu account and application preferences." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png" type="image/png" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+<div class="bg-mesh" aria-hidden="true"></div>
+
+<nav class="navbar">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-weight:800;font-size:1.25rem;">
+      <img src="assets/icons/icon.png" alt="Pchat shepu" class="app-logo-img" />
+      Pchat shepu
+    </a>
+    <div class="navbar-actions">
+      <a href="index.html" class="btn btn-ghost btn-sm">← Back to Chats</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page" style="padding-bottom:3rem;">
+  <div class="container" style="position:relative;z-index:1;">
+    <h1 style="padding:2rem 0 0.25rem;font-size:1.75rem;">Settings</h1>
+    <p style="color:var(--text-2);margin-bottom:1.5rem;">Manage your account and application preferences</p>
+
+    <div class="settings-layout">
+      <!-- Settings Nav -->
+      <nav class="settings-nav" aria-label="Settings sections">
+        <button class="sidebar-item active" data-section="account">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
+          <span class="item-label">Account</span>
+        </button>
+        <button class="sidebar-item" data-section="privacy">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+          <span class="item-label">Privacy</span>
+        </button>
+        <button class="sidebar-item" data-section="notifications">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
+          <span class="item-label">Notifications</span>
+        </button>
+        <button class="sidebar-item" data-section="about">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          <span class="item-label">About</span>
+        </button>
+        <button class="sidebar-item" data-section="debug">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
+          <span class="item-label">Developer</span>
+        </button>
+      </nav>
+
+      <!-- Settings Sections -->
+      <div>
+        <!-- Account -->
+        <section class="settings-section active" id="section-account">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Account</h3>
+
+            <div id="account-signed-in" style="display:none;">
+              <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+                <div class="avatar avatar-xl" id="settings-avatar" aria-hidden="true">?</div>
+                <div>
+                  <div style="font-weight:700;font-size:1.125rem;" id="settings-name">—</div>
+                  <div style="color:var(--muted);font-size:0.875rem;" id="settings-email">—</div>
+                  <div class="badge badge-success" style="margin-top:0.5rem;">Signed in</div>
+                </div>
+              </div>
+
+              
+            <!-- Google OAuth Client ID Configuration -->
+            <div class="card" style="margin-top:1.5rem;" id="google-setup">
+              <h3 style="font-size:1.125rem;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Google OAuth 2.0 Client ID
+              </h3>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1rem;">
+                Configure your Web Client ID from Google Cloud Console to enable Google Drive & Sheets room creation.
+              </p>
+
+              <div class="form-group" style="margin-bottom:1rem;">
+                <label for="settings-client-id" class="form-label">Client ID</label>
+                <div style="display:flex;gap:0.5rem;">
+                  <input 
+                    type="text" 
+                    id="settings-client-id" 
+                    class="form-input" 
+                    placeholder="123456789-xxxx.apps.googleusercontent.com" 
+                    style="font-family:monospace;font-size:0.8125rem;"
+                  />
+                  <button type="button" class="btn btn-primary" id="save-settings-client-id-btn" style="white-space:nowrap;">Save ID</button>
+                  <button type="button" class="btn btn-secondary" id="clear-settings-client-id-btn" style="white-space:nowrap;">Reset</button>
+                </div>
+              </div>
+
+              <div style="background:var(--surface-2);border-radius:var(--r-md);padding:0.875rem;font-size:0.8125rem;border:1px solid var(--border);">
+                <div style="font-weight:600;margin-bottom:0.25rem;">Authorized JavaScript Origin:</div>
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.25rem;">
+                  <code id="settings-origin-code" style="background:var(--surface-3);padding:0.25rem 0.5rem;border-radius:4px;color:var(--accent);">${window.location.origin}</code>
+                  <button type="button" class="btn btn-ghost btn-sm" id="copy-settings-origin-btn" style="font-size:0.75rem;">Copy</button>
+                </div>
+              </div>
+            </div>
+
+<div class="divider" style="margin:1.25rem 0;">Google OAuth</div>
+
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1rem;">
+                Your Google account is used only to create and manage your room's Google Drive files.
+                SHEPU ROOMS does not store your Google credentials.
+              </p>
+
+              <button class="btn btn-danger btn-sm" id="settings-signout-btn">Sign out</button>
+            </div>
+
+            <div id="account-signed-out" style="display:none;">
+              <p style="color:var(--text-2);margin-bottom:1.25rem;">
+                Sign in with Google to create and own rooms. Guests don't need to sign in.
+              </p>
+              <a href="login.html" class="btn btn-primary">Sign in with Google</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Privacy -->
+        <section class="settings-section" id="section-privacy">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Privacy Model</h3>
+
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+              <div class="panel" style="background:var(--surface-2);">
+                <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg> Where is my data stored?</h4>
+                <p style="font-size:0.875rem;color:var(--text-2);">
+                  Room data is stored in the <strong style="color:var(--text);">room owner's connected Google storage</strong>
+                  rather than in a central Pchat shepu message database.
+                  Each room's chat history lives in a Google Sheet that the owner controls.
+                </p>
+              </div>
+
+              <div class="panel" style="background:var(--surface-2);">
+                <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> Who can access my room?</h4>
+                <p style="font-size:0.875rem;color:var(--text-2);">
+                  Only people with the room link can join. Guests communicate through the room's
+                  private Apps Script endpoint — they never receive direct edit access to your Sheet.
+                </p>
+              </div>
+
+              <div class="panel" style="background:var(--surface-2);">
+                <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg> What does Pchat shepu store?</h4>
+                <p style="font-size:0.875rem;color:var(--text-2);">
+                  Pchat shepu stores only: room ID → deployment URL mappings in your browser's
+                  localStorage. No message content is stored on external third-party servers.
+                </p>
+              </div>
+
+              <div class="panel" style="background:var(--surface-2);">
+                <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> How do I delete my data?</h4>
+                <p style="font-size:0.875rem;color:var(--text-2);">
+                  Delete the room from the Owner Panel. Optionally, also delete the Google Sheet
+                  from your Google Drive. This permanently removes all chat history.
+                </p>
+              </div>
+            </div>
+
+            <div style="margin-top:1.5rem;">
+              <button class="btn btn-danger btn-sm" id="clear-local-data-btn" style="display:inline-flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Clear local app data (localStorage)
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notifications -->
+        <section class="settings-section" id="section-notifications">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Notifications</h3>
+            <p style="color:var(--text-2);font-size:0.875rem;margin-bottom:1.25rem;">
+              Browser notifications for new messages (requires permission).
+            </p>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+              <div>
+                <div style="font-weight:500;">New message notifications</div>
+                <div style="font-size:0.8125rem;color:var(--muted);" id="notif-status-text">Status: Not requested</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="request-notif-btn">Enable</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- About -->
+        <section class="settings-section" id="section-about">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">About SHEPU ROOMS</h3>
+
+            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+              <div style="width:56px;height:56px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--accent),#a855f7);display:grid;place-items:center;font-size:1.375rem;font-weight:900;color:#fff;box-shadow:var(--shadow-glow);">S</div>
+              <div>
+                <div style="font-weight:800;font-size:1.125rem;font-family:var(--font-display);">SHEPU ROOMS</div>
+                <div style="color:var(--muted);font-size:0.875rem;">Create a room. Own the data.</div>
+                <div style="color:var(--muted);font-size:0.8125rem;margin-top:2px;">v1.0.0 · Phase 1-5</div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.875rem;color:var(--text-2);">
+              <p><strong style="color:var(--text);">Architecture:</strong> Frontend → Apps Script endpoint → Google Sheet (owner's Drive)</p>
+              <p><strong style="color:var(--text);">Built with:</strong> HTML5, CSS3, Vanilla JavaScript, Google APIs</p>
+              <p><strong style="color:var(--text);">Storage:</strong> Google Drive (owner-controlled), localStorage (session), IndexedDB (cache)</p>
+              <p><strong style="color:var(--text);">Note:</strong> Google Sheets API quotas apply. Optimized for small private rooms, not unlimited public chat.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Developer -->
+        <section class="settings-section" id="section-debug">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Developer Tools</h3>
+
+            <div style="display:flex;flex-direction:column;gap:0.875rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div>
+                  <div style="font-weight:500;">Debug logging</div>
+                  <div style="font-size:0.8125rem;color:var(--muted);">Log API calls to console (never logs message content)</div>
+                </div>
+                <label style="position:relative;width:44px;height:24px;cursor:pointer;" aria-label="Toggle debug logging">
+                  <input type="checkbox" id="debug-toggle" style="opacity:0;width:0;height:0;position:absolute;" />
+                  <span id="debug-track" style="position:absolute;inset:0;background:var(--surface-3);border-radius:var(--r-full);transition:background 0.2s;border:1px solid var(--border);"></span>
+                  <span id="debug-thumb" style="position:absolute;left:3px;top:3px;width:18px;height:18px;background:var(--muted);border-radius:50%;transition:transform 0.2s;"></span>
+                </label>
+              </div>
+
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:500;margin-bottom:0.5rem;">Stored Auth State</div>
+                <pre id="debug-auth" style="font-size:0.75rem;max-height:120px;overflow:auto;"></pre>
+              </div>
+
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:500;margin-bottom:0.5rem;">Stored Rooms</div>
+                <pre id="debug-rooms" style="font-size:0.75rem;max-height:120px;overflow:auto;"></pre>
+              </div>
+
+              <button class="btn btn-secondary btn-sm" id="clear-idb-btn">Clear IndexedDB Cache</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<script src="js/config.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/rooms.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Tab navigation
+  document.querySelectorAll('[data-section]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-section]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      const section = document.getElementById('section-' + btn.dataset.section);
+      if (section) section.classList.add('active');
+    });
+  });
+
+  // Auth state
+  const auth = Storage.getAuth();
+  if (auth && auth.accessToken) {
+    document.getElementById('account-signed-in').style.display = '';
+    document.getElementById('account-signed-out').style.display = 'none';
+    if (auth.user) {
+      document.getElementById('settings-name').textContent = auth.user.name || '';
+      document.getElementById('settings-email').textContent = auth.user.email || '';
+      document.getElementById('settings-avatar').textContent = (auth.user.name || auth.user.email || '?')[0].toUpperCase();
+    }
+  } else {
+    document.getElementById('account-signed-in').style.display = 'none';
+    document.getElementById('account-signed-out').style.display = '';
+  }
+
+  document.getElementById('settings-signout-btn').addEventListener('click', () => {
+    Auth.signOut();
+    window.location.href = 'index.html';
+  });
+
+  // Clear local data
+  document.getElementById('clear-local-data-btn').addEventListener('click', async () => {
+    const ok = await UI.confirmDialog({
+      title: 'Clear local data?',
+      message: 'This will sign you out and remove room cache.',
+      confirmText: 'Clear all',
+      cancelText: 'Keep',
+      danger: true,
+    });
+    if (ok) {
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = 'index.html';
+    }
+  });
+
+  // Notifications
+  const notifBtn = document.getElementById('request-notif-btn');
+  const notifStatus = document.getElementById('notif-status-text');
+
+  if ('Notification' in window) {
+    notifStatus.textContent = 'Status: ' + Notification.permission;
+    if (Notification.permission === 'granted') notifBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;vertical-align:-2px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Enabled';
+  } else {
+    notifStatus.textContent = 'Not supported in this browser';
+    notifBtn.disabled = true;
+  }
+
+  notifBtn.addEventListener('click', async () => {
+    const perm = await Notification.requestPermission();
+    notifStatus.textContent = 'Status: ' + perm;
+    if (perm === 'granted') notifBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;vertical-align:-2px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Enabled';
+  });
+
+  // Debug toggle
+  const debugToggle = document.getElementById('debug-toggle');
+  debugToggle.checked = Storage.get('debug_mode') === 'true';
+  updateToggle();
+
+  debugToggle.addEventListener('change', () => {
+    Storage.set('debug_mode', String(debugToggle.checked));
+    updateToggle();
+  });
+
+  function updateToggle() {
+    const on = debugToggle.checked;
+    document.getElementById('debug-track').style.background = on ? 'var(--accent)' : 'var(--surface-3)';
+    document.getElementById('debug-thumb').style.transform = on ? 'translateX(20px)' : 'translateX(0)';
+    document.getElementById('debug-thumb').style.background = on ? '#fff' : 'var(--muted)';
+  }
+
+  // Debug info
+  const authRaw = Storage.getAuth();
+  const safeAuth = authRaw ? { user: authRaw.user, hasToken: !!authRaw.accessToken, expiresAt: authRaw.expiresAt } : null;
+  document.getElementById('debug-auth').textContent = JSON.stringify(safeAuth, null, 2);
+  const roomsForDebug = (typeof Rooms !== 'undefined' && Rooms.getMyRooms) ? Rooms.getMyRooms().map(r => ({ id: r.id, name: r.name, status: r.status })) : [];
+  document.getElementById('debug-rooms').textContent = JSON.stringify(roomsForDebug, null, 2);
+
+  // Clear IDB
+  document.getElementById('clear-idb-btn').addEventListener('click', async () => {
+    const IDBStorage = window.IDBStorage;
+    if (IDBStorage) {
+      await IDBStorage.clearAll();
+      UI.toast('success', 'Cleared', 'IndexedDB cache cleared.');
+    } else {
+      UI.toast('info', 'Note', 'IndexedDB storage not initialized.');
+    }
+  });
+
+  // Google Client ID in settings
+  const clientIdInput = document.getElementById('settings-client-id');
+  const originCode    = document.getElementById('settings-origin-code');
+  if (originCode) originCode.textContent = window.location.origin;
+
+  if (clientIdInput) {
+    clientIdInput.value = CONFIG.isGoogleConfigured() ? CONFIG.GOOGLE_CLIENT_ID : '';
+
+    document.getElementById('save-settings-client-id-btn').addEventListener('click', () => {
+      const val = clientIdInput.value.trim();
+      if (!val || val.length < 20 || !val.includes('.apps.googleusercontent.com')) {
+        UI.toast('error', 'Invalid Client ID', 'Please enter a valid Google Web Client ID ending with .apps.googleusercontent.com');
+        return;
+      }
+      CONFIG.setClientId(val);
+      UI.toast('success', 'Saved', 'Google OAuth Client ID updated.');
+    });
+
+    document.getElementById('clear-settings-client-id-btn').addEventListener('click', () => {
+      CONFIG.clearClientId();
+      clientIdInput.value = '';
+      UI.toast('info', 'Reset', 'Google OAuth Client ID reset to default.');
+    });
+
+    document.getElementById('copy-settings-origin-btn').addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.origin);
+      UI.toast('success', 'Copied', 'Authorized origin copied.');
+    });
+  }
+
+});
+</script>
+</body>
+</html>

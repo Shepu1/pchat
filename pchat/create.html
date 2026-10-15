@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Room — Pchat shepu</title>
+  <meta name="description" content="Create a private chat room backed by your Google Sheet. Share via link or QR code." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png" type="image/png" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+  <script src="js/icons.js"></script>
+</head>
+<body>
+<div class="bg-mesh" aria-hidden="true"></div>
+
+<!-- ── Navbar ───────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-family:var(--font-display);font-weight:800;font-size:1.25rem;">
+      <img src="assets/icons/icon.png" alt="Pchat shepu" class="app-logo-img" />
+      Pchat shepu
+    </a>
+    <div class="navbar-actions">
+      <a href="index.html" class="btn btn-ghost btn-sm">← Back to Chats</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page" role="main" style="padding:2.5rem 1rem 4rem;">
+  <div class="container container-sm">
+
+    <!-- ── Step 1: Create Form ─────────────────────────────────────── -->
+    <div id="step-form" class="panel" style="background:var(--surface);border:1px solid var(--border-2);padding:2rem;border-radius:var(--r-xl);box-shadow:var(--shadow-lg);">
+      <div style="text-align:center;margin-bottom:2rem;">
+        <div style="width:64px;height:64px;margin:0 auto 1rem;border-radius:50%;background:var(--accent-gradient-subtle);display:flex;align-items:center;justify-content:center;color:var(--accent);border:1px solid rgba(99,102,241,0.3);" id="room-emoji-preview">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <h1 style="font-size:1.6rem;letter-spacing:-0.02em;">Create a Private Room</h1>
+        <p style="color:var(--text-2);margin-top:0.35rem;font-size:0.9rem;">
+          Instant link and QR code will be generated for your friends.
+        </p>
+      </div>
+
+      <form id="create-form" novalidate style="display:flex;flex-direction:column;gap:1.5rem;">
+        <!-- Choose Icon / Emoji -->
+        <div>
+          <label class="form-label" style="font-size:0.8125rem;font-weight:600;margin-bottom:0.5rem;display:block;">
+            Pick a Room Icon
+          </label>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;" id="emoji-picker-row">
+            <button type="button" class="btn-emoji-tag active" data-emoji="💬" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-3);border:1px solid var(--accent);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="🔥" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.38 0 2.5-1.12 2.5-2.5 0-1.63-1.07-2.67-1.74-3.32-.4-.39-.76-.74-.76-1.18 0-.44.33-.8.75-.8.56 0 1.25.32 1.75.82 1.5 1.5 2.5 3.5 2.5 6A6.5 6.5 0 0 1 2 16c0-3.5 2.5-6.5 5-8.5.5 1 1.5 2 1.5 3.5 0 .5-.25.96-.5 1.4-.41.72-.5 1.5-.5 2.1z"></path></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="🚀" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="🎮" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="🔐" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="☕" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="🌟" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>
+            <button type="button" class="btn-emoji-tag" data-emoji="🍕" style="padding:0.5rem;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>
+          </div>
+        </div>
+
+        <!-- ── Connection Mode: Instant (P2P) vs Secure (Google Sheet) ── -->
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.8125rem;font-weight:600;margin-bottom:0.5rem;display:block;">
+            Connection Mode
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;" id="room-mode-picker">
+            <button type="button" class="room-mode-btn active" data-mode="instant"
+              style="display:flex;align-items:center;gap:0.6rem;padding:0.85rem;border-radius:var(--r-md);background:var(--surface-3);border:1.5px solid var(--accent);text-align:left;cursor:pointer;transition:all var(--t-fast);">
+              <span style="width:38px;height:38px;flex-shrink:0;border-radius:var(--r-md);background:var(--accent-gradient-subtle);display:flex;align-items:center;justify-content:center;color:var(--accent);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              </span>
+              <span>
+                <span style="display:block;font-weight:700;font-size:0.95rem;">Instant</span>
+                <span style="display:block;font-size:0.72rem;color:var(--text-2);">Peer-to-peer · no login</span>
+              </span>
+            </button>
+            <button type="button" class="room-mode-btn" data-mode="secure"
+              style="display:flex;align-items:center;gap:0.6rem;padding:0.85rem;border-radius:var(--r-md);background:var(--surface-2);border:1.5px solid var(--border);text-align:left;cursor:pointer;transition:all var(--t-fast);">
+              <span style="width:38px;height:38px;flex-shrink:0;border-radius:var(--r-md);background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;color:#10b981;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              </span>
+              <span>
+                <span style="display:block;font-weight:700;font-size:0.95rem;">Secure</span>
+                <span style="display:block;font-size:0.72rem;color:var(--text-2);">Google Sheet backup</span>
+              </span>
+            </button>
+          </div>
+          <p class="form-hint" id="mode-hint" style="margin-top:0.5rem;">Instant rooms connect devices directly over peer-to-peer — no sign-in needed.</p>
+        </div>
+
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+            <label class="form-label" for="room-name" style="margin-bottom:0;font-weight:600;">Room Name <span class="required">*</span></label>
+            <button type="button" id="btn-random-name" style="font-size:0.75rem;color:var(--accent-2);font-weight:600;display:flex;align-items:center;gap:0.35rem;background:none;border:none;cursor:pointer;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle></svg> Random Name
+            </button>
+          </div>
+          <input
+            type="text"
+            class="form-input"
+            id="room-name"
+            placeholder="e.g. Midnight Hangout"
+            maxlength="80"
+            required
+            autocomplete="off"
+            style="font-size:1rem;padding:0.75rem 1rem;"
+          />
+          <p class="form-hint" id="room-name-count">0 / 80</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="room-description" style="font-weight:600;">
+            Topic or Description <span style="color:var(--muted);font-weight:400;">(optional)</span>
+          </label>
+          <input
+            type="text"
+            class="form-input"
+            id="room-description"
+            placeholder="e.g. Chatting about music and life"
+            maxlength="120"
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Google Sheet & Apps Script Integration -->
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:1.1rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+            <label style="font-size:0.85rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:0.4rem;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg>
+              <span>Google Sheet & Apps Script Backend</span>
+            </label>
+            <span style="font-size:0.75rem;color:var(--success);font-weight:600;" id="auth-status-indicator">
+              ● Google Cloud Ready
+            </span>
+          </div>
+          <p style="font-size:0.8rem;color:var(--text-2);margin:0 0 0.75rem;line-height:1.4;">
+            Messages are stored in your Google Sheet. If you already have an Apps Script Web App URL, paste it below, or leave blank to auto-create with your Google account.
+          </p>
+          <input
+            type="url"
+            class="form-input"
+            id="custom-script-url"
+            placeholder="e.g. https://script.google.com/macros/s/.../exec (optional)"
+            style="font-size:0.82rem;padding:0.6rem 0.85rem;"
+          />
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;font-size:0.75rem;">
+            <a href="https://docs.google.com/spreadsheets/create" target="_blank" rel="noopener" style="color:var(--accent-2);text-decoration:none;font-weight:600;">
+              ↗ Open New Google Sheet
+            </a>
+            <button type="button" id="btn-copy-apps-script-code" class="btn btn-ghost btn-sm" style="font-size:0.75rem;padding:0.2rem 0.6rem;display:inline-flex;align-items:center;gap:4px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Apps Script Code
+            </button>
+          </div>
+        </div>
+
+        <div id="create-error" class="panel" style="background:var(--danger-dim);border-color:var(--danger);padding:0.875rem;display:none;" role="alert">
+          <p style="font-size:0.875rem;color:var(--danger);" id="create-error-text"></p>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full btn-lg" id="create-btn" style="padding:0.85rem;font-size:1.05rem;">
+          <span class="btn-text" style="display:inline-flex;align-items:center;gap:6px;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg> Create Room & Generate Link</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- ── Step 2: Instant Loader ──────────────────────────────── -->
+    <div id="step-progress" class="panel" style="background:var(--surface);border:1px solid var(--border-2);padding:3rem 2rem;border-radius:var(--r-xl);text-align:center;display:none;">
+      <div class="spinner" style="margin:0 auto 1.25rem;"></div>
+      <h2 style="font-size:1.35rem;font-weight:700;margin-bottom:0.25rem;" id="progress-title">Creating your room…</h2>
+      <p style="color:var(--text-2);font-size:0.875rem;" id="progress-subtitle">Generating invite link and QR code</p>
+    </div>
+
+    <!-- ── Step 3: Success Screen (QR Code + Phone Link) ──────────── -->
+    <div id="step-done" class="panel" style="background:var(--surface);border:1px solid var(--border-2);padding:2.5rem 2rem;border-radius:var(--r-xl);text-align:center;box-shadow:var(--shadow-lg);display:none;">
+      <div style="width:60px;height:60px;margin:0 auto 1rem;border-radius:50%;background:rgba(16,185,129,0.15);color:var(--success);display:flex;align-items:center;justify-content:center;border:1px solid rgba(16,185,129,0.3);">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <h2 style="font-size:1.6rem;letter-spacing:-0.02em;margin-bottom:0.35rem;">Room is Live!</h2>
+      <p style="color:var(--text-2);font-size:0.95rem;margin-bottom:1.5rem;" id="done-room-name">Your private room is ready.</p>
+
+      <!-- Live QR Code -->
+      <div class="qr-container">
+        <img id="done-qr-img" src="" alt="Scan QR Code with Phone" />
+        <p style="font-size:0.75rem;color:#1e293b;margin-top:0.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> Scan with phone camera to join
+        </p>
+      </div>
+
+      <!-- Single universal invite link (works on phone + PC) -->
+      <div style="max-width:440px;margin:1.5rem auto 1rem;">
+        <div class="copy-field" style="margin-bottom:0.5rem;">
+          <span class="copy-url" id="done-room-url" style="font-size:0.8rem;text-align:left;">—</span>
+          <button class="btn btn-sm btn-primary" id="copy-link-btn" style="padding:0.4rem 1rem;">Copy</button>
+        </div>
+
+        <p style="font-size:0.75rem;color:var(--muted);line-height:1.4;" id="link-hint">
+          Share this link or QR code — it works on phone and PC.
+        </p>
+
+        <!-- Troubleshooting Drawer -->
+        <div class="troubleshoot-box">
+          <button type="button" class="troubleshoot-toggle" id="btn-toggle-troubleshoot">
+            <span style="display:inline-flex;align-items:center;gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Phone not connecting? Click for help</span>
+            <span id="troubleshoot-chevron">▾</span>
+          </button>
+          <div class="troubleshoot-content" id="troubleshoot-content" style="display:none;">
+            <ol style="padding-left:1.2rem;margin-bottom:0.5rem;display:flex;flex-direction:column;gap:0.35rem;">
+              <li>Make sure your mobile phone is connected to the <strong>same Wi-Fi router</strong> as your computer (not mobile data/4G).</li>
+              <li>Instant rooms sync across devices over peer-to-peer &amp; the cloud — no local server needed.</li>
+              <li><strong>Universal access anywhere:</strong> Host on GitHub Pages (<code>https://shepu1.github.io/s/index/pchat/</code>) or run <code>npx localtunnel --port 5500</code> in terminal!</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:440px;margin:1.5rem auto 0;">
+        <button class="btn btn-primary btn-full btn-lg" id="open-chat-btn" style="padding:0.85rem;font-size:1.05rem;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> Enter Chat Room
+        </button>
+        <button class="btn btn-secondary btn-full" id="share-link-btn" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Share Link with Friends
+        </button>
+        <a href="index.html" class="btn btn-ghost btn-full" style="color:var(--text-2);">
+          ← Go to Dashboard
+        </a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+<script src="js/config.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/custom-emoji.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/google.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/apps-script.js"></script>
+<script src="js/rooms.js"></script>
+<script src="js/create-room.js"></script>
+<script>
+  // Random room names generator
+  const randomNames = [
+    'Night Owls', 'Coffee & Code', 'Game Squad', 
+    'Secret Den', 'Vibe Station', 'Tech Mavericks', 
+    'Chill Lounge', 'Deep Talks', 'Weekend Crew'
+  ];
+  const diceBtn = document.getElementById('btn-random-name');
+  const nameInput = document.getElementById('room-name');
+  if (diceBtn && nameInput) {
+    diceBtn.addEventListener('click', () => {
+      const pick = randomNames[Math.floor(Math.random() * randomNames.length)];
+      nameInput.value = pick;
+      const count = document.getElementById('room-name-count');
+      if (count) count.textContent = `${pick.length} / 80`;
+    });
+  }
+
+  // Emoji picker row
+  let selectedEmoji = '💬';
+  const emojiBtns = document.querySelectorAll('.btn-emoji-tag');
+  const emojiPreview = document.getElementById('room-emoji-preview');
+  emojiBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      emojiBtns.forEach(b => {
+        b.classList.remove('active');
+        b.style.background = 'var(--surface-2)';
+        b.style.borderColor = 'var(--border)';
+      });
+      btn.classList.add('active');
+      btn.style.background = 'var(--surface-3)';
+      btn.style.borderColor = 'var(--accent)';
+      selectedEmoji = btn.getAttribute('data-emoji');
+      if (emojiPreview) emojiPreview.textContent = selectedEmoji;
+    });
+  });
+</script>
+</body>
+</html>

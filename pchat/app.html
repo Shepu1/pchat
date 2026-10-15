@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Pchat shepu — Fast & Private Messaging</title>
+  <meta name="description" content="Pchat shepu: Next-gen responsive web & mobile chat app. Real-time multi-device sync with Google Sheets & Apps Script." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png" type="image/png" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+  <script src="js/icons.js"></script>
+  <style>
+    /* Professional Clean SaaS Responsive Layout */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      font-family: var(--font-body);
+      color: var(--text);
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-layout-container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar (Chats) */
+    .app-sidebar-col {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-2);
+      border-right: 1px solid var(--border);
+      position: relative;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    /* Right Main Canvas (Desktop Hub) */
+    .app-main-col {
+      flex: 1;
+      height: 100vh;
+      display: none;
+      background: var(--bg);
+      background-image: 
+        radial-gradient(circle at 85% 15%, rgba(37, 99, 235, 0.07) 0%, transparent 50%),
+        radial-gradient(circle at 20% 85%, rgba(59, 130, 246, 0.04) 0%, transparent 50%);
+      position: relative;
+      overflow-y: auto;
+      padding: 2.5rem 3rem;
+    }
+
+    @media (min-width: 860px) {
+      .app-sidebar-col {
+        width: 390px;
+        min-width: 360px;
+        max-width: 420px;
+      }
+      .app-main-col {
+        display: flex;
+        flex-direction: column;
+      }
+    }
+
+    /* Chip Filter */
+    .chip-filter-row {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.6rem 1rem 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex-shrink: 0;
+    }
+    .chip-filter-row::-webkit-scrollbar { display: none; }
+
+    .chip-btn {
+      padding: 0.38rem 0.9rem;
+      border-radius: var(--r-full);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: var(--text-2);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--t-fast);
+    }
+    .chip-btn.active {
+      background: var(--accent-gradient-subtle);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Emoji Tags */
+    .btn-emoji-tag {
+      font-size: 1.25rem;
+      padding: 0.4rem 0.65rem;
+      border-radius: var(--r-md);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .btn-emoji-tag.active {
+      background: var(--surface-3);
+      border-color: var(--accent);
+      transform: scale(1.1);
+    }
+
+    /* Hub Cards */
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+      max-width: 900px;
+    }
+
+    .hub-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 1.75rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      transition: transform var(--t-fast), border-color var(--t-fast);
+    }
+    .hub-card:hover {
+      border-color: rgba(37, 99, 235, 0.35);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-layout-container">
+
+  <!-- ════════════════════════════════════════════════════════════════
+       LEFT COLUMN: CHAT SIDEBAR (Responsive on PC and Mobile)
+       ════════════════════════════════════════════════════════════════ -->
+  <aside class="app-sidebar-col">
+
+    <!-- Top App Bar -->
+    <header class="app-topbar">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <img src="assets/icons/icon.png" alt="Pchat shepu" style="width:38px;height:38px;border-radius:10px;object-fit:cover;box-shadow:0 3px 12px rgba(0,0,0,0.35);" />
+        <div>
+          <div class="app-brand-title" style="letter-spacing:-0.01em;font-weight:800;">Pchat shepu</div>
+          <div style="font-size:0.7rem;color:var(--success);display:flex;align-items:center;gap:0.35rem;font-weight:600;">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;animation:pulse 2s infinite;"></span>
+            <span>Real-time Active</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:0.4rem;">
+        <button class="btn btn-icon btn-ghost" id="top-join-btn" title="Join with Room Code" style="width:38px;height:38px;border-radius:var(--r-full);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        </button>
+        <!-- User Avatar / logout -->
+        <button id="user-avatar-btn" title="Account / Logout" style="width:34px;height:34px;border-radius:50%;background:var(--accent-gradient);border:2px solid rgba(255,255,255,0.15);color:#fff;font-weight:700;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0;flex-shrink:0;">
+          <span id="user-avatar-initials">?</span>
+          <img id="user-avatar-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+        </button>
+      </div>
+    </header>
+
+    <!-- Search & Fast Join Bar -->
+    <div class="app-search-bar" style="margin:0.75rem 1rem 0.25rem;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input type="text" class="app-search-input" id="search-input" placeholder="Search chats or paste code / link..." autocomplete="off" />
+      <button id="search-clear-btn" style="display:none;background:none;border:none;color:var(--muted);font-size:0.85rem;cursor:pointer;padding:0.2rem;" aria-label="Clear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+
+    <!-- Filter Chips -->
+    <div class="chip-filter-row">
+      <button class="chip-btn active" data-filter="all"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>All Chats</button>
+      <button class="chip-btn" data-filter="my"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>My Rooms</button>
+      <button class="chip-btn" data-filter="joined"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Joined</button>
+    </div>
+
+    <!-- Conversations List -->
+    <main class="chat-list" id="chat-list-container" style="flex:1;overflow-y:auto;">
+      <div id="chats-loading" style="text-align:center;padding:3.5rem 0;">
+        <div class="spinner" style="margin:0 auto 1rem;"></div>
+        <p style="color:var(--text-2);font-size:0.85rem;">Loading conversations…</p>
+      </div>
+
+      <div id="chats-items" style="display:none;flex-direction:column;"></div>
+
+      <!-- Empty State -->
+      <div id="chats-empty" style="display:none;text-align:center;padding:3.5rem 1.5rem;">
+        <div style="width:72px;height:72px;border-radius:20px;background:var(--accent-gradient-subtle);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;border:1px solid rgba(37,99,235,0.3);box-shadow:0 8px 30px var(--accent-glow);">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        </div>
+        <h3 style="font-size:1.25rem;margin-bottom:0.35rem;font-weight:700;">No Chats Yet</h3>
+        <p style="color:var(--text-2);font-size:0.85rem;max-width:280px;margin:0 auto 1.5rem;line-height:1.5;">
+          Create a private room in 1 tap or join using your friend's invite code.
+        </p>
+        <button class="btn btn-primary" id="empty-create-btn" style="padding:0.75rem 1.5rem;font-size:0.9rem;margin:0 auto;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> Start New Chat
+        </button>
+      </div>
+    </main>
+
+    <!-- Floating Action Button (FAB +) -->
+    <button class="fab-create" id="fab-create-btn" title="Create Room" aria-label="Create Room">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </button>
+
+    <!-- Mobile Bottom Navigation Bar (Hidden on PC desktop) -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" id="nav-tab-chats">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        <span>Chats</span>
+      </button>
+      <button class="nav-item" id="nav-tab-new">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        <span>New</span>
+      </button>
+      <button class="nav-item" id="nav-tab-settings" onclick="window.location.href='settings.html'">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </aside>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       RIGHT COLUMN: DESKTOP APP HUB (Shown on PC & Tablets >= 860px)
+       ════════════════════════════════════════════════════════════════ -->
+  <main class="app-main-col">
+    <!-- Header Banner -->
+    <div style="max-width:900px;margin-bottom:1.5rem;">
+      <div style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 0.9rem;border-radius:var(--r-full);background:var(--accent-dim);border:1px solid rgba(37, 99, 235, 0.25);font-size:0.8rem;font-weight:600;color:var(--accent);margin-bottom:1rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 2s infinite;"></span>
+        Google Drive & Sheets Cloud Sync &middot; High Performance Web App
+      </div>
+
+      <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:0.75rem;">
+        <img src="assets/icons/icon.png" alt="Pchat shepu" style="width:58px;height:58px;border-radius:16px;object-fit:cover;box-shadow:0 8px 24px rgba(0,0,0,0.4);" />
+        <div>
+          <h1 style="font-size:clamp(1.8rem, 3.2vw, 2.4rem);font-weight:900;letter-spacing:-0.03em;line-height:1.2;margin:0;">
+            Pchat shepu
+          </h1>
+          <p style="color:var(--text-2);font-size:0.95rem;margin:0.2rem 0 0;">
+            Fast, private messaging powered by your Google Sheet & Apps Script backend.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop Hub Grid Cards -->
+    <div class="hub-grid">
+      
+      <!-- Card 1: Fast Room Creator -->
+      <div class="hub-card">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+          <div style="width:42px;height:42px;border-radius:12px;background:var(--accent-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg>
+          </div>
+          <div>
+            <h3 style="margin:0;font-size:1.15rem;font-weight:700;">Create Instant Room</h3>
+            <p style="margin:0;font-size:0.8rem;color:var(--muted);">Ready in 0.05 seconds</p>
+          </div>
+        </div>
+
+        <form id="desktop-create-form" style="display:flex;flex-direction:column;gap:1rem;">
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.35rem;display:block;">Choose Icon</label>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;" id="desktop-emoji-row">
+              <button type="button" class="btn-emoji-tag active" data-emoji="💬" title="Chat"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
+              <button type="button" class="btn-emoji-tag" data-emoji="🔥" title="Hot"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.38 0 2.5-1.12 2.5-2.5 0-1.63-1.07-2.67-1.74-3.32-.4-.39-.76-.74-.76-1.18 0-.44.33-.8.75-.8.56 0 1.25.32 1.75.82 1.5 1.5 2.5 3.5 2.5 6A6.5 6.5 0 0 1 2 16c0-3.5 2.5-6.5 5-8.5.5 1 1.5 2 1.5 3.5 0 .5-.25.96-.5 1.4-.41.72-.5 1.5-.5 2.1z"></path></svg></button>
+              <button type="button" class="btn-emoji-tag" data-emoji="🚀" title="Rocket"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path></svg></button>
+              <button type="button" class="btn-emoji-tag" data-emoji="🎮" title="Gaming"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg></button>
+              <button type="button" class="btn-emoji-tag" data-emoji="☕" title="Chill"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path></svg></button>
+              <button type="button" class="btn-emoji-tag" data-emoji="🌟" title="Star"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.35rem;display:block;">Connection
+              Mode</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;" id="desktop-mode-picker">
+              <button type="button" class="room-mode-btn active" data-mode="instant"
+                style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0.7rem 0.8rem;border-radius:var(--r-md);background:var(--surface-3);border:1.5px solid var(--accent);text-align:left;cursor:pointer;transition:all var(--t-fast);">
+                <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:0.9rem;color:var(--accent);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Instant
+                </span>
+                <span style="font-size:0.7rem;color:var(--text-2);">Peer-to-peer · no login</span>
+              </button>
+              <button type="button" class="room-mode-btn" data-mode="secure"
+                style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0.7rem 0.8rem;border-radius:var(--r-md);background:var(--surface-2);border:1.5px solid var(--border);text-align:left;cursor:pointer;transition:all var(--t-fast);">
+                <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:0.9rem;color:#10b981;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Secure
+                </span>
+                <span style="font-size:0.7rem;color:var(--text-2);">Google Sheet backup</span>
+              </button>
+            </div>
+            <p id="desktop-mode-hint" style="margin-top:0.4rem;font-size:0.72rem;color:var(--muted);">Instant rooms connect devices directly over peer-to-peer — no sign-in needed.</p>
+          </div>
+
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;">
+              <label for="desktop-room-name" style="font-size:0.8rem;font-weight:600;color:var(--text-2);">Room Name</label>
+              <button type="button" id="btn-desktop-random" style="font-size:0.75rem;color:var(--accent-2);background:none;border:none;cursor:pointer;font-weight:600;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-1px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle></svg> Random
+              </button>
+            </div>
+            <input 
+              type="text" 
+              id="desktop-room-name" 
+              class="form-input" 
+              placeholder="e.g. Midnight Hangout" 
+              maxlength="80" 
+              required 
+              style="font-size:0.95rem;padding:0.7rem 0.9rem;"
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" style="padding:0.8rem;font-weight:700;font-size:0.95rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg> Create &amp; Get QR Code
+          </button>
+        </form>
+      </div>
+
+      <!-- Card 2: Quick Join by Code -->
+      <div class="hub-card">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+          <div style="width:42px;height:42px;border-radius:12px;background:rgba(16, 185, 129, 0.15);border:1px solid rgba(16, 185, 129, 0.3);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:1.2rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+          </div>
+          <div>
+            <h3 style="margin:0;font-size:1.15rem;font-weight:700;">Join Existing Room</h3>
+            <p style="margin:0;font-size:0.8rem;color:var(--muted);">Paste code or invite URL</p>
+          </div>
+        </div>
+
+        <form id="desktop-join-form" style="display:flex;flex-direction:column;gap:1rem;">
+          <div>
+            <label for="desktop-join-code" style="font-size:0.8rem;font-weight:600;color:var(--text-2);margin-bottom:0.3rem;display:block;">Room ID or Link</label>
+            <input 
+              type="text" 
+              id="desktop-join-code" 
+              class="form-input" 
+              placeholder="e.g. ABCD1234 or paste link" 
+              required 
+              style="font-size:0.95rem;padding:0.7rem 0.9rem;"
+            />
+          </div>
+
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:0.75rem;font-size:0.78rem;color:var(--muted);line-height:1.4;display:flex;align-items:flex-start;gap:0.5rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning);flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Guests don't need to sign in! Just enter a nickname and chat immediately.</span>
+          </div>
+
+          <button type="submit" class="btn btn-secondary btn-full" style="padding:0.8rem;font-weight:700;font-size:0.95rem;">
+            Join Room &rarr;
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- Device Connectivity Info Strip -->
+    <div style="max-width:900px;margin-top:2rem;background:#0d1017;border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span style="display:inline-flex;color:var(--accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></span>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;">Mobile & Cross-Device Access</div>
+          <div style="font-size:0.78rem;color:var(--muted);">Scan QR code with phone camera to open: <code id="connectivity-url-display" style="color:var(--accent-2);background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">https://shepu1.github.io/s/index/pchat/index.html</code></div>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline" id="btn-desktop-show-qr" style="font-size:0.8rem;padding:0.4rem 1rem;">
+        Show QR Code
+      </button>
+    </div>
+  </main>
+
+</div>
+
+<!-- ── Fast Create Bottom Sheet (Mobile) ─────────────────────── -->
+<div class="bottom-sheet-overlay" id="create-sheet">
+  <div class="bottom-sheet-card">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+      <h3 style="font-size:1.25rem;font-weight:700;">New Chat Room</h3>
+      <button class="modal-close" id="close-create-sheet" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:0.78rem;font-weight:600;color:var(--text-2);margin-bottom:0.4rem;display:block;">Choose an Icon</label>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;" id="sheet-emoji-row">
+        <button type="button" class="btn-emoji-tag active" data-emoji="💬" title="Chat"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="🔥" title="Hot"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.38 0 2.5-1.12 2.5-2.5 0-1.63-1.07-2.67-1.74-3.32-.4-.39-.76-.74-.76-1.18 0-.44.33-.8.75-.8.56 0 1.25.32 1.75.82 1.5 1.5 2.5 3.5 2.5 6A6.5 6.5 0 0 1 2 16c0-3.5 2.5-6.5 5-8.5.5 1 1.5 2 1.5 3.5 0 .5-.25.96-.5 1.4-.41.72-.5 1.5-.5 2.1z"></path></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="🚀" title="Rocket"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="🎮" title="Gaming"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="☕" title="Chill"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="🌟" title="Star"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="🍕" title="Hangout"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></button>
+        <button type="button" class="btn-emoji-tag" data-emoji="🔐" title="Private"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></button>
+      </div>
+    </div>
+
+    <form id="fast-create-form" style="display:flex;flex-direction:column;gap:1.25rem;">
+      <div class="form-group">
+        <label class="form-label" style="font-size:0.85rem;font-weight:600;">Connection Mode</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;" id="sheet-mode-picker">
+          <button type="button" class="room-mode-btn active" data-mode="instant"
+            style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0.7rem 0.8rem;border-radius:var(--r-md);background:var(--surface-3);border:1.5px solid var(--accent);text-align:left;cursor:pointer;transition:all var(--t-fast);">
+            <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:0.9rem;color:var(--accent);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Instant
+            </span>
+            <span style="font-size:0.7rem;color:var(--text-2);">Peer-to-peer · no login</span>
+          </button>
+          <button type="button" class="room-mode-btn" data-mode="secure"
+            style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0.7rem 0.8rem;border-radius:var(--r-md);background:var(--surface-2);border:1.5px solid var(--border);text-align:left;cursor:pointer;transition:all var(--t-fast);">
+            <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:0.9rem;color:#10b981;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Secure
+            </span>
+            <span style="font-size:0.7rem;color:var(--text-2);">Google Sheet backup</span>
+          </button>
+        </div>
+        <p id="sheet-mode-hint" style="margin-top:0.45rem;font-size:0.75rem;color:var(--text-2);">Instant rooms connect devices directly over peer-to-peer — no sign-in needed.</p>
+      </div>
+
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+          <label class="form-label" for="sheet-room-name" style="margin-bottom:0;font-size:0.85rem;font-weight:600;">Room Name</label>
+          <button type="button" id="btn-sheet-random" style="font-size:0.75rem;color:var(--accent-2);background:none;border:none;cursor:pointer;font-weight:600;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-1px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle></svg> Random Name
+          </button>
+        </div>
+        <input 
+          type="text" 
+          id="sheet-room-name" 
+          class="form-input" 
+          placeholder="e.g. Midnight Hangout" 
+          maxlength="80" 
+          required 
+          autocomplete="off" 
+          style="font-size:1rem;padding:0.75rem 1rem;"
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" style="padding:0.85rem;font-size:1rem;font-weight:700;">
+        <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path></svg> Create Room Now</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Fast Join Modal ────────────────────────────────────────── -->
+<div class="bottom-sheet-overlay" id="join-sheet">
+  <div class="bottom-sheet-card">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+      <h3 style="font-size:1.25rem;font-weight:700;">Join a Room</h3>
+      <button class="modal-close" id="close-join-sheet" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+
+    <form id="fast-join-form" style="display:flex;flex-direction:column;gap:1.25rem;">
+      <div class="form-group">
+        <label class="form-label" for="join-code-input" style="font-size:0.85rem;font-weight:600;">Room Code or Invite Link</label>
+        <input 
+          type="text" 
+          id="join-code-input" 
+          class="form-input" 
+          placeholder="e.g. ABCD1234 or paste link" 
+          required 
+          autocomplete="off" 
+          style="font-size:1rem;padding:0.75rem 1rem;"
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" style="padding:0.85rem;font-size:1rem;">
+        Join Room &rarr;
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Share Room Modal (QR Code + 3 Device Tabs) ─────────────── -->
+<div class="modal-overlay hidden" id="share-modal" role="dialog" aria-labelledby="share-modal-title" aria-modal="true">
+  <div class="modal" style="max-width:480px;text-align:center;padding:1.75rem;">
+    <div class="modal-header" style="justify-content:center;position:relative;">
+      <h3 id="share-modal-title" style="font-size:1.25rem;font-weight:700;">Invite Friends</h3>
+      <button class="modal-close" id="share-modal-close" aria-label="Close" style="position:absolute;right:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+
+    <!-- QR Code container -->
+    <div class="qr-container" style="margin:1rem auto 0.75rem;">
+      <img id="share-qr-img" src="" alt="Room QR Code" />
+      <p style="font-size:0.75rem;color:#1e293b;margin-top:0.4rem;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> Scan with phone camera to join
+      </p>
+    </div>
+
+    <!-- Single universal invite link (works on phone + PC) -->
+<div class="copy-field" style="margin-bottom:0.75rem;">
+      <span class="copy-url" id="modal-share-url" style="font-size:0.8rem;text-align:left;">—</span>
+      <button class="btn btn-sm btn-primary" id="btn-modal-copy">Copy</button>
+    </div>
+
+    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:1rem;" id="modal-link-hint">
+      Share this link or QR code — it works on phone and PC.
+    </p>
+
+    <!-- Troubleshooting Drawer -->
+    <div class="troubleshoot-box">
+      <button type="button" class="troubleshoot-toggle" id="btn-toggle-troubleshoot">
+        <span style="display:inline-flex;align-items:center;gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Phone not connecting? Click for help</span>
+        <span id="troubleshoot-chevron">▾</span>
+      </button>
+      <div class="troubleshoot-content" id="troubleshoot-content" style="display:none;">
+        <ol style="padding-left:1.2rem;margin-bottom:0.5rem;display:flex;flex-direction:column;gap:0.35rem;font-size:0.8rem;color:var(--text-2);text-align:left;">
+          <li>Make sure your mobile phone is connected to the <strong>same Wi-Fi router</strong> as your computer (not 4G/5G).</li>
+          <li>Instant rooms sync across devices over peer-to-peer &amp; the cloud — no local server needed.</li>
+          <li><strong>Universal access from anywhere:</strong> Host on GitHub Pages (<code>https://shepu1.github.io/s/index/pchat/</code>) or run <code>npx localtunnel --port 5500</code> in terminal!</li>
+        </ol>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:0.75rem;justify-content:center;margin-top:1.25rem;">
+      <button class="btn btn-ghost" id="share-modal-done">Close</button>
+      <button class="btn btn-primary" id="share-modal-chat" style="padding:0.7rem 1.5rem;font-weight:700;">
+        Enter Chat &rarr;
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Creating Progress Overlay (Google Sheets flow) -->
+<div id="room-creating-overlay" class="hidden" style="
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(9,13,22,0.92);
+  backdrop-filter:blur(12px);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:1.5rem;
+">
+  <div style="
+    width:72px;height:72px;border-radius:18px;
+    background:linear-gradient(135deg,#0f9d58,#34a853);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 30px rgba(15,157,88,0.4);
+    animation:pulse 2s ease-in-out infinite;
+  ">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="8" y1="13" x2="16" y2="13"></line>
+      <line x1="8" y1="17" x2="16" y2="17"></line>
+      <line x1="8" y1="9" x2="10" y2="9"></line>
+    </svg>
+  </div>
+  <div style="text-align:center;">
+    <p style="font-size:1.1rem;font-weight:700;color:#fff;margin:0 0 0.5rem;">Setting up your room…</p>
+    <p id="room-creating-text" style="font-size:0.875rem;color:rgba(255,255,255,0.6);margin:0;min-height:1.4em;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0f9d58" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Creating Google Sheet in your Drive…</p>
+  </div>
+  <div class="spinner" style="border-color:rgba(15,157,88,0.25);border-top-color:#0f9d58;width:32px;height:32px;"></div>
+  <p style="font-size:0.75rem;color:rgba(255,255,255,0.35);margin:0;">This may take 10-20 seconds</p>
+</div>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+
+<!-- Scripts -->
+<script src="js/config.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/custom-emoji.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/google.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/apps-script.js"></script>
+<script src="js/peerjs.min.js"></script>
+<script src="js/p2p-sync.js"></script>
+<script src="js/rooms.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ── Auth Guard: login required before anything ────────────────
+  if (!Auth.isAuthenticated()) {
+    window.location.href = `login.html?redirect=${encodeURIComponent(location.href)}&reason=required`;
+    return;
+  }
+
+  // ── Show user profile in header ───────────────────────────────
+  const user = Auth.getUser();
+  const avatarBtn = document.getElementById('user-avatar-btn');
+  const avatarInitials = document.getElementById('user-avatar-initials');
+  const avatarImg = document.getElementById('user-avatar-img');
+  if (user) {
+    const initials = (user.name || user.email || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    if (avatarInitials) avatarInitials.textContent = initials;
+    if (avatarImg && user.picture) {
+      avatarImg.src = user.picture;
+      avatarImg.style.display = 'block';
+      if (avatarInitials) avatarInitials.style.display = 'none';
+    }
+  }
+  if (avatarBtn) {
+    avatarBtn.onclick = async () => {
+            const ok = await UI.confirmDialog({
+              title: 'Log out?',
+              message: `Logged in as ${user?.name || user?.email || 'User'}`,
+              confirmText: 'Log out',
+              cancelText: 'Stay',
+              danger: true,
+            });
+            if (ok) {
+              Auth.signOut();
+              window.location.href = 'login.html';
+            }
+          };
+  }
+
+  const chatListContainer = document.getElementById('chats-items');
+  const chatLoading = document.getElementById('chats-loading');
+  const chatEmpty = document.getElementById('chats-empty');
+  const searchInput = document.getElementById('search-input');
+  const clearBtn = document.getElementById('search-clear-btn');
+
+  const fabCreate = document.getElementById('fab-create-btn');
+  const navTabNew = document.getElementById('nav-tab-new');
+  const emptyCreate = document.getElementById('empty-create-btn');
+  const createSheet = document.getElementById('create-sheet');
+  const closeCreate = document.getElementById('close-create-sheet');
+  const createForm = document.getElementById('fast-create-form');
+  const roomNameInput = document.getElementById('sheet-room-name');
+  const randomBtn = document.getElementById('btn-sheet-random');
+
+  const topJoin = document.getElementById('top-join-btn');
+  const joinSheet = document.getElementById('join-sheet');
+  const closeJoin = document.getElementById('close-join-sheet');
+  const joinForm = document.getElementById('fast-join-form');
+  const joinCodeInput = document.getElementById('join-code-input');
+
+  // Desktop Card Form Elements
+  const desktopCreateForm = document.getElementById('desktop-create-form');
+  const desktopRoomName = document.getElementById('desktop-room-name');
+  const desktopRandomBtn = document.getElementById('btn-desktop-random');
+  const desktopJoinForm = document.getElementById('desktop-join-form');
+  const desktopJoinCode = document.getElementById('desktop-join-code');
+  const desktopShowQr = document.getElementById('btn-desktop-show-qr');
+
+  const filterBtns = document.querySelectorAll('.chip-btn');
+  let currentFilter = 'all';
+  let allRooms = [];
+  let selectedEmoji = '💬'; // still used as room identifier
+  const randomNames = [
+    'Night Owls', 'Coffee Chill', 'Game Squad', 'Secret Den',
+    'Vibe Station', 'Tech Talk', 'Weekend Crew', 'Open Space'
+  ];
+
+  // Emoji buttons
+  const setupEmojiRow = (containerId) => {
+    const btns = document.querySelectorAll(`#${containerId} .btn-emoji-tag`);
+    btns.forEach(btn => {
+      btn.onclick = () => {
+        btns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedEmoji = btn.dataset.emoji;
+      };
+    });
+  };
+  setupEmojiRow('sheet-emoji-row');
+  setupEmojiRow('desktop-emoji-row');
+
+  // ── Connection Mode selector (Instant P2P vs Secure Google Sheet) ──
+  let roomMode = 'instant';
+  const MODE_HINTS = {
+    instant: 'Instant rooms connect devices directly over peer-to-peer — no sign-in needed.',
+    secure:  'Secure rooms back up every message to a Google Sheet in your Drive. Google sign-in required.',
+  };
+  const sheetModeBtns   = Array.from(document.querySelectorAll('#sheet-mode-picker .room-mode-btn'));
+  const desktopModeBtns = Array.from(document.querySelectorAll('#desktop-mode-picker .room-mode-btn'));
+  const sheetModeHint   = document.getElementById('sheet-mode-hint');
+  const desktopModeHint = document.getElementById('desktop-mode-hint');
+  const syncModePickers = () => {
+    [sheetModeBtns, desktopModeBtns].forEach(btns => {
+      btns.forEach(b => {
+        const isActive = b.dataset.mode === roomMode;
+        b.classList.toggle('active', isActive);
+        b.style.background  = isActive ? 'var(--surface-3)' : 'var(--surface-2)';
+        b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+      });
+    });
+  };
+  const bindModePicker = (btns) => {
+    btns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        roomMode = btn.dataset.mode;
+        syncModePickers();
+        if (sheetModeHint)   sheetModeHint.textContent   = MODE_HINTS[roomMode];
+        if (desktopModeHint) desktopModeHint.textContent = MODE_HINTS[roomMode];
+      });
+    });
+  };
+  bindModePicker(sheetModeBtns);
+  bindModePicker(desktopModeBtns);
+
+  // Random Name generators
+  const pickRandom = (inputEl) => {
+    const pick = randomNames[Math.floor(Math.random() * randomNames.length)];
+    inputEl.value = pick;
+    inputEl.focus();
+  };
+  if (randomBtn && roomNameInput) randomBtn.onclick = () => pickRandom(roomNameInput);
+  if (desktopRandomBtn && desktopRoomName) desktopRandomBtn.onclick = () => pickRandom(desktopRoomName);
+
+  // Filter chips
+  filterBtns.forEach(btn => {
+    btn.onclick = () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      applyFilterAndRender();
+    };
+  });
+
+  function applyFilterAndRender() {
+    let list = allRooms;
+    if (currentFilter === 'my') list = allRooms.filter(r => r.isOwner);
+    if (currentFilter === 'joined') list = allRooms.filter(r => !r.isOwner);
+
+    const q = (searchInput.value || '').trim().toLowerCase();
+    if (q) {
+      list = list.filter(r => (r.name || '').toLowerCase().includes(q) || (r.id || '').toLowerCase().includes(q));
+    }
+    renderRooms(list);
+  }
+
+  function loadRooms() {
+    chatLoading.style.display = 'block';
+    chatListContainer.style.display = 'none';
+    chatEmpty.style.display = 'none';
+
+    try {
+      const myRooms = Rooms.getMyRooms() || [];
+      const joined = Rooms.getJoinedRooms() || [];
+      
+      const map = new Map();
+      myRooms.forEach(r => map.set(r.id, { ...r, isOwner: true }));
+      joined.forEach(r => { if (!map.has(r.id)) map.set(r.id, { ...r, isOwner: false }); });
+
+      allRooms = Array.from(map.values()).sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      applyFilterAndRender();
+    } catch (e) {
+      console.error(e);
+      chatLoading.style.display = 'none';
+      chatEmpty.style.display = 'block';
+    }
+  }
+
+  function renderRooms(rooms) {
+    chatLoading.style.display = 'none';
+
+    if (!rooms.length) {
+      chatListContainer.style.display = 'none';
+      chatEmpty.style.display = 'block';
+      return;
+    }
+
+    chatEmpty.style.display = 'none';
+    chatListContainer.style.display = 'flex';
+    chatListContainer.innerHTML = '';
+
+    rooms.forEach(room => {
+      const item = document.createElement('div');
+      item.className = 'chat-item';
+      
+      const cleanName = (room.name || 'R').replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\s]+/gu, '').trim();
+      const initial = (cleanName[0] || (room.name || 'R').trim()[0] || 'R').toUpperCase();
+      const timeStr = formatRelativeTime(room.createdAt || room.joinedAt);
+
+      item.innerHTML = `
+        <div class="chat-avatar">
+          ${initial.toUpperCase()}
+          <span class="online-indicator"></span>
+        </div>
+        <div class="chat-info">
+          <div class="chat-row-top">
+            <span class="chat-name">${emoName(room.name || 'Private Room')}</span>
+            <span class="chat-time">${timeStr || 'Active'}</span>
+          </div>
+          <div class="chat-row-bottom">
+            <span class="chat-preview-text">${escapeHtml(room.description || 'Tap to enter chat room')}</span>
+            <button type="button" class="btn btn-icon btn-ghost btn-item-qr" title="Share QR" style="width:32px;height:32px;flex-shrink:0;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </button>
+          </div>
+        </div>
+      `;
+
+      item.onclick = (e) => {
+        if (e.target.closest('.btn-item-qr')) return;
+        window.location.href = `room.html?r=${room.id}`;
+      };
+
+      const qrBtn = item.querySelector('.btn-item-qr');
+      if (qrBtn) {
+        qrBtn.onclick = (e) => {
+          e.stopPropagation();
+          openShareModal(room);
+        };
+      }
+
+      chatListContainer.appendChild(item);
+    });
+  }
+
+  // Search filter
+  searchInput.oninput = () => {
+    const query = searchInput.value.trim().toLowerCase();
+    clearBtn.style.display = query ? 'block' : 'none';
+    applyFilterAndRender();
+  };
+
+  clearBtn.onclick = () => {
+    searchInput.value = '';
+    clearBtn.style.display = 'none';
+    applyFilterAndRender();
+  };
+
+  // Open Create Sheet
+  const openCreateSheet = () => {
+    createSheet.classList.add('active');
+    setTimeout(() => roomNameInput.focus(), 150);
+  };
+  if (fabCreate) fabCreate.onclick = openCreateSheet;
+  if (navTabNew) navTabNew.onclick = openCreateSheet;
+  if (emptyCreate) emptyCreate.onclick = openCreateSheet;
+
+  if (closeCreate) closeCreate.onclick = () => createSheet.classList.remove('active');
+  createSheet.onclick = (e) => { if (e.target === createSheet) createSheet.classList.remove('active'); };
+
+  // Room Creation Helper — async, uses Google Sheet (Secure) or P2P (Instant) based on selected mode
+  const handleCreate = async (rawName, inputEl, sheetToClose) => {
+    if (!rawName) return;
+
+    const savedName = localStorage.getItem('shepu_display_name');
+    // Instant mode works without Google login; Secure mode requires it.
+    if (!Auth.isAuthenticated() && !(roomMode === 'instant' && savedName)) {
+      UI.toast('error', 'Login Required', 'Please login to create a room.');
+      setTimeout(() => window.location.href = 'login.html?redirect=' + encodeURIComponent(location.href), 1200);
+      return;
+    }
+
+    const ownerUser = Auth.getUser();
+    const ownerName = ownerUser?.name || ownerUser?.email?.split('@')[0] || savedName || 'Owner';
+    const name = rawName.includes(selectedEmoji) ? rawName : `${selectedEmoji} ${rawName}`;
+
+    // Close sheet & disable inputs
+    if (sheetToClose) sheetToClose.classList.remove('active');
+    if (inputEl) inputEl.value = '';
+
+    // Show progress overlay
+    const overlay = document.getElementById('room-creating-overlay');
+    const progressText = document.getElementById('room-creating-text');
+    if (overlay) overlay.classList.remove('hidden');
+    const updateProgress = (msg) => {
+      if (progressText) progressText.textContent = msg;
+    };
+
+    let newRoom;
+    try {
+      if (roomMode === 'instant') {
+        // Instant (P2P) mode — no Google sign-in required
+        updateProgress('Creating room (instant peer-to-peer mode)…');
+        newRoom = Rooms.createInstantRoom(name, 'Private Room', ownerName);
+        UI.toast('success', 'Room Created!', `"${name}" is live. Share the link to invite people!`);
+      } else {
+        // Secure mode — Google Sheet backend, requires sign-in
+        if (!CONFIG.isGoogleConfigured() || typeof Drive === 'undefined') {
+          throw new Error('Secure mode needs a Google Client ID configured. Switch to Instant mode.');
+        }
+        if (!Auth.isAuthenticated()) {
+          updateProgress('Waiting for Google sign-in…');
+          try {
+            await Auth.signIn();
+          } catch (e) {
+            throw new Error('Google sign-in is required for Secure rooms. Please try again or switch to Instant.');
+          }
+        }
+        newRoom = await Rooms.createRoomWithSheet(name, 'Private Room', ownerName, updateProgress);
+        UI.toast('success', 'Room + Google Sheet Created!', `Your chat is backed by Google Sheets.`);
+      }
+    } catch (err) {
+      console.error('Room creation error:', err);
+      if (roomMode === 'secure') {
+        // Never silently downgrade a Secure room to Instant
+        UI.toast('error', 'Secure room failed', err.message || 'Please try again.');
+        if (overlay) overlay.classList.add('hidden');
+        return;
+      }
+      // Emergency fallback (Instant mode only)
+      newRoom = Rooms.createInstantRoom(name, 'Private Room', ownerName);
+      UI.toast('warning', 'Room Created (Instant)', 'Created instant room.');
+    } finally {
+      if (overlay) overlay.classList.add('hidden');
+    }
+
+    // Play room-created animation (~2.5s) before opening the share modal
+    if (window.UI?.playRoomCreatedAnimation) await UI.playRoomCreatedAnimation();
+
+    loadRooms();
+    openShareModal(newRoom);
+  };
+
+  // Mobile create submit
+  createForm.onsubmit = (e) => {
+    e.preventDefault();
+    handleCreate(roomNameInput.value.trim(), roomNameInput, createSheet);
+  };
+
+  // Desktop create submit
+  if (desktopCreateForm) {
+    desktopCreateForm.onsubmit = (e) => {
+      e.preventDefault();
+      handleCreate(desktopRoomName.value.trim(), desktopRoomName, null);
+    };
+  }
+
+  // Join Sheet
+  const openJoinSheet = () => {
+    joinSheet.classList.add('active');
+    setTimeout(() => joinCodeInput.focus(), 150);
+  };
+  if (topJoin) topJoin.onclick = openJoinSheet;
+  if (closeJoin) closeJoin.onclick = () => joinSheet.classList.remove('active');
+  joinSheet.onclick = (e) => { if (e.target === joinSheet) joinSheet.classList.remove('active'); };
+
+  const handleJoin = (val) => {
+    if (!val) return;
+    if (val.includes('join.html?')) {
+      window.location.href = val;
+    } else {
+      const cleanId = val.replace(/[^a-zA-Z0-9]/g, '');
+      if (cleanId.length >= 6) {
+        window.location.href = `join.html?r=${cleanId}`;
+      } else {
+        UI.toast('error', 'Invalid code', 'Please enter a valid room code or link.');
+      }
+    }
+  };
+
+  joinForm.onsubmit = (e) => {
+    e.preventDefault();
+    handleJoin(joinCodeInput.value.trim());
+  };
+
+  if (desktopJoinForm) {
+    desktopJoinForm.onsubmit = (e) => {
+      e.preventDefault();
+      handleJoin(desktopJoinCode.value.trim());
+    };
+  }
+
+  // Share Modal (QR + 3 tabs)
+  let activeShareRoom = null;
+  let activeShareUrl = '';
+
+  // Single universal invite link (no device tabs — one link for all)
+  function openShareModal(room) {
+    activeShareRoom = room;
+    const modal = document.getElementById('share-modal');
+    const modalTitle = document.getElementById('share-modal-title');
+    const qrImg = document.getElementById('share-qr-img');
+    const urlDisplay = document.getElementById('modal-share-url');
+
+    const urls = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
+    activeShareUrl = urls.defaultUrl;
+
+    modalTitle.innerHTML = emoName(room.name);
+    urlDisplay.textContent = activeShareUrl;
+    qrImg.src = urls.qrCodeUrl;
+
+    UI.openModal('share-modal');
+  }
+
+  if (desktopShowQr) {
+    desktopShowQr.onclick = () => {
+      if (allRooms.length > 0) {
+        openShareModal(allRooms[0]);
+      } else {
+        const tempRoom = Rooms.createInstantRoom('Hangout Lounge', 'General chat room');
+        loadRooms();
+        openShareModal(tempRoom);
+      }
+    };
+  }
+
+  // Copy button
+  document.getElementById('btn-modal-copy').onclick = async () => {
+    if (!activeShareUrl) return;
+    await UI.copyText(activeShareUrl);
+    UI.toast('success', 'Copied!', 'Room link copied to clipboard.');
+  };
+
+  // Close share modal
+  document.getElementById('share-modal-close').onclick = () => UI.closeModal('share-modal');
+  document.getElementById('share-modal-done').onclick = () => UI.closeModal('share-modal');
+
+  // Enter Chat Button
+  document.getElementById('share-modal-chat').onclick = () => {
+    if (activeShareRoom) {
+      window.location.href = `room.html?r=${activeShareRoom.id}`;
+    }
+  };
+
+  // Troubleshooting toggle
+  const tBtn = document.getElementById('btn-toggle-troubleshoot');
+  const tContent = document.getElementById('troubleshoot-content');
+  const tChevron = document.getElementById('troubleshoot-chevron');
+  if (tBtn && tContent) {
+    tBtn.onclick = () => {
+      const isHidden = tContent.style.display === 'none';
+      tContent.style.display = isHidden ? 'block' : 'none';
+      tChevron.textContent = isHidden ? '▴' : '▾';
+    };
+  }
+
+  function formatRelativeTime(ts) {
+    if (!ts) return '';
+    const diff = Date.now() - new Date(ts).getTime();
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    return Math.floor(diff / 86400000) + 'd ago';
+  }
+
+  // Initial load
+  loadRooms();
+  // Re-render once custom emoji arrive so room names show images
+  if (window.CustomEmoji) {
+    CustomEmoji.load().then(() => applyFilterAndRender()).catch(() => {});
+  }
+});
+</script>
+</body>
+</html>

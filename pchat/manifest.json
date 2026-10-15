@@ -1,0 +1,16 @@
+{
+  "name": "Pchat shepu",
+  "short_name": "Pchat shepu",
+  "description": "Fast, private messaging powered by your Google Sheet & Apps Script backend.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "icons": [
+    {
+      "src": "assets/icons/icon.png",
+      "sizes": "1458x1382",
+      "type": "image/png"
+    }
+  ]
+}

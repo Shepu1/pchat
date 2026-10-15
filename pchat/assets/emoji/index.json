@@ -1,0 +1,1478 @@
+[
+ {
+  "file": "bubble_tea.png",
+  "unicode": "🧋",
+  "category": "drinks",
+  "name": "bubble tea"
+ },
+ {
+  "file": "coconut_drink.png",
+  "unicode": "🥥",
+  "category": "drinks",
+  "name": "coconut drink"
+ },
+ {
+  "file": "cup_of_tea.png",
+  "unicode": "🍵",
+  "category": "drinks",
+  "name": "cup of tea"
+ },
+ {
+  "file": "espresso_coffee_cup.png",
+  "unicode": "☕",
+  "category": "drinks",
+  "name": "espresso coffee cup"
+ },
+ {
+  "file": "fruit_smoothie.png",
+  "unicode": "🥤",
+  "category": "drinks",
+  "name": "fruit smoothie"
+ },
+ {
+  "file": "glass_of_lemonade.png",
+  "unicode": "🍋",
+  "category": "drinks",
+  "name": "glass of lemonade"
+ },
+ {
+  "file": "glass_of_water.png",
+  "unicode": "🫗",
+  "category": "drinks",
+  "name": "glass of water"
+ },
+ {
+  "file": "juice_box.png",
+  "unicode": "🧃",
+  "category": "drinks",
+  "name": "juice box"
+ },
+ {
+  "file": "milk_carton.png",
+  "unicode": "🥛",
+  "category": "drinks",
+  "name": "milk carton"
+ },
+ {
+  "file": "mocktail_glass.png",
+  "unicode": "🍸",
+  "category": "drinks",
+  "name": "mocktail glass"
+ },
+ {
+  "file": "orange_juice.png",
+  "unicode": "🍊",
+  "category": "drinks",
+  "name": "orange juice"
+ },
+ {
+  "file": "soda_can.png",
+  "unicode": "🥤",
+  "category": "drinks",
+  "name": "soda can"
+ },
+ {
+  "file": "sports_drink_bottle.png",
+  "unicode": "⚡",
+  "category": "drinks",
+  "name": "sports drink bottle"
+ },
+ {
+  "file": "stylish_teapot.png",
+  "unicode": "🫖",
+  "category": "drinks",
+  "name": "stylish teapot"
+ },
+ {
+  "file": "takeaway_iced_coffee.png",
+  "unicode": "☕",
+  "category": "drinks",
+  "name": "takeaway iced coffee"
+ },
+ {
+  "file": "water_bottle.png",
+  "unicode": "💧",
+  "category": "drinks",
+  "name": "water bottle"
+ },
+ {
+  "file": "angry_face.png",
+  "unicode": "😡",
+  "category": "face",
+  "name": "angry face"
+ },
+ {
+  "file": "astonished_shocked_face.png",
+  "unicode": "😲",
+  "category": "face",
+  "name": "astonished shocked face"
+ },
+ {
+  "file": "big_toothy_grin.png",
+  "unicode": "😁",
+  "category": "face",
+  "name": "big toothy grin"
+ },
+ {
+  "file": "clown-face.png",
+  "unicode": "🤡",
+  "category": "face",
+  "name": "clown face"
+ },
+ {
+  "file": "cool-sunglasses-face.png",
+  "unicode": "😎",
+  "category": "face",
+  "name": "cool sunglasses face"
+ },
+ {
+  "file": "cowboy-hat-face.png",
+  "unicode": "🤠",
+  "category": "face",
+  "name": "cowboy hat face"
+ },
+ {
+  "file": "curious-monocle-face.png",
+  "unicode": "🧐",
+  "category": "face",
+  "name": "curious monocle face"
+ },
+ {
+  "file": "disappointed-face.png",
+  "unicode": "😞",
+  "category": "face",
+  "name": "disappointed face"
+ },
+ {
+  "file": "dizzy-face-x-eyes.png",
+  "unicode": "😵",
+  "category": "face",
+  "name": "dizzy face x eyes"
+ },
+ {
+  "file": "drooling-face.png",
+  "unicode": "🤤",
+  "category": "face",
+  "name": "drooling face"
+ },
+ {
+  "file": "embarrassed-blushing-face.png",
+  "unicode": "😳",
+  "category": "face",
+  "name": "embarrassed blushing face"
+ },
+ {
+  "file": "expressionless-half-lidded-face.png",
+  "unicode": "😑",
+  "category": "face",
+  "name": "expressionless half lidded face"
+ },
+ {
+  "file": "eye-roll-annoyed-face.png",
+  "unicode": "🙄",
+  "category": "face",
+  "name": "eye roll annoyed face"
+ },
+ {
+  "file": "face-savoring-food.png",
+  "unicode": "😋",
+  "category": "face",
+  "name": "face savoring food"
+ },
+ {
+  "file": "face-with-head-bandage.png",
+  "unicode": "🤕",
+  "category": "face",
+  "name": "face with head bandage"
+ },
+ {
+  "file": "face-with-medical-mask.png",
+  "unicode": "😷",
+  "category": "face",
+  "name": "face with medical mask"
+ },
+ {
+  "file": "face-with-spiral-eyes.png",
+  "unicode": "😵‍💫",
+  "category": "face",
+  "name": "face with spiral eyes"
+ },
+ {
+  "file": "face-with-thermometer.png",
+  "unicode": "🤒",
+  "category": "face",
+  "name": "face with thermometer"
+ },
+ {
+  "file": "face_blowing_a_kiss.png",
+  "unicode": "😘",
+  "category": "face",
+  "name": "face blowing a kiss"
+ },
+ {
+  "file": "face_with_single_tear.png",
+  "unicode": "🥲",
+  "category": "face",
+  "name": "face with single tear"
+ },
+ {
+  "file": "grimacing-clenched-teeth-face.png",
+  "unicode": "😬",
+  "category": "face",
+  "name": "grimacing clenched teeth face"
+ },
+ {
+  "file": "happy_smiling_face.png",
+  "unicode": "😊",
+  "category": "face",
+  "name": "happy smiling face"
+ },
+ {
+  "file": "heart_eyes.png",
+  "unicode": "😍",
+  "category": "face",
+  "name": "heart eyes"
+ },
+ {
+  "file": "hugging-face.png",
+  "unicode": "🤗",
+  "category": "face",
+  "name": "hugging face"
+ },
+ {
+  "file": "laughing_with_tears_of_joy.png",
+  "unicode": "😂",
+  "category": "face",
+  "name": "laughing with tears of joy"
+ },
+ {
+  "file": "loudly_crying_face.png",
+  "unicode": "😭",
+  "category": "face",
+  "name": "loudly crying face"
+ },
+ {
+  "file": "lying-face.png",
+  "unicode": "🤥",
+  "category": "face",
+  "name": "lying face"
+ },
+ {
+  "file": "mischievous-smirk-face.png",
+  "unicode": "😏",
+  "category": "face",
+  "name": "mischievous smirk face"
+ },
+ {
+  "file": "money-mouth-face.png",
+  "unicode": "🤑",
+  "category": "face",
+  "name": "money mouth face"
+ },
+ {
+  "file": "nauseated-green-face.png",
+  "unicode": "🤮",
+  "category": "face",
+  "name": "nauseated green face"
+ },
+ {
+  "file": "nerd-face.png",
+  "unicode": "🤓",
+  "category": "face",
+  "name": "nerd face"
+ },
+ {
+  "file": "neutral-face.png",
+  "unicode": "😐",
+  "category": "face",
+  "name": "neutral face"
+ },
+ {
+  "file": "partying-face.png",
+  "unicode": "🥳",
+  "category": "face",
+  "name": "partying face"
+ },
+ {
+  "file": "playful_tongue_out_face.png",
+  "unicode": "😛",
+  "category": "face",
+  "name": "playful tongue out face"
+ },
+ {
+  "file": "pleading_face_sparkling_watery_eyes.png",
+  "unicode": "🥺",
+  "category": "face",
+  "name": "pleading face sparkling watery eyes"
+ },
+ {
+  "file": "rolling_on_the_floor_laughing.png",
+  "unicode": "🤣",
+  "category": "face",
+  "name": "rolling on the floor laughing"
+ },
+ {
+  "file": "shushing_face.png",
+  "unicode": "🤫",
+  "category": "face",
+  "name": "shushing face"
+ },
+ {
+  "file": "sleepy_face_with_sleep_symbol.png",
+  "unicode": "😴",
+  "category": "face",
+  "name": "sleepy face with sleep symbol"
+ },
+ {
+  "file": "slightly-sad-face.png",
+  "unicode": "🙁",
+  "category": "face",
+  "name": "slightly sad face"
+ },
+ {
+  "file": "sneezing-face.png",
+  "unicode": "🤧",
+  "category": "face",
+  "name": "sneezing face"
+ },
+ {
+  "file": "surprised-hand-over-mouth-face.png",
+  "unicode": "🤭",
+  "category": "face",
+  "name": "surprised hand over mouth face"
+ },
+ {
+  "file": "thinking_face.png",
+  "unicode": "🤔",
+  "category": "face",
+  "name": "thinking face"
+ },
+ {
+  "file": "unamused-side-eye-face.png",
+  "unicode": "😒",
+  "category": "face",
+  "name": "unamused side eye face"
+ },
+ {
+  "file": "upside-down-face.png",
+  "unicode": "🙃",
+  "category": "face",
+  "name": "upside down face"
+ },
+ {
+  "file": "winking_face.png",
+  "unicode": "😉",
+  "category": "face",
+  "name": "winking face"
+ },
+ {
+  "file": "worried-face.png",
+  "unicode": "😟",
+  "category": "face",
+  "name": "worried face"
+ },
+ {
+  "file": "yawning-sleepy-face.png",
+  "unicode": "🥱",
+  "category": "face",
+  "name": "yawning sleepy face"
+ },
+ {
+  "file": "zipper-mouth-face.png",
+  "unicode": "🤐",
+  "category": "face",
+  "name": "zipper mouth face"
+ },
+ {
+  "file": "blackmoon.png",
+  "unicode": "🌚",
+  "category": "face",
+  "name": "blackmoon"
+ },
+ {
+  "file": "birthday-cake.png",
+  "unicode": "🎂",
+  "category": "festival",
+  "name": "birthday cake"
+ },
+ {
+  "file": "celebration-star.png",
+  "unicode": "🌟",
+  "category": "festival",
+  "name": "celebration star"
+ },
+ {
+  "file": "celebration-wreath.png",
+  "unicode": "🎀",
+  "category": "festival",
+  "name": "celebration wreath"
+ },
+ {
+  "file": "christmas-tree.png",
+  "unicode": "🎄",
+  "category": "festival",
+  "name": "christmas tree"
+ },
+ {
+  "file": "colorful-balloon.png",
+  "unicode": "🎈",
+  "category": "festival",
+  "name": "colorful balloon"
+ },
+ {
+  "file": "crescent-moon-lantern.png",
+  "unicode": "🏮",
+  "category": "festival",
+  "name": "crescent moon lantern"
+ },
+ {
+  "file": "festival-lantern.png",
+  "unicode": "🏮",
+  "category": "festival",
+  "name": "festival lantern"
+ },
+ {
+  "file": "festive-fireworks.png",
+  "unicode": "🎆",
+  "category": "festival",
+  "name": "festive fireworks"
+ },
+ {
+  "file": "floating-confetti.png",
+  "unicode": "🎊",
+  "category": "festival",
+  "name": "floating confetti"
+ },
+ {
+  "file": "heart-shaped-gift-box.png",
+  "unicode": "💝",
+  "category": "festival",
+  "name": "heart shaped gift box"
+ },
+ {
+  "file": "jack-o-lantern.png",
+  "unicode": "🎃",
+  "category": "festival",
+  "name": "jack o lantern"
+ },
+ {
+  "file": "party-hat.png",
+  "unicode": "🎉",
+  "category": "festival",
+  "name": "party hat"
+ },
+ {
+  "file": "party-popper.png",
+  "unicode": "🎉",
+  "category": "festival",
+  "name": "party popper"
+ },
+ {
+  "file": "red-gift-envelope.png",
+  "unicode": "🧧",
+  "category": "festival",
+  "name": "red gift envelope"
+ },
+ {
+  "file": "snowman.png",
+  "unicode": "⛄",
+  "category": "festival",
+  "name": "snowman"
+ },
+ {
+  "file": "wrapped-gift-box.png",
+  "unicode": "🎁",
+  "category": "festival",
+  "name": "wrapped gift box"
+ },
+ {
+  "file": "apple.png",
+  "unicode": "🍎",
+  "category": "fruit",
+  "name": "apple"
+ },
+ {
+  "file": "avocado.png",
+  "unicode": "🥑",
+  "category": "fruit",
+  "name": "avocado"
+ },
+ {
+  "file": "banana.png",
+  "unicode": "🍌",
+  "category": "fruit",
+  "name": "banana"
+ },
+ {
+  "file": "broccoli.png",
+  "unicode": "🥦",
+  "category": "fruit",
+  "name": "broccoli"
+ },
+ {
+  "file": "carrot.png",
+  "unicode": "🥕",
+  "category": "fruit",
+  "name": "carrot"
+ },
+ {
+  "file": "coconut.png",
+  "unicode": "🥥",
+  "category": "fruit",
+  "name": "coconut"
+ },
+ {
+  "file": "corn.png",
+  "unicode": "🌽",
+  "category": "fruit",
+  "name": "corn"
+ },
+ {
+  "file": "cucumber.png",
+  "unicode": "🥒",
+  "category": "fruit",
+  "name": "cucumber"
+ },
+ {
+  "file": "grapes.png",
+  "unicode": "🍇",
+  "category": "fruit",
+  "name": "grapes"
+ },
+ {
+  "file": "mango.png",
+  "unicode": "🥭",
+  "category": "fruit",
+  "name": "mango"
+ },
+ {
+  "file": "orange.png",
+  "unicode": "🍊",
+  "category": "fruit",
+  "name": "orange"
+ },
+ {
+  "file": "pineapple.png",
+  "unicode": "🍍",
+  "category": "fruit",
+  "name": "pineapple"
+ },
+ {
+  "file": "red_chili_pepper.png",
+  "unicode": "🌶️",
+  "category": "fruit",
+  "name": "red chili pepper"
+ },
+ {
+  "file": "strawberry.png",
+  "unicode": "🍓",
+  "category": "fruit",
+  "name": "strawberry"
+ },
+ {
+  "file": "tomato.png",
+  "unicode": "🍅",
+  "category": "fruit",
+  "name": "tomato"
+ },
+ {
+  "file": "watermelon.png",
+  "unicode": "🍉",
+  "category": "fruit",
+  "name": "watermelon"
+ },
+ {
+  "file": "01_glossy_red_heart.png",
+  "unicode": "❤️",
+  "category": "love",
+  "name": "01 glossy red heart"
+ },
+ {
+  "file": "02_soft_pink_heart.png",
+  "unicode": "🩷",
+  "category": "love",
+  "name": "02 soft pink heart"
+ },
+ {
+  "file": "03_sparkling_heart.png",
+  "unicode": "💖",
+  "category": "love",
+  "name": "03 sparkling heart"
+ },
+ {
+  "file": "04_beating_heart.png",
+  "unicode": "💓",
+  "category": "love",
+  "name": "04 beating heart"
+ },
+ {
+  "file": "05_two_floating_hearts.png",
+  "unicode": "💕",
+  "category": "love",
+  "name": "05 two floating hearts"
+ },
+ {
+  "file": "06_revolving_hearts.png",
+  "unicode": "💞",
+  "category": "love",
+  "name": "06 revolving hearts"
+ },
+ {
+  "file": "07_broken_heart.png",
+  "unicode": "💔",
+  "category": "love",
+  "name": "07 broken heart"
+ },
+ {
+  "file": "08_bandaged_heart.png",
+  "unicode": "❤️‍🩹",
+  "category": "love",
+  "name": "08 bandaged heart"
+ },
+ {
+  "file": "09_arrow_pierced_heart.png",
+  "unicode": "💘",
+  "category": "love",
+  "name": "09 arrow pierced heart"
+ },
+ {
+  "file": "10_flaming_heart.png",
+  "unicode": "❤️‍🔥",
+  "category": "love",
+  "name": "10 flaming heart"
+ },
+ {
+  "file": "11_sealed_love_letter.png",
+  "unicode": "💌",
+  "category": "love",
+  "name": "11 sealed love letter"
+ },
+ {
+  "file": "12_lipstick_kiss_mark.png",
+  "unicode": "💋",
+  "category": "love",
+  "name": "12 lipstick kiss mark"
+ },
+ {
+  "file": "13_rose_bouquet.png",
+  "unicode": "💐",
+  "category": "love",
+  "name": "13 rose bouquet"
+ },
+ {
+  "file": "14_holding_hands.png",
+  "unicode": "🤝",
+  "category": "love",
+  "name": "14 holding hands"
+ },
+ {
+  "file": "15_romantic_couple.png",
+  "unicode": "💑",
+  "category": "love",
+  "name": "15 romantic couple"
+ },
+ {
+  "file": "16_engagement_ring.png",
+  "unicode": "💍",
+  "category": "love",
+  "name": "16 engagement ring"
+ },
+ {
+  "file": "adhesive_bandage.png",
+  "unicode": "🩹",
+  "category": "medical",
+  "name": "adhesive bandage"
+ },
+ {
+  "file": "bar_of_soap.png",
+  "unicode": "🧼",
+  "category": "medical",
+  "name": "bar of soap"
+ },
+ {
+  "file": "digital_thermometer.png",
+  "unicode": "🌡️",
+  "category": "medical",
+  "name": "digital thermometer"
+ },
+ {
+  "file": "first_aid_kit.png",
+  "unicode": "⛑️",
+  "category": "medical",
+  "name": "first aid kit"
+ },
+ {
+  "file": "hand_sanitizer_bottle.png",
+  "unicode": "🧴",
+  "category": "medical",
+  "name": "hand sanitizer bottle"
+ },
+ {
+  "file": "healthy_tooth.png",
+  "unicode": "🦷",
+  "category": "medical",
+  "name": "healthy tooth"
+ },
+ {
+  "file": "heart_monitor.png",
+  "unicode": "💓",
+  "category": "medical",
+  "name": "heart monitor"
+ },
+ {
+  "file": "medical_cross_emblem.png",
+  "unicode": "⚕️",
+  "category": "medical",
+  "name": "medical cross emblem"
+ },
+ {
+  "file": "medical_stethoscope.png",
+  "unicode": "🩺",
+  "category": "medical",
+  "name": "medical stethoscope"
+ },
+ {
+  "file": "medical_syringe.png",
+  "unicode": "💉",
+  "category": "medical",
+  "name": "medical syringe"
+ },
+ {
+  "file": "medicine_bottle.png",
+  "unicode": "💊",
+  "category": "medical",
+  "name": "medicine bottle"
+ },
+ {
+  "file": "medicine_capsule.png",
+  "unicode": "💊",
+  "category": "medical",
+  "name": "medicine capsule"
+ },
+ {
+  "file": "pair_of_crutches.png",
+  "unicode": "🩼",
+  "category": "medical",
+  "name": "pair of crutches"
+ },
+ {
+  "file": "reusable_ice_pack.png",
+  "unicode": "🧊",
+  "category": "medical",
+  "name": "reusable ice pack"
+ },
+ {
+  "file": "surgical_face_mask.png",
+  "unicode": "😷",
+  "category": "medical",
+  "name": "surgical face mask"
+ },
+ {
+  "file": "wheelchair.png",
+  "unicode": "♿",
+  "category": "medical",
+  "name": "wheelchair"
+ },
+ {
+  "file": "arcade_joystick.png",
+  "unicode": "🕹️",
+  "category": "music&games",
+  "name": "arcade joystick"
+ },
+ {
+  "file": "artists_palette.png",
+  "unicode": "🎨",
+  "category": "music&games",
+  "name": "artists palette"
+ },
+ {
+  "file": "chess_knight.png",
+  "unicode": "♞",
+  "category": "music&games",
+  "name": "chess knight"
+ },
+ {
+  "file": "clapperboard.png",
+  "unicode": "🎬",
+  "category": "music&games",
+  "name": "clapperboard"
+ },
+ {
+  "file": "dj_turntable.png",
+  "unicode": "🎧",
+  "category": "music&games",
+  "name": "dj turntable"
+ },
+ {
+  "file": "electric_guitar.png",
+  "unicode": "🎸",
+  "category": "music&games",
+  "name": "electric guitar"
+ },
+ {
+  "file": "game_controller.png",
+  "unicode": "🎮",
+  "category": "music&games",
+  "name": "game controller"
+ },
+ {
+  "file": "grand_piano.png",
+  "unicode": "🎹",
+  "category": "music&games",
+  "name": "grand piano"
+ },
+ {
+  "file": "jigsaw_puzzle_piece.png",
+  "unicode": "🧩",
+  "category": "music&games",
+  "name": "jigsaw puzzle piece"
+ },
+ {
+  "file": "microphone.png",
+  "unicode": "🎤",
+  "category": "music&games",
+  "name": "microphone"
+ },
+ {
+  "file": "musical_notes.png",
+  "unicode": "🎶",
+  "category": "music&games",
+  "name": "musical notes"
+ },
+ {
+  "file": "paintbrush.png",
+  "unicode": "🖌️",
+  "category": "music&games",
+  "name": "paintbrush"
+ },
+ {
+  "file": "pair_of_dice.png",
+  "unicode": "🎲",
+  "category": "music&games",
+  "name": "pair of dice"
+ },
+ {
+  "file": "snare_drum.png",
+  "unicode": "🥁",
+  "category": "music&games",
+  "name": "snare drum"
+ },
+ {
+  "file": "theatre_masks.png",
+  "unicode": "🎭",
+  "category": "music&games",
+  "name": "theatre masks"
+ },
+ {
+  "file": "vintage_film_camera.png",
+  "unicode": "🎥",
+  "category": "music&games",
+  "name": "vintage film camera"
+ },
+ {
+  "file": "blooming_flower.png",
+  "unicode": "🌸",
+  "category": "nature",
+  "name": "blooming flower"
+ },
+ {
+  "file": "cactus.png",
+  "unicode": "🌵",
+  "category": "nature",
+  "name": "cactus"
+ },
+ {
+  "file": "crescent_moon.png",
+  "unicode": "🌙",
+  "category": "nature",
+  "name": "crescent moon"
+ },
+ {
+  "file": "fluffy_cloud.png",
+  "unicode": "☁️",
+  "category": "nature",
+  "name": "fluffy cloud"
+ },
+ {
+  "file": "glowing_flame.png",
+  "unicode": "🔥",
+  "category": "nature",
+  "name": "glowing flame"
+ },
+ {
+  "file": "green_leaf.png",
+  "unicode": "🍃",
+  "category": "nature",
+  "name": "green leaf"
+ },
+ {
+  "file": "mountain_peak.png",
+  "unicode": "🏔️",
+  "category": "nature",
+  "name": "mountain peak"
+ },
+ {
+  "file": "ocean_wave.png",
+  "unicode": "🌊",
+  "category": "nature",
+  "name": "ocean wave"
+ },
+ {
+  "file": "radiant_sun.png",
+  "unicode": "🌞",
+  "category": "nature",
+  "name": "radiant sun"
+ },
+ {
+  "file": "rain_cloud.png",
+  "unicode": "🌧️",
+  "category": "nature",
+  "name": "rain cloud"
+ },
+ {
+  "file": "rainbow.png",
+  "unicode": "🌈",
+  "category": "nature",
+  "name": "rainbow"
+ },
+ {
+  "file": "snowflake.png",
+  "unicode": "❄️",
+  "category": "nature",
+  "name": "snowflake"
+ },
+ {
+  "file": "sparkling_stars.png",
+  "unicode": "✨",
+  "category": "nature",
+  "name": "sparkling stars"
+ },
+ {
+  "file": "spotted_mushroom.png",
+  "unicode": "🍄",
+  "category": "nature",
+  "name": "spotted mushroom"
+ },
+ {
+  "file": "thundercloud_lightning.png",
+  "unicode": "🌩️",
+  "category": "nature",
+  "name": "thundercloud lightning"
+ },
+ {
+  "file": "tornado.png",
+  "unicode": "🌪️",
+  "category": "nature",
+  "name": "tornado"
+ },
+ {
+  "file": "cute_baby.png",
+  "unicode": "👶",
+  "category": "people",
+  "name": "cute baby"
+ },
+ {
+  "file": "family_with_two_children.png",
+  "unicode": "👨‍👩‍👧‍👦",
+  "category": "people",
+  "name": "family with two children"
+ },
+ {
+  "file": "friendly_adult.png",
+  "unicode": "🧑",
+  "category": "people",
+  "name": "friendly adult"
+ },
+ {
+  "file": "parent_with_child.png",
+  "unicode": "👩‍👦",
+  "category": "people",
+  "name": "parent with child"
+ },
+ {
+  "file": "person_dancing.png",
+  "unicode": "💃",
+  "category": "people",
+  "name": "person dancing"
+ },
+ {
+  "file": "person_facepalming.png",
+  "unicode": "🤦",
+  "category": "people",
+  "name": "person facepalming"
+ },
+ {
+  "file": "person_meditating.png",
+  "unicode": "🧘",
+  "category": "people",
+  "name": "person meditating"
+ },
+ {
+  "file": "person_running.png",
+  "unicode": "🏃",
+  "category": "people",
+  "name": "person running"
+ },
+ {
+  "file": "person_shrugging.png",
+  "unicode": "🤷",
+  "category": "people",
+  "name": "person shrugging"
+ },
+ {
+  "file": "person_using_wheelchair.png",
+  "unicode": "🧑‍🦽",
+  "category": "people",
+  "name": "person using wheelchair"
+ },
+ {
+  "file": "person_waving_hello.png",
+  "unicode": "👋",
+  "category": "people",
+  "name": "person waving hello"
+ },
+ {
+  "file": "person_with_curly_hair.png",
+  "unicode": "👩‍🦱",
+  "category": "people",
+  "name": "person with curly hair"
+ },
+ {
+  "file": "person_with_glasses.png",
+  "unicode": "👓",
+  "category": "people",
+  "name": "person with glasses"
+ },
+ {
+  "file": "pregnant_person.png",
+  "unicode": "🫄",
+  "category": "people",
+  "name": "pregnant person"
+ },
+ {
+  "file": "smiling_child.png",
+  "unicode": "🧒",
+  "category": "people",
+  "name": "smiling child"
+ },
+ {
+  "file": "wise_elderly_person.png",
+  "unicode": "👴",
+  "category": "people",
+  "name": "wise elderly person"
+ },
+ {
+  "file": "hot_and_flustered.png",
+  "unicode": "🥵",
+  "category": "romantic",
+  "name": "hot and flustered"
+ },
+ {
+  "file": "lip_biting_flirt.png",
+  "unicode": "🫦",
+  "category": "romantic",
+  "name": "lip biting flirt"
+ },
+ {
+  "file": "passionate_kiss.png",
+  "unicode": "💏",
+  "category": "romantic",
+  "name": "passionate kiss"
+ },
+ {
+  "file": "private_romance_lock.png",
+  "unicode": "🔒",
+  "category": "romantic",
+  "name": "private romance lock"
+ },
+ {
+  "file": "sensual_rose.png",
+  "unicode": "🌹",
+  "category": "romantic",
+  "name": "sensual rose"
+ },
+ {
+  "file": "burger.png",
+  "unicode": "🍔",
+  "category": "rood",
+  "name": "burger"
+ },
+ {
+  "file": "cake_slice.png",
+  "unicode": "🍰",
+  "category": "rood",
+  "name": "cake slice"
+ },
+ {
+  "file": "chocolate_bar.png",
+  "unicode": "🍫",
+  "category": "rood",
+  "name": "chocolate bar"
+ },
+ {
+  "file": "chocolate_donut.png",
+  "unicode": "🍩",
+  "category": "rood",
+  "name": "chocolate donut"
+ },
+ {
+  "file": "cupcake.png",
+  "unicode": "🧁",
+  "category": "rood",
+  "name": "cupcake"
+ },
+ {
+  "file": "french_fries.png",
+  "unicode": "🍟",
+  "category": "rood",
+  "name": "french fries"
+ },
+ {
+  "file": "fried_chicken.png",
+  "unicode": "🍗",
+  "category": "rood",
+  "name": "fried chicken"
+ },
+ {
+  "file": "hot_dog.png",
+  "unicode": "🌭",
+  "category": "rood",
+  "name": "hot dog"
+ },
+ {
+  "file": "ice_cream_cone.png",
+  "unicode": "🍦",
+  "category": "rood",
+  "name": "ice cream cone"
+ },
+ {
+  "file": "pizza_slice.png",
+  "unicode": "🍕",
+  "category": "rood",
+  "name": "pizza slice"
+ },
+ {
+  "file": "ramen_bowl.png",
+  "unicode": "🍜",
+  "category": "rood",
+  "name": "ramen bowl"
+ },
+ {
+  "file": "rice_bowl.png",
+  "unicode": "🍚",
+  "category": "rood",
+  "name": "rice bowl"
+ },
+ {
+  "file": "salmon_sushi.png",
+  "unicode": "🍣",
+  "category": "rood",
+  "name": "salmon sushi"
+ },
+ {
+  "file": "sandwich.png",
+  "unicode": "🥪",
+  "category": "rood",
+  "name": "sandwich"
+ },
+ {
+  "file": "steamed_dumplings.png",
+  "unicode": "🥟",
+  "category": "rood",
+  "name": "steamed dumplings"
+ },
+ {
+  "file": "taco.png",
+  "unicode": "🌮",
+  "category": "rood",
+  "name": "taco"
+ },
+ {
+  "file": "bullseye_target.png",
+  "unicode": "🎯",
+  "category": "symbol",
+  "name": "bullseye target"
+ },
+ {
+  "file": "check_mark.png",
+  "unicode": "✅",
+  "category": "symbol",
+  "name": "check mark"
+ },
+ {
+  "file": "closed_padlock.png",
+  "unicode": "🔒",
+  "category": "symbol",
+  "name": "closed padlock"
+ },
+ {
+  "file": "cross_mark.png",
+  "unicode": "❌",
+  "category": "symbol",
+  "name": "cross mark"
+ },
+ {
+  "file": "directional_arrows.png",
+  "unicode": "🔄",
+  "category": "symbol",
+  "name": "directional arrows"
+ },
+ {
+  "file": "exclamation_mark.png",
+  "unicode": "❗",
+  "category": "symbol",
+  "name": "exclamation mark"
+ },
+ {
+  "file": "golden_star.png",
+  "unicode": "⭐",
+  "category": "symbol",
+  "name": "golden star"
+ },
+ {
+  "file": "infinity_symbol.png",
+  "unicode": "♾️",
+  "category": "symbol",
+  "name": "infinity symbol"
+ },
+ {
+  "file": "map_pin.png",
+  "unicode": "📍",
+  "category": "symbol",
+  "name": "map pin"
+ },
+ {
+  "file": "open_padlock.png",
+  "unicode": "🔓",
+  "category": "symbol",
+  "name": "open padlock"
+ },
+ {
+  "file": "prohibited_sign.png",
+  "unicode": "🚫",
+  "category": "symbol",
+  "name": "prohibited sign"
+ },
+ {
+  "file": "question_mark.png",
+  "unicode": "❓",
+  "category": "symbol",
+  "name": "question mark"
+ },
+ {
+  "file": "recycling_symbol.png",
+  "unicode": "♻️",
+  "category": "symbol",
+  "name": "recycling symbol"
+ },
+ {
+  "file": "shield.png",
+  "unicode": "🛡️",
+  "category": "symbol",
+  "name": "shield"
+ },
+ {
+  "file": "sparkles.png",
+  "unicode": "✨",
+  "category": "symbol",
+  "name": "sparkles"
+ },
+ {
+  "file": "warning_triangle.png",
+  "unicode": "⚠️",
+  "category": "symbol",
+  "name": "warning triangle"
+ },
+ {
+  "file": "camera_drone.png",
+  "unicode": "🚁",
+  "category": "technology",
+  "name": "camera drone"
+ },
+ {
+  "file": "computer_mouse.png",
+  "unicode": "🖱️",
+  "category": "technology",
+  "name": "computer mouse"
+ },
+ {
+  "file": "desktop_monitor.png",
+  "unicode": "🖥️",
+  "category": "technology",
+  "name": "desktop monitor"
+ },
+ {
+  "file": "digital_camera.png",
+  "unicode": "📷",
+  "category": "technology",
+  "name": "digital camera"
+ },
+ {
+  "file": "gaming_controller.png",
+  "unicode": "🎮",
+  "category": "technology",
+  "name": "gaming controller"
+ },
+ {
+  "file": "laptop.png",
+  "unicode": "💻",
+  "category": "technology",
+  "name": "laptop"
+ },
+ {
+  "file": "mechanical_keyboard.png",
+  "unicode": "⌨️",
+  "category": "technology",
+  "name": "mechanical keyboard"
+ },
+ {
+  "file": "miniature_robot.png",
+  "unicode": "🤖",
+  "category": "technology",
+  "name": "miniature robot"
+ },
+ {
+  "file": "over_ear_headphones.png",
+  "unicode": "🎧",
+  "category": "technology",
+  "name": "over ear headphones"
+ },
+ {
+  "file": "professional_microphone.png",
+  "unicode": "🎤",
+  "category": "technology",
+  "name": "professional microphone"
+ },
+ {
+  "file": "rechargeable_battery.png",
+  "unicode": "🔋",
+  "category": "technology",
+  "name": "rechargeable battery"
+ },
+ {
+  "file": "smartphone.png",
+  "unicode": "📱",
+  "category": "technology",
+  "name": "smartphone"
+ },
+ {
+  "file": "smartwatch.png",
+  "unicode": "⌚",
+  "category": "technology",
+  "name": "smartwatch"
+ },
+ {
+  "file": "tablet.png",
+  "unicode": "📱",
+  "category": "technology",
+  "name": "tablet"
+ },
+ {
+  "file": "virtual_reality_headset.png",
+  "unicode": "🥽",
+  "category": "technology",
+  "name": "virtual reality headset"
+ },
+ {
+  "file": "wireless_earbuds.png",
+  "unicode": "🎧",
+  "category": "technology",
+  "name": "wireless earbuds"
+ },
+ {
+  "file": "ambulance.png",
+  "unicode": "🚑",
+  "category": "vehicle",
+  "name": "ambulance"
+ },
+ {
+  "file": "bicycle.png",
+  "unicode": "🚲",
+  "category": "vehicle",
+  "name": "bicycle"
+ },
+ {
+  "file": "city-bus.png",
+  "unicode": "🚌",
+  "category": "vehicle",
+  "name": "city bus"
+ },
+ {
+  "file": "commercial-airplane.png",
+  "unicode": "✈️",
+  "category": "vehicle",
+  "name": "commercial airplane"
+ },
+ {
+  "file": "compact-car.png",
+  "unicode": "🚗",
+  "category": "vehicle",
+  "name": "compact car"
+ },
+ {
+  "file": "electric-scooter.png",
+  "unicode": "🛴",
+  "category": "vehicle",
+  "name": "electric scooter"
+ },
+ {
+  "file": "farm-tractor.png",
+  "unicode": "🚜",
+  "category": "vehicle",
+  "name": "farm tractor"
+ },
+ {
+  "file": "helicopter.png",
+  "unicode": "🚁",
+  "category": "vehicle",
+  "name": "helicopter"
+ },
+ {
+  "file": "passenger-ship.png",
+  "unicode": "🛳️",
+  "category": "vehicle",
+  "name": "passenger ship"
+ },
+ {
+  "file": "passenger-train.png",
+  "unicode": "🚄",
+  "category": "vehicle",
+  "name": "passenger train"
+ },
+ {
+  "file": "rocket.png",
+  "unicode": "🚀",
+  "category": "vehicle",
+  "name": "rocket"
+ },
+ {
+  "file": "sailboat.png",
+  "unicode": "⛵",
+  "category": "vehicle",
+  "name": "sailboat"
+ },
+ {
+  "file": "sport-motorcycle.png",
+  "unicode": "🏍️",
+  "category": "vehicle",
+  "name": "sport motorcycle"
+ },
+ {
+  "file": "sports-car.png",
+  "unicode": "🏎️",
+  "category": "vehicle",
+  "name": "sports car"
+ },
+ {
+  "file": "subway-train.png",
+  "unicode": "🚇",
+  "category": "vehicle",
+  "name": "subway train"
+ },
+ {
+  "file": "yellow-taxi.png",
+  "unicode": "🚕",
+  "category": "vehicle",
+  "name": "yellow taxi"
+ }
+]
