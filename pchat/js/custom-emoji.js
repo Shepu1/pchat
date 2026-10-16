@@ -13,7 +13,7 @@ const CustomEmoji = (() => {
   const CATEGORY_ORDER = [
     'face', 'drinks', 'festival', 'fruit', 'love', 'medical',
     'music&games', 'nature', 'people', 'romantic', 'rood',
-    'symbol', 'technology', 'vehicle',
+    'symbol', 'technology', 'vehicle', 'hand',
   ];
 
   let _items = [];          // [{file, unicode, category, name, src}]

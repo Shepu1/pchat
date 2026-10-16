@@ -131,7 +131,7 @@
     /* Hub Cards */
     .hub-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
       gap: 1.5rem;
       margin-top: 2rem;
       max-width: 980px;
@@ -434,6 +434,7 @@
       box-shadow: 0 4px 14px var(--accent-glow), 0 0 0 2px rgba(9, 13, 22, 0.6) !important;
     }
     .chat-avatar .online-indicator { box-shadow: 0 0 8px rgba(34, 197, 94, 0.9) !important; }
+    .chat-avatar.has-photo { border-color: transparent !important; box-shadow: none !important; background: none !important; }
     .chat-item .btn-item-qr:hover, .chat-item .btn-item-sheet:hover {
       background: rgba(99, 102, 241, 0.14) !important;
     }
@@ -678,9 +679,15 @@
       </div>
 
       <!-- How it works (first-timer guidance) -->
-      <div
-        style="max-width:900px;display:flex;align-items:stretch;gap:0;margin-top:0.25rem;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1rem 1.25rem;overflow-x:auto;">
-        <div style="flex:1;min-width:180px;display:flex;gap:0.7rem;align-items:flex-start;">
+      <style>
+        /* Steps wrap onto multiple lines instead of cropping inside a
+           horizontal scrollbar — robust at every window width and zoom. */
+        .how-strip .how-div { display: none !important; }
+        .how-strip .how-step > div:last-child { min-width: 0; }
+      </style>
+      <div class="how-strip"
+        style="max-width:900px;display:flex;align-items:flex-start;flex-wrap:wrap;gap:0.9rem 1.5rem;margin-top:0.25rem;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1rem 1.25rem;overflow:visible;">
+        <div class="how-step" style="flex:1 1 210px;min-width:0;display:flex;gap:0.7rem;align-items:flex-start;">
           <span
             style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--accent-gradient);color:#fff;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">1</span>
           <div>
@@ -688,8 +695,8 @@
             <div style="font-size:0.75rem;color:var(--muted);">Pick a name, tap Create. No account.</div>
           </div>
         </div>
-        <div style="width:1px;align-self:stretch;background:var(--border);margin:0 1rem;flex-shrink:0;"></div>
-        <div style="flex:1;min-width:180px;display:flex;gap:0.7rem;align-items:flex-start;">
+        <div class="how-div" style="display:none;"></div>
+        <div class="how-step" style="flex:1 1 210px;min-width:0;display:flex;gap:0.7rem;align-items:flex-start;">
           <span
             style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.4);color:#34d399;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">2</span>
           <div>
@@ -697,8 +704,8 @@
             <div style="font-size:0.75rem;color:var(--muted);">Friends open it on phone or PC.</div>
           </div>
         </div>
-        <div style="width:1px;align-self:stretch;background:var(--border);margin:0 1rem;flex-shrink:0;"></div>
-        <div style="flex:1;min-width:180px;display:flex;gap:0.7rem;align-items:flex-start;">
+        <div class="how-div" style="display:none;"></div>
+        <div class="how-step" style="flex:1 1 210px;min-width:0;display:flex;gap:0.7rem;align-items:flex-start;">
           <span
             style="width:26px;height:26px;flex-shrink:0;border-radius:50%;background:rgba(168,85,247,0.16);border:1px solid rgba(168,85,247,0.4);color:#c084fc;font-size:0.75rem;font-weight:800;display:flex;align-items:center;justify-content:center;">3</span>
           <div>
@@ -881,17 +888,17 @@
       <!-- Device Connectivity Info Strip -->
       <div
         style="max-width:900px;margin-top:2rem;background:#0d1017;border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:1.25rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-          <span style="display:inline-flex;color:var(--accent);"><svg width="24" height="24" viewBox="0 0 24 24"
+        <div style="display:flex;align-items:center;gap:0.75rem;min-width:0;flex:1 1 260px;">
+          <span style="display:inline-flex;color:var(--accent);flex-shrink:0;"><svg width="24" height="24" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
               <line x1="12" y1="18" x2="12.01" y2="18"></line>
             </svg></span>
-          <div>
+          <div style="min-width:0;">
             <div style="font-weight:700;font-size:0.9rem;">Mobile & Cross-Device Access</div>
-            <div style="font-size:0.78rem;color:var(--muted);">Scan QR code with phone camera to open: <code
+            <div style="font-size:0.78rem;color:var(--muted);min-width:0;">Scan QR code with phone camera to open: <code
                 id="connectivity-url-display"
-                style="color:var(--accent-2);background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">loading…</code>
+                style="color:var(--accent-2);background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;overflow-wrap:anywhere;word-break:break-all;">loading…</code>
             </div>
           </div>
         </div>
@@ -1205,7 +1212,7 @@
     <script src="js/p2p-sync.js?v=20261016a"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="js/instant-security.js?v=20261016a"></script>
-    <script src="js/rooms.js?v=20261016a"></script>
+    <script src="js/rooms.js?v=20261016b"></script>
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
@@ -1408,10 +1415,14 @@
             const cleanName = (room.name || 'R').replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\s]+/gu, '').trim();
             const initial = (cleanName[0] || (room.name || 'R').trim()[0] || 'R').toUpperCase();
             const timeStr = formatRelativeTime(room.createdAt || room.joinedAt);
+            const roomIcon = (typeof Rooms !== 'undefined' && Rooms.roomIcon)
+              ? Rooms.roomIcon(room, room.kind)
+              : (room.spreadsheetId ? 'assets/icons/saved.webp' : 'assets/icons/quick.webp');
 
             item.innerHTML = `
         <div class="chat-avatar">
           ${initial.toUpperCase()}
+          <img src="${roomIcon}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
           <span class="online-indicator"></span>
         </div>
         <div class="chat-info">

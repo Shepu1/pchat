@@ -369,6 +369,11 @@ const P2PSync = (() => {
 
   function broadcastMessage(msg) {
     if (!msg) return;
+    // Strip sender-local UI flags — receivers must see a clean wire message
+    // (an _optimistic flag would make them skip sound + notification).
+    try {
+      if (msg._optimistic) delete msg._optimistic;
+    } catch {}
     // Attach invisible proof so host can drop spoofed packets
     let proof = '';
     try {

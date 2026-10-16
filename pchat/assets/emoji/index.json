@@ -1510,5 +1510,545 @@
   "unicode": "👩‍❤️‍👨",
   "category": "romantic",
   "name": "whispering couple"
+ },
+ {
+  "file": "anxious_face_with_sweat.png",
+  "unicode": "😰",
+  "category": "face",
+  "name": "anxious face with sweat"
+ },
+ {
+  "file": "confused_face.png",
+  "unicode": "😕",
+  "category": "face",
+  "name": "confused face"
+ },
+ {
+  "file": "crying_face.png",
+  "unicode": "😢",
+  "category": "face",
+  "name": "crying face"
+ },
+ {
+  "file": "dizzy_face.png",
+  "unicode": "😶‍🌫️",
+  "category": "face",
+  "name": "dizzy face"
+ },
+ {
+  "file": "face_holding_back_tears.png",
+  "unicode": "🥹",
+  "category": "face",
+  "name": "face holding back tears"
+ },
+ {
+  "file": "face_screaming_in_fear.png",
+  "unicode": "😱",
+  "category": "face",
+  "name": "face screaming in fear"
+ },
+ {
+  "file": "face_with_hand_over_mouth.png",
+  "unicode": "🫢",
+  "category": "face",
+  "name": "face with hand over mouth"
+ },
+ {
+  "file": "face_with_open_mouth.png",
+  "unicode": "😮",
+  "category": "face",
+  "name": "face with open mouth"
+ },
+ {
+  "file": "face_with_peeking_eye.png",
+  "unicode": "🫀",
+  "category": "face",
+  "name": "face with peeking eye"
+ },
+ {
+  "file": "face_with_steam_from_nose.png",
+  "unicode": "😤",
+  "category": "face",
+  "name": "face with steam from nose"
+ },
+ {
+  "file": "face_without_mouth.png",
+  "unicode": "😶",
+  "category": "face",
+  "name": "face without mouth"
+ },
+ {
+  "file": "fearful_face.png",
+  "unicode": "😨",
+  "category": "face",
+  "name": "fearful face"
+ },
+ {
+  "file": "frowning_face.png",
+  "unicode": "☹️",
+  "category": "face",
+  "name": "frowning face"
+ },
+ {
+  "file": "grinning_face.png",
+  "unicode": "😀",
+  "category": "face",
+  "name": "grinning face"
+ },
+ {
+  "file": "grinning_face_with_big_eyes.png",
+  "unicode": "😃",
+  "category": "face",
+  "name": "grinning face with big eyes"
+ },
+ {
+  "file": "grinning_face_with_smiling_eyes.png",
+  "unicode": "😄",
+  "category": "face",
+  "name": "grinning face with smiling eyes"
+ },
+ {
+  "file": "grinning_face_with_sweat.png",
+  "unicode": "😅",
+  "category": "face",
+  "name": "grinning face with sweat"
+ },
+ {
+  "file": "grinning_squinting_face.png",
+  "unicode": "😆",
+  "category": "face",
+  "name": "grinning squinting face"
+ },
+ {
+  "file": "hushed_face.png",
+  "unicode": "😯",
+  "category": "face",
+  "name": "hushed face"
+ },
+ {
+  "file": "kissing_face.png",
+  "unicode": "😗",
+  "category": "face",
+  "name": "kissing face"
+ },
+ {
+  "file": "kissing_face_with_closed_eyes.png",
+  "unicode": "😚",
+  "category": "face",
+  "name": "kissing face with closed eyes"
+ },
+ {
+  "file": "kissing_face_with_smiling_eyes.png",
+  "unicode": "😙",
+  "category": "face",
+  "name": "kissing face with smiling eyes"
+ },
+ {
+  "file": "melting_face.png",
+  "unicode": "🫠",
+  "category": "face",
+  "name": "melting face"
+ },
+ {
+  "file": "pensive_face.png",
+  "unicode": "😔",
+  "category": "face",
+  "name": "pensive face"
+ },
+ {
+  "file": "saluting_face.png",
+  "unicode": "🫡",
+  "category": "face",
+  "name": "saluting face"
+ },
+ {
+  "file": "slightly_smiling_face.png",
+  "unicode": "🙂",
+  "category": "face",
+  "name": "slightly smiling face"
+ },
+ {
+  "file": "smiling_face_with_halo.png",
+  "unicode": "😇",
+  "category": "face",
+  "name": "smiling face with halo"
+ },
+ {
+  "file": "squinting_face_with_tongue.png",
+  "unicode": "😝",
+  "category": "face",
+  "name": "squinting face with tongue"
+ },
+ {
+  "file": "tired_face.png",
+  "unicode": "😫",
+  "category": "face",
+  "name": "tired face"
+ },
+ {
+  "file": "weary_face.png",
+  "unicode": "😩",
+  "category": "face",
+  "name": "weary face"
+ },
+ {
+  "file": "woozy_face.png",
+  "unicode": "🥴",
+  "category": "face",
+  "name": "woozy face"
+ },
+ {
+  "file": "zany_face.png",
+  "unicode": "🤪",
+  "category": "face",
+  "name": "zany face"
+ },
+ {
+  "file": "black_heart.png",
+  "unicode": "🖤",
+  "category": "love",
+  "name": "black heart"
+ },
+ {
+  "file": "blue_heart.png",
+  "unicode": "💙",
+  "category": "love",
+  "name": "blue heart"
+ },
+ {
+  "file": "brown_heart.png",
+  "unicode": "🤎",
+  "category": "love",
+  "name": "brown heart"
+ },
+ {
+  "file": "devilheart.png",
+  "unicode": "👿",
+  "category": "love",
+  "name": "devilheart"
+ },
+ {
+  "file": "green_heart.png",
+  "unicode": "💚",
+  "category": "love",
+  "name": "green heart"
+ },
+ {
+  "file": "grey_heart.png",
+  "unicode": "🩶",
+  "category": "love",
+  "name": "grey heart"
+ },
+ {
+  "file": "growing_heart.png",
+  "unicode": "💗",
+  "category": "love",
+  "name": "growing heart"
+ },
+ {
+  "file": "heart_decoration.png",
+  "unicode": "💟",
+  "category": "love",
+  "name": "heart decoration"
+ },
+ {
+  "file": "heart_exclamation.png",
+  "unicode": "❣️",
+  "category": "love",
+  "name": "heart exclamation"
+ },
+ {
+  "file": "heart_hands.png",
+  "unicode": "🫶",
+  "category": "love",
+  "name": "heart hands"
+ },
+ {
+  "file": "heart_with_ribbon.png",
+  "unicode": "🎗️",
+  "category": "love",
+  "name": "heart with ribbon"
+ },
+ {
+  "file": "heart_with_sparkles.png",
+  "unicode": "❇️",
+  "category": "love",
+  "name": "heart with sparkles"
+ },
+ {
+  "file": "hug.png",
+  "unicode": "🫂",
+  "category": "love",
+  "name": "hug"
+ },
+ {
+  "file": "light_blue_heart.png",
+  "unicode": "🩵",
+  "category": "love",
+  "name": "light blue heart"
+ },
+ {
+  "file": "orange_heart.png",
+  "unicode": "🧡",
+  "category": "love",
+  "name": "orange heart"
+ },
+ {
+  "file": "purple_heart.png",
+  "unicode": "💜",
+  "category": "love",
+  "name": "purple heart"
+ },
+ {
+  "file": "white_heart.png",
+  "unicode": "🤍",
+  "category": "love",
+  "name": "white heart"
+ },
+ {
+  "file": "yellow_heart.png",
+  "unicode": "💛",
+  "category": "love",
+  "name": "yellow heart"
+ },
+ {
+  "file": "lip_1.png",
+  "unicode": "👩‍❤️‍💋‍👨",
+  "category": "romantic",
+  "name": "lip 1"
+ },
+ {
+  "file": "lip_2.png",
+  "unicode": "👨‍❤️‍💋‍👨",
+  "category": "romantic",
+  "name": "lip 2"
+ },
+ {
+  "file": "lip_3.png",
+  "unicode": "👩‍❤️‍💋‍👩",
+  "category": "romantic",
+  "name": "lip 3"
+ },
+ {
+  "file": "lip_4.png",
+  "unicode": "💒",
+  "category": "romantic",
+  "name": "lip 4"
+ },
+ {
+  "file": "lip_5.png",
+  "unicode": "👰",
+  "category": "romantic",
+  "name": "lip 5"
+ },
+ {
+  "file": "lip_6.png",
+  "unicode": "🤵",
+  "category": "romantic",
+  "name": "lip 6"
+ },
+ {
+  "file": "lip_7.png",
+  "unicode": "😽",
+  "category": "romantic",
+  "name": "lip 7"
+ },
+ {
+  "file": "lip_8.png",
+  "unicode": "🏩",
+  "category": "romantic",
+  "name": "lip 8"
+ },
+ {
+  "file": "lip_9.png",
+  "unicode": "💫",
+  "category": "romantic",
+  "name": "lip 9"
+ },
+ {
+  "file": "lip_10.png",
+  "unicode": "🤴",
+  "category": "romantic",
+  "name": "lip 10"
+ },
+ {
+  "file": "lip_11.png",
+  "unicode": "🏹",
+  "category": "romantic",
+  "name": "lip 11"
+ },
+ {
+  "file": "lip_12.png",
+  "unicode": "💦",
+  "category": "romantic",
+  "name": "lip 12"
+ },
+ {
+  "file": "lip_13.png",
+  "unicode": "💄",
+  "category": "romantic",
+  "name": "lip 13"
+ },
+ {
+  "file": "lip_14.png",
+  "unicode": "👅",
+  "category": "romantic",
+  "name": "lip 14"
+ },
+ {
+  "file": "lip_15.png",
+  "unicode": "🪞",
+  "category": "romantic",
+  "name": "lip 15"
+ },
+ {
+  "file": "lip_16.png",
+  "unicode": "🥀",
+  "category": "romantic",
+  "name": "lip 16"
+ },
+ {
+  "file": "lip_17.png",
+  "unicode": "👰‍♀️",
+  "category": "romantic",
+  "name": "lip 17"
+ },
+ {
+  "file": "lip_18.png",
+  "unicode": "🧛",
+  "category": "romantic",
+  "name": "lip 18"
+ },
+ {
+  "file": "lip_19.png",
+  "unicode": "👰‍♂️",
+  "category": "romantic",
+  "name": "lip 19"
+ },
+ {
+  "file": "lip_20.png",
+  "unicode": "🤵‍♀️",
+  "category": "romantic",
+  "name": "lip 20"
+ },
+ {
+  "file": "lip_21.png",
+  "unicode": "🤵‍♂️",
+  "category": "romantic",
+  "name": "lip 21"
+ },
+ {
+  "file": "lip_22.png",
+  "unicode": "❀",
+  "category": "romantic",
+  "name": "lip 22"
+ },
+ {
+  "file": "lip_23.png",
+  "unicode": "👸",
+  "category": "romantic",
+  "name": "lip 23"
+ },
+ {
+  "file": "lip_24.png",
+  "unicode": "🍒",
+  "category": "romantic",
+  "name": "lip 24"
+ },
+ {
+  "file": "backhand_index_pointing_down.png",
+  "unicode": "👇",
+  "category": "hand",
+  "name": "backhand index pointing down"
+ },
+ {
+  "file": "backhand_index_pointing_up.png",
+  "unicode": "👆",
+  "category": "hand",
+  "name": "backhand index pointing up"
+ },
+ {
+  "file": "call_me_hand.png",
+  "unicode": "🤙",
+  "category": "hand",
+  "name": "call me hand"
+ },
+ {
+  "file": "clapping_hands.png",
+  "unicode": "👏",
+  "category": "hand",
+  "name": "clapping hands"
+ },
+ {
+  "file": "crossed_fingers.png",
+  "unicode": "🤞",
+  "category": "hand",
+  "name": "crossed fingers"
+ },
+ {
+  "file": "flexed_biceps.png",
+  "unicode": "💪",
+  "category": "hand",
+  "name": "flexed biceps"
+ },
+ {
+  "file": "folded_hands.png",
+  "unicode": "🙏",
+  "category": "hand",
+  "name": "folded hands"
+ },
+ {
+  "file": "index_pointing_up.png",
+  "unicode": "☝️",
+  "category": "hand",
+  "name": "index pointing up"
+ },
+ {
+  "file": "love_you_gesture.png",
+  "unicode": "🤟",
+  "category": "hand",
+  "name": "love you gesture"
+ },
+ {
+  "file": "ok_hand.png",
+  "unicode": "👌",
+  "category": "hand",
+  "name": "ok hand"
+ },
+ {
+  "file": "pinching_hand.png",
+  "unicode": "🤏",
+  "category": "hand",
+  "name": "pinching hand"
+ },
+ {
+  "file": "raising_hands.png",
+  "unicode": "🙌",
+  "category": "hand",
+  "name": "raising hands"
+ },
+ {
+  "file": "sign_of_the_horns.png",
+  "unicode": "🤘",
+  "category": "hand",
+  "name": "sign of the horns"
+ },
+ {
+  "file": "thumbs_down.png",
+  "unicode": "👎",
+  "category": "hand",
+  "name": "thumbs down"
+ },
+ {
+  "file": "thumbs_up.png",
+  "unicode": "👍",
+  "category": "hand",
+  "name": "thumbs up"
+ },
+ {
+  "file": "victory_hand.png",
+  "unicode": "✒️",
+  "category": "hand",
+  "name": "victory hand"
  }
 ]

@@ -46,6 +46,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const thP = params.get('th');
     if (thP && typeof RoomTheme !== 'undefined') urlTheme = RoomTheme.normalize(thP);
   } catch { urlTheme = null; }
+  // Room display name (?n=) + kind (?rt=saved|quick) from the invite link.
+  // Guests on a fresh device have no registry row, so the link is the only
+  // source of truth — without this they see a bare 'Private Room'.
+  let urlRoomName = null;
+  try {
+    const nP = params.get('n');
+    if (nP) urlRoomName = decodeURIComponent(nP) || null;
+  } catch { urlRoomName = null; }
+  let urlRoomKind = null;
+  try {
+    const rtP = params.get('rt');
+    if (rtP === 'saved' || rtP === 'quick') urlRoomKind = rtP;
+  } catch { urlRoomKind = null; }
 
   if (!roomId) {
     window.location.href = 'index.html';
@@ -113,7 +126,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Patch a valid session with a fresher secret/endpoint from the invite URL.
+  // Patch a valid session with fresher details from the invite URL.
   // This keeps link-joins working even when an old session exists.
   try {
     if (session && session.roomId === roomId) {
@@ -124,6 +137,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       if (urlDeployment && session.deploymentUrl !== urlDeployment) {
         session.deploymentUrl = urlDeployment;
+        patched = true;
+      }
+      if (urlRoomName && (!session.roomName || session.roomName === 'Private Room')) {
+        session.roomName = urlRoomName;
+        patched = true;
+      }
+      if (urlRoomKind && session.roomKind !== urlRoomKind) {
+        session.roomKind = urlRoomKind;
         patched = true;
       }
       if (urlTheme && !session.theme) {
@@ -155,7 +176,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Room not in registry but session is valid — reconstruct from session
     room = {
       id:            roomId,
-      name:          session.roomName || 'Private Room',
+      name:          (session.roomName && session.roomName !== 'Private Room' && session.roomName)
+                    || (urlRoomName || 'Private Room'),
       description:   session.roomDesc || '',
       status:        'active',
       deploymentUrl: session.deploymentUrl || `mock://local/${roomId}`,
@@ -163,6 +185,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       createdAt:     session.joinedAt || new Date().toISOString(),
       secret:        session.roomSecret || urlRoomSecret || '',
       theme:         session.theme || urlTheme || 1,
+      kind:          session.roomKind || urlRoomKind || 'quick',
     };
     // Save back to registry so future loads don't have to rebuild
     if (session.role === 'owner') {
@@ -187,6 +210,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       try { Rooms.updateRoom(roomId, { secret: sec }); } catch {}
     }
   }
+  // Backfill a truer room name/kind (invite link or session) when the
+  // registry still holds a blank/'Private Room' placeholder.
+  try {
+    const betterName = (urlRoomName && urlRoomName !== 'Private Room' && urlRoomName)
+      || (session.roomName && session.roomName !== 'Private Room' && session.roomName)
+      || null;
+    if (betterName && (!room.name || room.name === 'Private Room')) {
+      room.name = betterName;
+      try { Rooms.updateRoom(roomId, { name: betterName }); } catch {}
+    }
+    const betterKind = urlRoomKind || session.roomKind || null;
+    if (betterKind && !room.kind) {
+      room.kind = betterKind;
+      try { Rooms.updateRoom(roomId, { kind: betterKind }); } catch {}
+    }
+  } catch { /* non-critical */ }
   // Theme: URL (?th=) wins, then session/registry; apply wallpaper now.
   try {
     const th = (typeof RoomTheme !== 'undefined')
@@ -205,6 +244,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   const titleEl = document.getElementById('room-title');
   const paintTitle = (n) => { if (titleEl) titleEl.innerHTML = emoName(n); };
   paintTitle(room.name);
+  // Room profile icon: saved.webp for sheet rooms, quick.webp otherwise.
+  try {
+    const avImg = document.getElementById('room-avatar');
+    if (avImg) {
+      const icon = (typeof Rooms !== 'undefined' && Rooms.roomIcon)
+        ? Rooms.roomIcon(room, room.kind || urlRoomKind)
+        : ((room.spreadsheetId || room.kind === 'saved' || urlRoomKind === 'saved') ? 'assets/icons/saved.webp' : 'assets/icons/quick.webp');
+      avImg.src = icon;
+      avImg.alt = room.name || 'Room';
+      avImg.onerror = () => { try { avImg.style.display = 'none'; } catch {} };
+    }
+  } catch {}
   // Repaint once custom emoji arrive (room names may lead with emoji)
   try {
     if (typeof CustomEmoji !== 'undefined') {

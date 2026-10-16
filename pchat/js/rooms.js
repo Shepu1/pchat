@@ -105,6 +105,20 @@ const Rooms = {
   generateSecret()     { return Crypto.generateSecret(); },
   generateRoomSecret() { return Crypto.generateSecret(); },
 
+  // ── Room kind + profile icon ────────────────────────────────
+  // Saved (Google Sheet backup) rooms → saved.webp, everything else
+  // (instant/P2P quick rooms) → quick.webp. kindHint ('saved'|'quick')
+  // covers invite-link contexts where the registry row has no spreadsheetId.
+  roomKind(room, kindHint) {
+    if (kindHint === 'saved' || kindHint === 'quick') return kindHint;
+    return (room && room.spreadsheetId) ? 'saved' : 'quick';
+  },
+  roomIcon(room, kindHint) {
+    return this.roomKind(room, kindHint) === 'saved'
+      ? 'assets/icons/saved.webp'
+      : 'assets/icons/quick.webp';
+  },
+
   createInstantRoom(roomName, roomDesc, ownerName) {
     const roomId = Crypto.generateRoomId();
     const roomSecret = Crypto.generateSecret();
@@ -405,8 +419,8 @@ const Rooms = {
     }
     const themeParam = `&th=${RoomTheme.normalize(theme || 1)}`;
 
-    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}${keyFrag}`;
-    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}${keyFrag}`;
+    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}&rt=${this.roomKind(room)}${keyFrag}`;
+    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}&rt=${this.roomKind(room)}${keyFrag}`;
     // No hardcoded host path anymore: on GitHub Pages (any repo/subfolder)
     // the link is built from the live origin + base path, so moving hosting
     // (e.g. /s/index/pchat → /pchat/pchat) never produces stale links.
@@ -603,9 +617,20 @@ const RoomAPI = {
     if (!Array.isArray(roomData.members)) roomData.members = [];
 
     if (action === 'room') {
+      // Guests on other devices have no local mock row — fall back to the
+      // registry/session name before surrendering to 'Private Room'.
+      let fallbackName = '';
+      try {
+        const reg = (typeof Rooms !== 'undefined' && Rooms.getRoom) ? Rooms.getRoom(roomId) : null;
+        if (reg && reg.name && reg.name !== 'Private Room') fallbackName = reg.name;
+        if (!fallbackName) {
+          const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+          if (sess && sess.roomId === roomId && sess.roomName && sess.roomName !== 'Private Room') fallbackName = sess.roomName;
+        }
+      } catch {}
       const roomObj = {
         id: roomId,
-        name: roomData.name || 'Private Room',
+        name: roomData.name || fallbackName || 'Private Room',
         description: roomData.description || 'Welcome to the room!',
         status: 'active',
         created_at: roomData.created_at || new Date().toISOString(),

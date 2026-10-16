@@ -83,6 +83,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const nameParam = params.get('n') ? decodeURIComponent(params.get('n')) : null;
+  // Room kind (?rt=saved|quick) tells the join card which profile icon to show.
+  const kindParam = params.get('rt') === 'saved' ? 'saved' : (params.get('rt') === 'quick' ? 'quick' : null);
 
   // Update local room record with deployment URL if we just learned it
   if (room && !room.deploymentUrl && deploymentUrl) {
@@ -107,6 +109,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       status: 'active'
     };
   }
+
+  // The invite link name (?n=) wins over a blank/'Private Room' backend
+  // answer — for quick rooms on a guest's device the backend has no row and
+  // would otherwise stomp the real name guests should see.
+  if ((!roomInfo.name || roomInfo.name === 'Private Room') && nameParam) {
+    roomInfo.name = nameParam;
+  }
+  // Local registry is the next-best source (rejoin on same device).
+  if ((!roomInfo.name || roomInfo.name === 'Private Room') && room && room.name && room.name !== 'Private Room') {
+    roomInfo.name = room.name;
+  }
+  // Room kind for the profile icon: link param → backend → registry.
+  roomInfo.kind = kindParam
+    || (roomInfo.spreadsheetId ? 'saved' : null)
+    || ((room && room.spreadsheetId) ? 'saved' : null)
+    || 'quick';
 
   // Check room status
   if (roomInfo.status === 'deleted') {
@@ -177,6 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         deploymentUrl,
         roomName:     roomInfo.name || 'Private Room',
         roomDesc:     roomInfo.description || '',
+        roomKind:     roomInfo.kind || kindParam || 'quick',
         roomSecret:   roomSecret || (room && room.secret) || undefined,
         theme:        inviteTheme || (room && room.theme) || 1,
       };
@@ -193,6 +212,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         deploymentUrl,
         joinedAt:    sessionData.joinedAt,
         isOwner:     false,
+        kind:        roomInfo.kind || kindParam || 'quick',
         secret:      roomSecret || (room && room.secret) || undefined,
         theme:       inviteTheme || (room && room.theme) || 1,
       };
@@ -241,9 +261,25 @@ function showJoinForm(roomInfo) {
   hideLoading();
   document.getElementById('join-form-card').style.display = '';
 
-  // Room avatar
+  // Room avatar — saved.webp for sheet rooms, quick.webp otherwise.
+  // Letter stays behind as fallback; image covers it, removes itself on error.
   const initial = (roomInfo.name || 'R')[0].toUpperCase();
-  document.getElementById('join-room-avatar').textContent    = initial;
+  const avEl = document.getElementById('join-room-avatar');
+  avEl.textContent = initial;
+  try {
+    const icon = (typeof Rooms !== 'undefined' && Rooms.roomIcon)
+      ? Rooms.roomIcon(roomInfo, roomInfo.kind)
+      : (roomInfo.kind === 'saved' ? 'assets/icons/saved.webp' : 'assets/icons/quick.webp');
+    const img = document.createElement('img');
+    img.src = icon;
+    img.alt = '';
+    img.setAttribute('aria-hidden', 'true');
+    img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:20px;';
+    img.onerror = () => { try { img.remove(); } catch {} };
+    avEl.style.position = 'relative';
+    avEl.style.overflow = 'hidden';
+    avEl.appendChild(img);
+  } catch {}
   document.getElementById('join-room-name').innerHTML      = emoName(roomInfo.name || 'Room');
   document.getElementById('join-room-desc').textContent      = roomInfo.description || 'Private chat room';
 
@@ -311,6 +347,25 @@ function showRejoin(roomInfo, session) {
     let touched = false;
     if (freshSecret && session.roomSecret !== freshSecret) { session.roomSecret = freshSecret; touched = true; }
     if (freshDep && session.deploymentUrl !== freshDep) { session.deploymentUrl = freshDep; touched = true; }
+    // A fresh invite may also carry a truer room name (?n=) / kind (?rt=):
+    // adopt them when the stored ones are blank or still 'Private Room'.
+    try {
+      const nP = qp.get('n') ? decodeURIComponent(qp.get('n')) : null;
+      if (nP && (!session.roomName || session.roomName === 'Private Room') && (!roomInfo || !roomInfo.name || roomInfo.name === 'Private Room')) {
+        session.roomName = nP;
+        if (roomInfo) roomInfo.name = nP;
+        touched = true;
+      } else if (roomInfo && roomInfo.name && roomInfo.name !== 'Private Room' && session.roomName !== roomInfo.name) {
+        session.roomName = roomInfo.name;
+        touched = true;
+      }
+      const rtP = qp.get('rt');
+      if ((rtP === 'saved' || rtP === 'quick') && session.roomKind !== rtP) {
+        session.roomKind = rtP;
+        if (roomInfo) roomInfo.kind = rtP;
+        touched = true;
+      }
+    } catch {}
     try {
       const thP = qp.get('th');
       if (thP && typeof RoomTheme !== 'undefined' && !session.theme) {
@@ -325,6 +380,8 @@ function showRejoin(roomInfo, session) {
       const patch = {};
       if (freshSecret && !reg.secret) patch.secret = freshSecret;
       if (freshDep && reg.deploymentUrl !== freshDep) patch.deploymentUrl = freshDep;
+      if ((!reg.name || reg.name === 'Private Room') && session.roomName && session.roomName !== 'Private Room') patch.name = session.roomName;
+      if (!reg.kind && session.roomKind) patch.kind = session.roomKind;
       try {
         const thP = qp.get('th');
         if (thP && typeof RoomTheme !== 'undefined' && !reg.theme) patch.theme = RoomTheme.normalize(thP);

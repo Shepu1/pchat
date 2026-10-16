@@ -15,6 +15,26 @@ const Notify = (() => {
   const _lastShownAt = new Map(); // dedupe by message id
   const DEDUPE_WINDOW_MS = 10000;
 
+  // User's ON/OFF choice for the header bell (default ON).
+  // OFF mutes BOTH system notifications and chat sound effects.
+  const LS_KEY = 'shepu_notify_pref';
+
+  function getUserPref() {
+    try {
+      const v = localStorage.getItem(LS_KEY);
+      return v === 'off' ? 'off' : 'on'; // default ON
+    } catch {
+      return 'on';
+    }
+  }
+
+  function setUserPref(v) {
+    try { localStorage.setItem(LS_KEY, v === 'off' ? 'off' : 'on'); } catch {}
+  }
+
+  // Sound effects follow the same switch: OFF = fully silent.
+  function isSoundOn() { return getUserPref() !== 'off'; }
+
   function init({ memberId, displayName, roomName }) {
     _memberId = memberId;
     _roomName = roomName || 'Chat';
@@ -39,14 +59,38 @@ const Notify = (() => {
     }
   }
 
-  function isEnabled() { return _enabled && _supported() && Notification.permission === 'granted'; }
+  function isEnabled() {
+    // User switch OFF disables everything. Otherwise read live permission:
+    // init() runs when permission is often still "default", so a cached flag
+    // would stay false forever even after the user grants access.
+    if (!isSoundOn()) return false;
+    try {
+      return _supported() && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  function isBackground() {
+    // A tab can be visible yet unfocused (side-by-side windows, minimized,
+    // Alt-Tab). Those should still notify — visibilityState alone misses them.
+    try {
+      if (typeof document !== 'undefined' && document.hidden) return true;
+      if (typeof document !== 'undefined' && typeof document.hasFocus === 'function' && !document.hasFocus()) return true;
+    } catch { /* ignore */ }
+    return false;
+  }
 
   // Called for every incoming message. Only notifies for others' messages
-  // and only when the tab is not visible.
+  // and only when the chat is not in front of the user.
   function notifyMessage(msg) {
-    if (!isEnabled() || !msg) return;
-    if (msg.senderId && msg.senderId === _memberId) return;      // my own message
-    if (document.visibilityState === 'visible') return;          // user is looking
+    if (!msg) return;
+    // Sender-local / unconfirmed rows must never notify (also guards against
+    // stale peers that still broadcast _optimistic on the wire).
+    if (msg._optimistic) return;
+    if (msg.senderId && _memberId && msg.senderId === _memberId) return;      // my own message
+    if (!isBackground()) return;          // user is looking at the chat
+    if (!isEnabled()) return;
 
     const id = msg.id;
     if (id) {
@@ -84,7 +128,7 @@ const Notify = (() => {
     } catch { /* some browsers require a service worker; ignore */ }
   }
 
-  return { init, requestPermission, notifyMessage, isEnabled, isSupported: _supported };
+  return { init, requestPermission, notifyMessage, isEnabled, isSupported: _supported, isSoundOn, getUserPref, setUserPref };
 })();
 
 window.Notify = Notify;

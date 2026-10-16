@@ -162,6 +162,20 @@ const Chat = (() => {
   function appendMessages(msgs) {
     if (!msgs || !msgs.length) return;
 
+    // Defense-in-depth: _optimistic is sender-local only. Old/buggy peers
+    // may still broadcast it on the wire — strip it for anyone else's
+    // message so sound + notification pipelines treat it as a real message.
+    // (Own unconfirmed optimistic rows are matched by DOM id below anyway.)
+    try {
+      if (_session && _session.memberId) {
+        msgs.forEach(m => {
+          if (m && m._optimistic && m.senderId && m.senderId !== _session.memberId) {
+            delete m._optimistic;
+          }
+        });
+      }
+    } catch { /* ignore */ }
+
     // Handle seen events & reaction events & music events separately
     const seenEvents     = msgs.filter(m => m._seenEvent);
     const reactionEvents = msgs.filter(m => m._reactionEvent);
@@ -254,9 +268,12 @@ const Chat = (() => {
     }
 
     // Fire background notifications for genuinely new incoming messages
+    // (never for my own messages — Notify also guards this internally).
     if (addedCount > 0 && typeof Notify !== 'undefined') {
       sortedMsgs.forEach(m => {
-        if (!m.deleted && (!m._optimistic)) Notify.notifyMessage(m);
+        if (!m.deleted && (!m._optimistic) && m.senderId && _session && m.senderId !== _session.memberId) {
+          try { Notify.notifyMessage(m); } catch {}
+        }
       });
     }
 
@@ -277,7 +294,9 @@ const Chat = (() => {
       if (fresh.length) {
         const hasEmoji = fresh.some(m =>
           m.messageType !== 'image' && m.messageType !== 'file' &&
-          _containsEmoji(m.message)
+          (_containsEmoji(m.message) ||
+            (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.containsShortcode &&
+              SpecialEmoji.containsShortcode(m.message)))
         );
         if (hasEmoji) {
           RoomSounds.playEmoji();
@@ -612,6 +631,13 @@ const Chat = (() => {
     const rawText = (msg.messageType === 'text' && !isDeleted && typeof msg.message === 'string') ? msg.message.trim() : '';
     const isEmojiMsg = rawText && _isEmojiOnly(rawText);
     const emojiCount = isEmojiMsg ? _countEmojis(rawText) : 0;
+    // Special-emoji shortcodes count toward the big-bubble sizing too
+    let spCount = 0;
+    try {
+      if (isEmojiMsg && typeof SpecialEmoji !== 'undefined' && SpecialEmoji.countShortcodes) {
+        spCount = SpecialEmoji.countShortcodes(rawText) || 0;
+      }
+    } catch {}
 
     // Bubble
     const bubble = document.createElement('div');
@@ -619,11 +645,12 @@ const Chat = (() => {
     if (isEmojiMsg) {
       bubble.classList.add('msg-bubble-emoji');
       // Use grapheme-aware count; if Intl.Segmenter returns 0 (edge case), estimate from text length
-      const effectiveCount = emojiCount > 0 ? emojiCount : Math.max(1, Math.ceil(rawText.length / 2));
+      const effectiveCount = (emojiCount + spCount) > 0 ? (emojiCount + spCount) : Math.max(1, Math.ceil(rawText.length / 2));
       if (effectiveCount === 1)      bubble.classList.add('emoji-xl');
       else if (effectiveCount <= 3)  bubble.classList.add('emoji-lg');
       else if (effectiveCount <= 6)  bubble.classList.add('emoji-md');
-      else                           bubble.classList.add('emoji-sm');
+      else if (effectiveCount <= 12) bubble.classList.add('emoji-sm');
+      else                           bubble.classList.add('emoji-xs');
     }
     bubble.setAttribute('role', 'article');
 
@@ -646,6 +673,7 @@ const Chat = (() => {
     }
     }
     bubble.appendChild(textEl);
+    _paintMediaBubble(textEl); // initial render happens pre-attach, so paint here
 
     if (msg.edited && !isDeleted) {
       const editedLabel = document.createElement('span');
@@ -910,10 +938,18 @@ const Chat = (() => {
   }
 
   // ── Emoji detection helpers ───────────────────────────────────
+  function _stripSpecialCodes(text) {
+    try {
+      if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.stripShortcodes) {
+        return SpecialEmoji.stripShortcodes(text);
+      }
+    } catch {}
+    return String(text || '').replace(/:sp_[A-Za-z0-9_-]{1,48}:/g, '');
+  }
   function _isEmojiOnly(text) {
     if (!text || !text.trim()) return false;
     // Strip ALL emoji-related code points, then check if any real text remains
-    const stripped = text.trim()
+    const stripped = _stripSpecialCodes(text).trim()
       .replace(/\p{Emoji_Presentation}/gu, '')      // standard emoji (colored)
       .replace(/\p{Extended_Pictographic}/gu, '')    // extended pictographic
       .replace(/[\uFE00-\uFE0F]/g, '')               // variation selectors
@@ -968,6 +1004,15 @@ const Chat = (() => {
     // Linkify URLs
     t = t.replace(/(https?:\/\/[^\s<>"]+)/gi,
       '<a href="$1" target="_blank" rel="noopener noreferrer" class="msg-link">$1</a>');
+    // Special-emoji shortcodes → inline <img>. MUST run after linkify:
+    // the pass emits absolute blob: URLs and linkify would shred them.
+    // (Shortcodes themselves contain no URL prefix, so linkify never
+    // matches them first.)
+    try {
+      if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.emojifyShortcodes) {
+        t = SpecialEmoji.emojifyShortcodes(t);
+      }
+    } catch { /* leave shortcodes as text */ }
     // Line breaks
     t = t.replace(/\n/g, '<br>');
     return t;
@@ -978,7 +1023,16 @@ const Chat = (() => {
     const e = escapeHtml(text || '');
     try {
       if (typeof CustomEmoji !== 'undefined' && CustomEmoji.isLoaded && CustomEmoji.isLoaded()) {
-        return CustomEmoji.emojifyEscaped(e);
+        const c = CustomEmoji.emojifyEscaped(e);
+        if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.emojifyShortcodes) {
+          return SpecialEmoji.emojifyShortcodes(c);
+        }
+        return c;
+      }
+    } catch {}
+    try {
+      if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.emojifyShortcodes) {
+        return SpecialEmoji.emojifyShortcodes(e);
       }
     } catch {}
     return e;
@@ -1161,6 +1215,12 @@ const Chat = (() => {
       _optimistic:    true,
     };
     const wireMsg = { ...optimisticMsg, message: finalMessage };
+    // _optimistic is sender-local UI state — it must NEVER go on the wire.
+    // Otherwise receivers treat a real human message as "optimistic" and
+    // skip both sound (RoomSounds) and background notification (Notify),
+    // while bot messages (no such flag) still beep. That is exactly the
+    // "bot বাজে, মানুষ বাজে না" bug in Chrome/Firefox/Brave P2P rooms.
+    delete wireMsg._optimistic;
 
     _pendingIds.add(msgId);
     _appendOptimistic(optimisticMsg);
@@ -1867,6 +1927,40 @@ const Chat = (() => {
     if (sendBtn) sendBtn.disabled = true;
   }
 // ── Attachments Handling ──────────────────────────────────────
+  // ── Shared attachment preview (file picker + special emoji) ───
+  // Shows the preview bar so the user can add a caption and press Send.
+  function _showAttachmentPreview({ name, size, type, dataUrl }) {
+    if (!name || !dataUrl) return;
+    _pendingAttachment = {
+      name: name,
+      size: size || 0,
+      type: type || 'image/png',
+      dataUrl: dataUrl,
+      kind: 'image',
+    };
+    try {
+      const previewBar = document.getElementById('attachment-preview-bar');
+      const thumbEl    = document.getElementById('attachment-thumb');
+      const fileIconEl = document.getElementById('attachment-file-icon');
+      const nameEl     = document.getElementById('attachment-name');
+      const sizeEl     = document.getElementById('attachment-size');
+      if (nameEl) nameEl.textContent = name;
+      if (sizeEl) sizeEl.textContent = UI.formatBytes ? UI.formatBytes(size || 0) : (Math.round((size || 0) / 1024) + ' KB');
+      if (String(type || '').startsWith('image/')) {
+        if (thumbEl) { thumbEl.src = dataUrl; thumbEl.classList.remove('hidden'); }
+        if (fileIconEl) fileIconEl.style.display = 'none';
+      } else {
+        if (thumbEl) thumbEl.classList.add('hidden');
+        if (fileIconEl) fileIconEl.style.display = '';
+      }
+      if (previewBar) previewBar.classList.remove('hidden');
+      if (input) {
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus({ preventScroll: true });
+      }
+    } catch {}
+  }
+
   function _bindAttachments() {
     const attachBtn   = document.getElementById('attach-btn');
     const fileInput   = document.getElementById('attach-file-input');
@@ -1893,27 +1987,12 @@ const Chat = (() => {
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        _pendingAttachment = {
+        _showAttachmentPreview({
           name: file.name,
           size: file.size,
           type: file.type,
           dataUrl: e.target.result,
-        };
-
-        nameEl.textContent = file.name;
-        sizeEl.textContent = UI.formatBytes ? UI.formatBytes(file.size) : (Math.round(file.size/1024) + ' KB');
-
-        if (file.type.startsWith('image/')) {
-          thumbEl.src = e.target.result;
-          thumbEl.classList.remove('hidden');
-          fileIconEl.style.display = 'none';
-        } else {
-          thumbEl.classList.add('hidden');
-          fileIconEl.style.display = '';
-        }
-
-        previewBar.classList.remove('hidden');
-        if (input) input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
       };
       reader.readAsDataURL(file);
     });
@@ -1927,10 +2006,19 @@ const Chat = (() => {
       });
     }
 
-    // Lightbox modal close
+    // Lightbox modal: backdrop click / close button / Esc to close
     const lightbox = document.getElementById('lightbox-modal');
     if (lightbox) {
-      lightbox.addEventListener('click', () => lightbox.classList.add('hidden'));
+      lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) closeLightbox();
+      });
+      document.getElementById('lightbox-close')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeLightbox();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !lightbox.classList.contains('hidden')) closeLightbox();
+      });
     }
   }
 
@@ -2092,8 +2180,164 @@ const Chat = (() => {
     const loadingEl   = document.getElementById('emoji-loading');
     if (!searchInput || !catRow || !resultsEl) return;
 
+    // ── Normal / Special set switcher ───────────────────────────
+    // 3-dot menu beside the search bar. Special mode swaps the search bar
+    // for a password input; the ZIP unlocks in memory only.
+    const modeBtn    = document.getElementById('emoji-mode-btn');
+    const modeMenu   = document.getElementById('emoji-mode-menu');
+    const searchIcon = document.getElementById('emoji-search-icon');
+    const searchWrap = searchInput.closest('.emoji-search-wrap');
+    const passWrap   = document.getElementById('emoji-pass-wrap');
+    const passInput  = document.getElementById('emoji-pass-input');
+    const unlockBtn  = document.getElementById('emoji-unlock-btn');
+    const passStatus = document.getElementById('emoji-pass-status');
+    const hasSpecial = !!(modeBtn && modeMenu && passWrap && passInput && unlockBtn
+      && typeof SpecialEmoji !== 'undefined');
+
     let activeCat = 'All';
     let query = '';
+
+    function setPassStatus(msg, kind) {
+      if (!passStatus) return;
+      if (!msg) { passStatus.classList.add('hidden'); passStatus.textContent = ''; return; }
+      passStatus.classList.remove('hidden');
+      passStatus.textContent = msg;
+      passStatus.dataset.kind = kind || 'info';
+    }
+
+    function specialButton(item) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'emoji-btn emoji-btn-custom';
+      btn.title = item.name;
+      btn.setAttribute('aria-label', item.name);
+      const img = document.createElement('img');
+      img.src = item.url;
+      img.alt = item.name;
+      img.title = item.name;
+      img.loading = 'lazy';
+      img.draggable = false;
+      img.className = 'custom-emoji-picker';
+      btn.appendChild(img);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Behave exactly like a normal emoji: insert a shortcode as plain
+        // text at the cursor (popover stays open for multi-pick). The
+        // renderer swaps it for an inline image at send/display time.
+        try {
+          if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.shortcodeFor) {
+            insertEmoji(SpecialEmoji.shortcodeFor(item));
+          }
+        } catch {}
+      });
+      return btn;
+    }
+
+    function renderSpecial() {
+      resultsEl.innerHTML = '';
+      if (!hasSpecial) return;
+      if (!SpecialEmoji.isUnlocked()) {
+        const hint = document.createElement('div');
+        hint.className = 'emoji-empty';
+        hint.textContent = 'Enter the password above to view special emojis.';
+        resultsEl.appendChild(hint);
+        return;
+      }
+      const items = SpecialEmoji.getItems();
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'emoji-empty';
+        empty.textContent = 'No special emojis found.';
+        resultsEl.appendChild(empty);
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = 'emoji-grid';
+      items.forEach(it => grid.appendChild(specialButton(it)));
+      resultsEl.appendChild(grid);
+    }
+
+    function paintModeMenu() {
+      if (!modeMenu) return;
+      const mode = hasSpecial ? SpecialEmoji.getMode() : 'normal';
+      modeMenu.querySelectorAll('.emoji-mode-item').forEach(b => {
+        const on = b.dataset.mode === mode;
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        const chk = b.querySelector('.emoji-mode-check');
+        if (chk) chk.textContent = on ? '✓' : '';
+      });
+      if (modeBtn) modeBtn.setAttribute('aria-expanded', (!modeMenu.classList.contains('hidden')) ? 'true' : 'false');
+    }
+
+    function closeModeMenu() {
+      if (modeMenu) modeMenu.classList.add('hidden');
+      if (modeBtn) modeBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function applyMode(mode) {
+      if (!hasSpecial) return;
+      SpecialEmoji.setMode(mode);
+      const special = SpecialEmoji.getMode() === 'special';
+      if (searchInput) searchInput.classList.toggle('hidden', special);
+      if (searchIcon) searchIcon.classList.toggle('hidden', special);
+      if (catRow) catRow.classList.toggle('hidden', special);
+      if (passWrap) passWrap.classList.toggle('hidden', !special);
+      if (!special) setPassStatus('');
+      paintModeMenu();
+      if (special) {
+        if (passInput && !SpecialEmoji.isUnlocked()) {
+          setTimeout(() => { try { passInput.focus({ preventScroll: true }); } catch {} }, 50);
+        }
+        renderSpecial();
+      } else {
+        query = '';
+        if (searchInput) searchInput.value = '';
+        renderResults();
+      }
+    }
+
+    async function doUnlock() {
+      if (!hasSpecial || SpecialEmoji.isBusy()) return;
+      const pw = (passInput && passInput.value) || '';
+      if (!pw) { setPassStatus('Please enter the password.', 'error'); return; }
+      try { unlockBtn.disabled = true; } catch {}
+      setPassStatus('Unlocking…', 'info');
+      const res = await SpecialEmoji.unlock(pw, (frac, label) => {
+        setPassStatus(label || `Unlocking… ${Math.round((frac || 0) * 100)}%`, 'info');
+      });
+      try { unlockBtn.disabled = false; } catch {}
+      try { if (passInput) passInput.value = ''; } catch {}
+      if (res && res.ok) {
+        setPassStatus(`Unlocked ${res.count} special emojis.`, 'ok');
+        renderSpecial();
+      } else {
+        setPassStatus((res && res.error) || 'Unlock failed.', 'error');
+      }
+    }
+
+    if (hasSpecial) {
+      modeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        modeMenu.classList.toggle('hidden');
+        paintModeMenu();
+      });
+      modeMenu.addEventListener('click', (e) => e.stopPropagation());
+      modeMenu.querySelectorAll('.emoji-mode-item').forEach(b => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeModeMenu();
+          applyMode(b.dataset.mode);
+        });
+      });
+      unlockBtn.addEventListener('click', (e) => { e.stopPropagation(); doUnlock(); });
+      passInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); doUnlock(); }
+        e.stopPropagation();
+      });
+      passInput.addEventListener('click', (e) => e.stopPropagation());
+      // Start on Normal (default) — restores search + previous emojis.
+      applyMode('normal');
+    }
 
     function insertEmoji(unicode) {
       if (!unicode || !input) return;
@@ -2157,6 +2401,11 @@ const Chat = (() => {
 
     function renderResults() {
       resultsEl.innerHTML = '';
+      // Special mode has its own renderer (password grid, no search).
+      if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.getMode() === 'special') {
+        renderSpecial();
+        return;
+      }
       const q = (query || '').trim();
       if (q) {
         // Search across the active category (All = everything)
@@ -2273,10 +2522,16 @@ const Chat = (() => {
     emojiBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       popover.classList.toggle('hidden');
-      if (!popover.classList.contains('hidden') && searchInput) {
-        unlockSearch();
-        purgeAutofill();
-        setTimeout(() => searchInput.focus({ preventScroll: true }), 50);
+      if (!popover.classList.contains('hidden')) {
+        closeModeMenu();
+        const special = (typeof SpecialEmoji !== 'undefined') && SpecialEmoji.getMode() === 'special';
+        if (special && passInput) {
+          setTimeout(() => { try { passInput.focus({ preventScroll: true }); } catch {} }, 50);
+        } else if (searchInput) {
+          unlockSearch();
+          purgeAutofill();
+          setTimeout(() => searchInput.focus({ preventScroll: true }), 50);
+        }
       }
     });
 
@@ -2303,33 +2558,48 @@ const Chat = (() => {
     }
   }
 
-  // ── Notification permission toggle (Web Notifications) ─────────
+  // ── Notification ON/OFF toggle (header bell) ──────────────────
+  // Default ON: sounds + background notifications work. Click → OFF and
+  // everything goes silent. Click again → back ON. Choice persists.
   function _bindNotifications() {
     const btn = document.getElementById('notify-toggle-btn');
     if (!btn || typeof Notify === 'undefined' || !Notify.isSupported()) {
       if (btn) btn.style.display = 'none';
       return;
     }
-    // Reflect current state
-    if (Notify.isEnabled()) {
-      btn.style.color = 'var(--accent-2)';
-      btn.title = 'Notifications enabled';
-    }
+    // ON = normal bell, OFF = bell with a slash so the state is obvious.
+    const ICON_ON = btn.innerHTML;
+    const ICON_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><path d="M18.63 13A17.89 17.89 0 0 1 18 8"></path><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"></path><path d="M18 8a6 6 0 0 0-9.33-5"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+    const paint = () => {
+      const on = Notify.isSoundOn();
+      btn.innerHTML = on ? ICON_ON : ICON_OFF;
+      btn.style.color = on ? 'var(--accent-2)' : 'var(--muted)';
+      btn.title = on ? 'Notifications on' : 'Notifications off';
+      btn.setAttribute('aria-label', on ? 'Turn notifications off' : 'Turn notifications on');
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    };
+    paint();
     btn.addEventListener('click', async () => {
-      if (Notify.isEnabled()) {
-        UI.toast('info', 'Notifications On', 'Background notifications are already enabled.');
+      if (Notify.isSoundOn()) {
+        // ON → OFF: mute sounds + system notifications
+        Notify.setUserPref('off');
+        paint();
+        UI.toast('info', 'Notifications Off', 'Sounds muted. Click the bell to turn back on.');
         return;
       }
-      const result = await Notify.requestPermission();
-      if (result === 'granted') {
-        btn.style.color = 'var(--accent-2)';
-        btn.title = 'Notifications enabled';
-        UI.toast('success', 'Notifications Enabled', 'You’ll be notified of new messages.');
-      } else if (result === 'denied') {
-        UI.toast('warning', 'Notifications Blocked', 'Enable them in your browser settings.');
-      } else {
-        UI.toast('error', 'Notifications Unavailable', 'Your browser does not support notifications.');
-      }
+      // OFF → ON: restore sounds; request system permission if needed
+      Notify.setUserPref('on');
+      paint();
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+          const result = await Notify.requestPermission();
+          if (result === 'denied') {
+            UI.toast('warning', 'Notifications On', 'Sounds are on, but system popups are blocked in browser settings.');
+            return;
+          }
+        }
+      } catch {}
+      UI.toast('success', 'Notifications On', 'Sounds and background alerts are enabled.');
     });
   }
 
@@ -2581,6 +2851,75 @@ const Chat = (() => {
     }, { once: true });
   }
 
+  // ── Professional image rendering helpers ─────────────────────
+  // Edge-to-edge media bubble (WhatsApp style): image-only bubbles lose
+  // their text padding so the photo sits flush with rounded corners.
+  function _paintMediaBubble(container) {
+    try {
+      const bubble = container && container.closest ? container.closest('.msg-bubble') : null;
+      if (!bubble) return;
+      const media = container.querySelector('.msg-media-wrap');
+      bubble.classList.toggle('msg-media', !!media && !media.classList.contains('has-caption'));
+      bubble.classList.toggle('has-caption', !!media && media.classList.contains('has-caption'));
+    } catch {}
+  }
+
+  // Fade-in on load, error state, overlay buttons (view/download).
+  function _bindMediaWraps(container) {
+    try {
+      container.querySelectorAll('.msg-media-wrap').forEach(wrap => {
+        const img = wrap.querySelector('img.msg-attachment-img');
+        if (img) {
+          if (img.complete && img.naturalWidth) {
+            wrap.classList.add('loaded');
+          } else {
+            img.addEventListener('load', () => wrap.classList.add('loaded'), { once: true });
+            img.addEventListener('error', () => wrap.classList.add('media-error'), { once: true });
+          }
+          img.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openLightbox(img.src, wrap.dataset.filename || img.alt || 'Image');
+          });
+        }
+        wrap.querySelectorAll('[data-act="view"]').forEach(b => {
+          b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const im = wrap.querySelector('img.msg-attachment-img');
+            if (im) openLightbox(im.src, wrap.dataset.filename || im.alt || 'Image');
+          });
+        });
+        wrap.querySelectorAll('[data-act="download"]').forEach(a => {
+          a.addEventListener('click', (e) => e.stopPropagation());
+        });
+      });
+    } catch {}
+  }
+
+  function openLightbox(src, name) {
+    try {
+      const box = document.getElementById('lightbox-modal');
+      const img = document.getElementById('lightbox-img');
+      const label = document.getElementById('lightbox-name');
+      const dl = document.getElementById('lightbox-download');
+      if (!box || !img || !src) return;
+      img.src = src;
+      img.alt = name || 'Enlarged preview';
+      if (label) label.textContent = name || '';
+      if (dl) { dl.href = src; dl.setAttribute('download', name || 'image'); }
+      box.classList.remove('hidden');
+      try { document.body.style.overflow = 'hidden'; } catch {}
+    } catch {}
+  }
+
+  function closeLightbox() {
+    try {
+      document.getElementById('lightbox-modal')?.classList.add('hidden');
+      const img = document.getElementById('lightbox-img');
+      if (img) img.src = '';
+      try { document.body.style.overflow = ''; } catch {}
+    } catch {}
+  }
+
   function _renderBubbleContent(container, content, messageType, msgId) {
     if (!container) return;
     try {
@@ -2601,26 +2940,38 @@ const Chat = (() => {
         if (isAudio && typeof parsed.dataUrl === 'string' && /^data:audio\//i.test(parsed.dataUrl)) {
           const dur = parsed.durationSec > 0 ? _fmtDuration(parsed.durationSec) : '';
           let ahtml = `<div class="voice-player"><button type="button" class="vp-play" aria-label="Play voice message">${VP_PLAY}</button><div class="vp-wave" role="slider" aria-label="Seek"></div><button type="button" class="vp-speed" aria-label="Playback speed">1x</button><span class="vp-time">${dur ? escapeHtml(dur) : ''}</span><audio class="vp-audio" preload="metadata" src="${escapeHtml(parsed.dataUrl)}"></audio></div>`;
-          if (parsed.text) ahtml += `<div style="margin-top:0.35rem;">${_renderText(parsed.text)}</div>`;
+          if (parsed.text) ahtml += `<div class="msg-attach-caption">${_renderText(parsed.text)}</div>`;
           container.innerHTML = ahtml;
           _bindVoicePlayer(container, parsed, msgId);
+          _paintMediaBubble(container);
           return;
         }
         const dataUrl = (typeof parsed.dataUrl === 'string' && /^(data:(image|audio|video|application\/pdf|text\/plain)[^,]*(;base64)?,)/i.test(parsed.dataUrl)) ? parsed.dataUrl : '';
         let html = '';
         if (dataUrl && parsed.fileType && parsed.fileType.startsWith('image/')) {
-          html += `<div class="msg-attachment-wrap"><img src="${escapeHtml(dataUrl)}" class="msg-attachment-img" alt="${escapeHtml(parsed.fileName || 'Attachment')}" /></div>`;
+          const fname = parsed.fileName || 'Image';
+          const cap = parsed.text ? `<div class="msg-img-caption">${_renderText(parsed.text)}</div>` : '';
+          html += `<figure class="msg-media-wrap${parsed.text ? ' has-caption' : ''}" data-filename="${escapeHtml(fname)}">`
+            + `<span class="msg-media-shimmer" aria-hidden="true"></span>`
+            + `<img src="${escapeHtml(dataUrl)}" class="msg-attachment-img" alt="${escapeHtml(fname)}" loading="lazy" />`
+            + `<figcaption class="msg-media-overlay">`
+            + `<button type="button" class="msg-media-btn" data-act="view" aria-label="View full size" title="View full size"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg></button>`
+            + `<a class="msg-media-btn" data-act="download" href="${escapeHtml(dataUrl)}" download="${escapeHtml(fname)}" aria-label="Download image" title="Download"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></a>`
+            + `</figcaption></figure>${cap}`;
         } else if (dataUrl) {
           html += `<a href="${escapeHtml(dataUrl)}" download="${escapeHtml(parsed.fileName || 'file')}" class="msg-file-card"><span class="msg-file-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></span><div class="msg-file-details"><div class="msg-file-name">${escapeHtml(parsed.fileName)}</div><div class="msg-file-meta">${Math.round((parsed.fileSize||0)/1024)} KB · Click to download</div></div></a>`;
         }
         if (parsed.text) {
-          html += `<div style="margin-top:0.35rem;">${_renderText(parsed.text)}</div>`;
+          html += `<div class="msg-attach-caption">${_renderText(parsed.text)}</div>`;
         }
         container.innerHTML = html;
+        _bindMediaWraps(container);
+        _paintMediaBubble(container);
         return;
       }
     } catch (e) { /* fallback to plain text */ }
     container.innerHTML = _renderText(content);
+    _paintMediaBubble(container);
   }
 
 
