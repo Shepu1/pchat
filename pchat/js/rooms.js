@@ -338,7 +338,6 @@ const Rooms = {
     const port = window.location.port ? `:${window.location.port}` : '';
     const host = window.location.hostname || '';
     const protocol = window.location.protocol || 'https:';
-    const isGithub = host.includes('github.io');
     const isLocalhost = host === '127.0.0.1' || host === 'localhost' || host === '';
 
     const origin = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file'))
@@ -407,15 +406,14 @@ const Rooms = {
     const themeParam = `&th=${RoomTheme.normalize(theme || 1)}`;
 
     let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}${keyFrag}`;
-    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}${keyFrag}`;
-    let githubUrl = `https://shepu1.github.io/s/index/pchat/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}${keyFrag}`;
+    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}${keyFrag}`;
+    // No hardcoded host path anymore: on GitHub Pages (any repo/subfolder)
+    // the link is built from the live origin + base path, so moving hosting
+    // (e.g. /s/index/pchat → /pchat/pchat) never produces stale links.
+    // (phoneUrl differs only on localhost, where it points at the LAN IP.)
+    let githubUrl = localUrl;
 
-    if (isGithub) {
-      phoneUrl = githubUrl;
-      localUrl = githubUrl;
-    }
-
-    const primaryUrl = isGithub ? githubUrl : (isLocalhost ? phoneUrl : localUrl);
+    const primaryUrl = isLocalhost ? phoneUrl : localUrl;
     // Fallback remote QR (used only if local QR lib is missing).
     // NOTE: prefer InstantSecurity.renderQR() so the secret never leaves the device.
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(primaryUrl)}`;
