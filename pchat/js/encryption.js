@@ -94,6 +94,32 @@ const Encryption = (() => {
   function isManual() { return _manual === true; }
   function clearKey() { _key = null; _manual = false; }
 
+  // Export the active key (JWK) so a room-password key can survive reloads
+  // via sessionStorage (tab-close clears it). Returns null when no key.
+  async function exportKey() {
+    if (!_key) return null;
+    try { return await crypto.subtle.exportKey('jwk', _key); }
+    catch { return null; }
+  }
+
+  // Import a previously exported JWK as the active key.
+  // manual=true → new messages encrypt (room-password rooms).
+  async function importKey(jwk, manual) {
+    if (!jwk) throw new Error('No key to import');
+    _key = await crypto.subtle.importKey(
+      'jwk', jwk, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+    );
+    _manual = manual === true;
+    return _key;
+  }
+
+  // SHA-256 hex (for password verifiers / topic secrets — never the key).
+  async function sha256Hex(text) {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(String(text || '')));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
   // ── Derive AES-GCM key from a room secret (Quick rooms) ───────
   // Every member who has the room secret (embedded in the invite link)
   // derives the SAME key, so messages are encrypted at rest
@@ -149,6 +175,9 @@ const Encryption = (() => {
     shouldEncrypt,
     isManual,
     clearKey,
+    exportKey,
+    importKey,
+    sha256Hex,
   };
 })();
 

@@ -9,6 +9,22 @@ const UI = {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
+    // Flood guard: identical toasts refresh instead of stacking, and at most
+    // 3 are ever visible — busy rooms used to bury the chat under a wall.
+    try {
+      const key = `${type}|${title}|${message}`.slice(0, 160);
+      const dup = [...container.querySelectorAll('.toast')].find(
+        (n) => n.getAttribute('data-toast-key') === key
+      );
+      if (dup) {
+        clearTimeout(dup._toastTimer);
+        dup._toastTimer = setTimeout(() => UI._dismissToast(dup), duration);
+        return dup.id;
+      }
+      while (container.querySelectorAll('.toast').length >= 3) {
+        container.querySelector('.toast')?.remove();
+      }
+    } catch {}
     const icons = {
       success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
       error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
@@ -21,6 +37,10 @@ const UI = {
     el.id = id;
     el.className = `toast ${type}`;
     el.setAttribute('role', 'status');
+    try {
+      const key = `${type}|${title}|${message}`;
+      el.setAttribute('data-toast-key', key.slice(0, 160));
+    } catch {}
     el.innerHTML = `
       <div class="toast-icon">${icons[type] || icons.info}</div>
       <div class="toast-content">
@@ -31,14 +51,19 @@ const UI = {
     container.appendChild(el);
 
     // Auto-dismiss
-    setTimeout(() => {
+    el._toastTimer = setTimeout(() => UI._dismissToast(el), duration);
+
+    return id;
+  },
+
+  // Shared dismiss (also used to refresh duplicate toasts)
+  _dismissToast(el) {
+    try {
       el.style.opacity = '0';
       el.style.transform = 'translateX(100%)';
       el.style.transition = 'all 0.3s ease';
       setTimeout(() => el.remove(), 350);
-    }, duration);
-
-    return id;
+    } catch { try { el.remove(); } catch {} }
   },
 
   // ── Loading Button ────────────────────────────────────────────

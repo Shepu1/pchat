@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Pchat shepu — Fast & Private Messaging</title>
   <meta name="description"
@@ -266,6 +267,44 @@
     }
 
     .hub-label-action:hover { opacity: 0.8; }
+
+    /* Optional password toggle (collapsed by default) */
+    .pw-opt { margin: 0; }
+    .pw-toggle {
+      background: none;
+      border: none;
+      padding: 0.15rem 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--text-2);
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .pw-track {
+      width: 34px;
+      height: 19px;
+      border-radius: 999px;
+      background: var(--surface-3);
+      border: 1px solid var(--border);
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.18s ease, border-color 0.18s ease;
+    }
+    .pw-knob {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: left 0.18s ease, background 0.18s ease;
+    }
+    .pw-toggle[aria-expanded="true"] .pw-track { background: rgba(16, 185, 129, 0.22); border-color: #10b981; }
+    .pw-toggle[aria-expanded="true"] .pw-knob { left: 17px; background: #10b981; }
+    .pw-opt-tag { font-weight: 400; color: var(--muted); font-size: 0.72rem; }
 
     /* Inputs */
     .hub-input {
@@ -775,6 +814,18 @@
                 maxlength="80" required autocomplete="off" />
             </div>
 
+            <!-- Optional password (collapsed toggle, off by default) -->
+            <div class="pw-opt">
+              <button type="button" class="pw-toggle" id="desktop-pw-toggle" aria-expanded="false" aria-controls="desktop-pw-box">
+                <span class="pw-track" aria-hidden="true"><span class="pw-knob"></span></span>
+                <span>Password</span><span class="pw-opt-tag">optional</span>
+              </button>
+              <div class="hidden" id="desktop-pw-box" style="margin-top:0.5rem;">
+                <input type="password" id="desktop-room-password" class="hub-input" placeholder="Encrypted from the first message"
+                  maxlength="128" autocomplete="new-password" />
+              </div>
+            </div>
+
             <!-- Room icon -->
             <div>
               <label class="hub-label">Room Icon</label>
@@ -1027,6 +1078,17 @@
             required autocomplete="off" style="font-size:1rem;padding:0.75rem 1rem;" />
         </div>
 
+        <div class="pw-opt">
+          <button type="button" class="pw-toggle" id="sheet-pw-toggle" aria-expanded="false" aria-controls="sheet-pw-box">
+            <span class="pw-track" aria-hidden="true"><span class="pw-knob"></span></span>
+            <span style="font-size:0.85rem;">Password</span><span class="pw-opt-tag">optional</span>
+          </button>
+          <div class="hidden" id="sheet-pw-box" style="margin-top:0.5rem;">
+            <input type="password" id="sheet-room-password" class="form-input" placeholder="Encrypted from the start" maxlength="128"
+              autocomplete="new-password" style="font-size:1rem;padding:0.75rem 1rem;" />
+          </div>
+        </div>
+
         <button type="submit" class="btn btn-primary btn-full btn-lg"
           style="padding:0.85rem;font-size:1rem;font-weight:700;">
           <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -1072,7 +1134,7 @@
   <!-- ── Share Room Modal (QR Code + 3 Device Tabs) ─────────────── -->
   <div class="modal-overlay hidden" id="share-modal" role="dialog" aria-labelledby="share-modal-title"
     aria-modal="true">
-    <div class="modal" style="max-width:480px;text-align:center;padding:1.75rem;">
+    <div class="modal" style="max-width:min(480px, calc(100vw - 2rem));text-align:center;padding:1.75rem;">
       <div class="modal-header" style="justify-content:center;position:relative;">
         <h3 id="share-modal-title" style="font-size:1.25rem;font-weight:700;">Invite Friends</h3>
         <button class="modal-close" id="share-modal-close" aria-label="Close" style="position:absolute;right:0;"><svg
@@ -1202,17 +1264,19 @@
     <!-- Scripts -->
     <script src="js/config.js?v=20261016a"></script>
     <script src="js/storage.js?v=20261016a"></script>
-    <script src="js/ui.js?v=20261016a"></script>
+    <script src="js/ui.js?v=20261018a"></script>
 <script src="js/custom-emoji.js?v=20261016a"></script>
     <script src="js/auth.js?v=20261016a"></script>
     <script src="js/google.js?v=20261016a"></script>
     <script src="js/drive.js?v=20261016a"></script>
     <script src="js/sheets.js?v=20261016a"></script>
         <script src="js/peerjs.min.js?v=20261016a"></script>
-    <script src="js/p2p-sync.js?v=20261016a"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="js/p2p-sync.js?v=20261018a"></script>
+    <script src="js/qrcode.min.js?v=20261018a"></script>
     <script src="js/instant-security.js?v=20261016a"></script>
-    <script src="js/rooms.js?v=20261016b"></script>
+    <script src="js/encryption.js?v=20261018a"></script>
+    <script src="js/room-password.js?v=20261018a"></script>
+    <script src="js/rooms.js?v=20261018a"></script>
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
@@ -1488,8 +1552,16 @@
         createSheet.onclick = (e) => { if (e.target === createSheet) createSheet.classList.remove('active'); };
 
         // Room Creation Helper — async, uses Google Sheet if configured
-        const handleCreate = async (rawName, inputEl, sheetToClose) => {
+        const handleCreate = async (rawName, inputEl, sheetToClose, pwEl) => {
           if (!rawName) return;
+          // Optional password up front (empty = open room). Validated BEFORE
+          // anything is created so a typo can't leave a half-locked room.
+          const pwValue = ((pwEl && pwEl.value) || '');
+          if (pwValue && pwValue.length < 4) {
+            UI.toast('error', 'Weak Password', 'Use at least 4 characters — or leave it empty for an open room.');
+            try { pwEl.focus(); } catch {}
+            return;
+          }
 
           // One rule: logged-in → Gmail name; logged-out → one-time name prompt.
           // Saved rooms trigger Google sign-in on demand below.
@@ -1500,6 +1572,7 @@
           // Close sheet & disable inputs
           if (sheetToClose) sheetToClose.classList.remove('active');
           if (inputEl) inputEl.value = '';
+          if (pwEl) pwEl.value = '';
 
           // Show progress overlay
           const overlay = document.getElementById('room-creating-overlay');
@@ -1555,22 +1628,70 @@
 
 
           loadRooms();
+          // Optional password: lock with end-to-end encryption from the very
+          // first message. Secret is brand-new (nothing leaked yet), so no
+          // rotation is needed — key + registry flag + server verifier.
+          if (newRoom && pwValue) {
+            if (overlay) overlay.classList.remove('hidden');
+            updateProgress('Locking with password…');
+            try {
+              if (typeof RoomPassword === 'undefined') throw new Error('Password module missing — reload and retry.');
+              await RoomPassword.deriveAndStore(newRoom.id, pwValue);
+              const hash = await RoomPassword.hashForServer(newRoom.id, pwValue);
+              const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+              const res = await RoomAPI.roomOp(newRoom.deploymentUrl, {
+                memberId: sess && sess.memberId, sessionToken: sess && sess.sessionToken,
+                op: 'set_password', passwordHash: hash,
+              });
+              if (!res || !res.success) throw new Error((res && res.error) || 'Server refused.');
+              try { Rooms.updateRoom(newRoom.id, { passwordLocked: true }); } catch {}
+              newRoom.passwordLocked = true;
+              UI.toast('success', 'Room Locked', 'End-to-end encrypted from the first message.');
+            } catch (err) {
+              try { RoomPassword.clearStored(newRoom.id); } catch {}
+              try { if (typeof Encryption !== 'undefined') Encryption.clearKey(); } catch {}
+              UI.toast('warning', 'Lock Failed', (err && err.message) || 'Room created WITHOUT password.');
+            } finally {
+              if (overlay) overlay.classList.add('hidden');
+            }
+          }
           // Play room-created animation (~2.5s) before opening the share modal
           if (window.UI?.playRoomCreatedAnimation) await UI.playRoomCreatedAnimation();
           openShareModal(newRoom);
         };
 
+        // Optional password toggle (collapsed, OFF by default). Turning it
+        // OFF clears the box so a stale password can never lock by accident.
+        const bindPwToggle = (btnId, boxId, inputId) => {
+          const btn = document.getElementById(btnId), box = document.getElementById(boxId), inp = document.getElementById(inputId);
+          if (!btn || !box) return;
+          btn.addEventListener('click', () => {
+            const open = box.classList.contains('hidden');
+            box.classList.toggle('hidden', !open);
+            btn.setAttribute('aria-expanded', String(open));
+            if (open && inp) setTimeout(() => inp.focus(), 60);
+            if (!open && inp) inp.value = '';
+          });
+        };
+        bindPwToggle('sheet-pw-toggle', 'sheet-pw-box', 'sheet-room-password');
+        bindPwToggle('desktop-pw-toggle', 'desktop-pw-box', 'desktop-room-password');
+        // Password input counts ONLY while its toggle box is open.
+        const pwEnabledInput = (boxId, inputId) => {
+          const box = document.getElementById(boxId), inp = document.getElementById(inputId);
+          return (box && inp && !box.classList.contains('hidden')) ? inp : null;
+        };
+
         // Mobile create submit
         createForm.onsubmit = (e) => {
           e.preventDefault();
-          handleCreate(roomNameInput.value.trim(), roomNameInput, createSheet);
+          handleCreate(roomNameInput.value.trim(), roomNameInput, createSheet, pwEnabledInput('sheet-pw-box', 'sheet-room-password'));
         };
 
         // Desktop create submit
         if (desktopCreateForm) {
           desktopCreateForm.onsubmit = (e) => {
             e.preventDefault();
-            handleCreate(desktopRoomName.value.trim(), desktopRoomName, null);
+            handleCreate(desktopRoomName.value.trim(), desktopRoomName, null, pwEnabledInput('desktop-pw-box', 'desktop-room-password'));
           };
         }
 

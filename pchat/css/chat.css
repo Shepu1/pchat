@@ -294,6 +294,29 @@
   min-width: 0;
 }
 
+.chat-header .e2ee-badge-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* End-to-end encrypted badge (password-locked rooms with an active key) */
+.chat-header .e2ee-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: var(--r-full);
+  padding: 0.28rem 0.65rem;
+  white-space: nowrap;
+}
+
 .chat-header .room-title {
   font-family: var(--font-display);
   font-weight: 700;
@@ -1777,12 +1800,16 @@ img.custom-emoji-picker {
 /* Locked special-emoji placeholder (pack not unlocked on this device) */
 .special-emoji-locked {
   display: inline-block;
-  font-size: 1.1em;
   line-height: 1;
   vertical-align: -0.2em;
   cursor: help;
-  filter: grayscale(1);
   opacity: 0.85;
+  color: var(--muted);
+}
+.special-emoji-locked svg {
+  width: 1.1em;
+  height: 1.1em;
+  display: block;
 }
 
 /* ── Emoji-Only Message Bubbles (Facebook/WhatsApp style) ─── */
@@ -2024,6 +2051,46 @@ img.custom-emoji-picker {
 }
 .lightbox-btn:hover { background: rgba(255, 255, 255, 0.22); }
 .lightbox-img { cursor: zoom-out; }
+
+/* ── Room password gate + modal ───────────────────────────── */
+.pw-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(4, 6, 12, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.pw-gate.hidden { display: none; }
+.pw-gate-card {
+  width: min(400px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-xl);
+  padding: 2rem 1.75rem;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+.pw-gate-card h2 { font-size: 1.3rem; margin: 0.9rem 0 0.4rem; }
+.pw-gate-icon {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+.pw-gate-desc { font-size: 0.85rem; color: var(--text-2); margin-bottom: 1.25rem; }
+.pw-gate-input { text-align: center; }
+#pw-gate-error, #password-modal-error { font-size: 0.8rem; margin-top: 0.6rem; justify-content: center; }
 
 /* ── Message Reactions ────────────────────────────────────────── */
 .msg-reactions-row {

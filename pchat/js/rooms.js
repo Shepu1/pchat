@@ -385,28 +385,28 @@ const Rooms = {
     const effectiveName = roomName || (room && room.name) || 'Private Room';
     const encodedName = encodeURIComponent(effectiveName);
 
-    // Embed the room secret in the invite link so every member derives the
-    // same AES-GCM key → messages stay encrypted at rest (ntfy cloud / localStorage).
-    // Fall back to the active session secret so re-shared links never lose ?k=.
-    let roomSecret = (room && room.secret) ? room.secret : '';
-    if (!roomSecret) {
-      try {
-        const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
-        if (sess && sess.roomId === roomId && sess.roomSecret) roomSecret = sess.roomSecret;
-      } catch {}
+    // Password-locked rooms: the invite link carries NO key material at all
+    // (neither ?k= nor #k=) — only `&pw=1`. The password derives everything
+    // on the joiner's device. A leaked link alone opens nothing.
+    const roomLocked = !!(room && room.passwordLocked === true);
+    let roomSecret = '';
+    let keyFrag = '';
+    if (!roomLocked) {
+      roomSecret = (room && room.secret) ? room.secret : '';
+      if (!roomSecret) {
+        try {
+          const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+          if (sess && sess.roomId === roomId && sess.roomSecret) roomSecret = sess.roomSecret;
+        } catch {}
+      }
     }
-    const encodedKey = roomSecret
-      ? btoa(roomSecret).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-      : '';
-    // Secret travels TWO ways (belt + suspenders):
-    //   1. ?k= query — survives browsers/WebViews that strip #fragments
-    //      (some in-app browsers drop everything after # on navigation).
-    //   2. #k= fragment — never reaches servers/logs.
-    // Tradeoff: ?k= appears in browser history + own server logs, but messages
-    // stay E2EE (only ciphertext ever touches ntfy/Google). Reliability wins.
-    // Links with only one of them still work (join-room reads both).
-    const keyQuery = encodedKey ? `&k=${encodedKey}` : '';
-    const keyFrag = encodedKey ? `#k=${encodedKey}` : '';
+    if (roomSecret) {
+      const encodedKey = btoa(roomSecret).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      // NOTE: ?k= is no longer emitted (history/log exposure). The #k=
+      // fragment never reaches servers/logs — sole key carrier. Old ?k=
+      // links are still READ (then stripped from the address bar).
+      keyFrag = `#k=${encodedKey}`;
+    }
 
     // Theme is public (just a wallpaper digit) → plain ?th= query param
     // BEFORE the fragment, so every device shows the same chat theme.
@@ -419,8 +419,8 @@ const Rooms = {
     }
     const themeParam = `&th=${RoomTheme.normalize(theme || 1)}`;
 
-    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}&rt=${this.roomKind(room)}${keyFrag}`;
-    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${keyQuery}${themeParam}&rt=${this.roomKind(room)}${keyFrag}`;
+    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}&rt=${this.roomKind(room)}${roomLocked ? '&pw=1' : ''}${keyFrag}`;
+    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}&rt=${this.roomKind(room)}${roomLocked ? '&pw=1' : ''}${keyFrag}`;
     // No hardcoded host path anymore: on GitHub Pages (any repo/subfolder)
     // the link is built from the live origin + base path, so moving hosting
     // (e.g. /s/index/pchat → /pchat/pchat) never produces stale links.
@@ -521,8 +521,8 @@ const RoomAPI = {
   },
 
   // ── Join ──────────────────────────────────────────────────────
-  async join(endpointUrl, { displayName, memberId, sessionToken, picture }) {
-    return this.post(endpointUrl, { action: 'join', displayName, memberId, sessionToken, picture: picture || '' });
+  async join(endpointUrl, { displayName, memberId, sessionToken, picture, passwordHash }) {
+    return this.post(endpointUrl, { action: 'join', displayName, memberId, sessionToken, picture: picture || '', passwordHash: passwordHash || '' });
   },
 
   // ── Leave ─────────────────────────────────────────────────────
@@ -582,8 +582,14 @@ const RoomAPI = {
     const mockStorageKey = 'shepu_mock_room_' + roomId;
     // Private (secret-derived) + legacy topics. Best-effort secret lookup —
     // falls back to legacy topic so old clients keep working.
+    // Password-locked rooms ALWAYS use the password-derived topic secret
+    // (link secrets are meaningless there — links carry no key).
     const _sec = (() => {
       try {
+        if (typeof RoomPassword !== 'undefined' && RoomPassword.storedTopicSecret) {
+          const pw = RoomPassword.storedTopicSecret(roomId);
+          if (pw) return pw;
+        }
         const reg = (typeof Rooms !== 'undefined' && Rooms.getRoom) ? Rooms.getRoom(roomId) : null;
         if (reg && reg.secret) return reg.secret;
         const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
@@ -594,6 +600,13 @@ const RoomAPI = {
     const _topics = (typeof InstantSecurity !== 'undefined')
       ? InstantSecurity.topicsFor(roomId, _sec)
       : [`shepu_pchat_${roomId}`];
+    // Password-locked rooms: relay ONLY on the private topic — the legacy
+    // roomId topic is guessable and must see nothing, not even presence.
+    try {
+      const _regLocked = (typeof Rooms !== 'undefined' && Rooms.getRoom)
+        ? (Rooms.getRoom(roomId) || {}).passwordLocked === true : false;
+      if (_regLocked && _topics.length > 1) _topics.splice(1);
+    } catch {}
     const _relay = (payload) => {
       _topics.forEach(t => {
         try {
@@ -620,9 +633,11 @@ const RoomAPI = {
       // Guests on other devices have no local mock row — fall back to the
       // registry/session name before surrendering to 'Private Room'.
       let fallbackName = '';
+      let fallbackLocked = false;
       try {
         const reg = (typeof Rooms !== 'undefined' && Rooms.getRoom) ? Rooms.getRoom(roomId) : null;
         if (reg && reg.name && reg.name !== 'Private Room') fallbackName = reg.name;
+        if (reg && reg.passwordLocked === true) fallbackLocked = true;
         if (!fallbackName) {
           const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
           if (sess && sess.roomId === roomId && sess.roomName && sess.roomName !== 'Private Room') fallbackName = sess.roomName;
@@ -634,6 +649,7 @@ const RoomAPI = {
         description: roomData.description || 'Welcome to the room!',
         status: 'active',
         created_at: roomData.created_at || new Date().toISOString(),
+        passwordLocked: !!(roomData.passwordLocked || fallbackLocked),
       };
       return {
         success: true,
@@ -808,6 +824,18 @@ const RoomAPI = {
         roomData.members = (roomData.members || []).filter(m => (m.id || m.memberId) !== params.targetId);
         localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
         return { success: true };
+      }
+      if (op === 'set_password' && /^[0-9a-f]{64}$/i.test(String(params.passwordHash || ''))) {
+        roomData.passwordHash = String(params.passwordHash).toLowerCase();
+        roomData.passwordLocked = true;
+        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        return { success: true, passwordLocked: true };
+      }
+      if (op === 'remove_password') {
+        roomData.passwordHash = '';
+        roomData.passwordLocked = false;
+        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        return { success: true, passwordLocked: false };
       }
       return { success: true };
     }

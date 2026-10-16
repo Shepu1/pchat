@@ -17,7 +17,10 @@ const P2PSync = (() => {
   let _onHistoryRequestCb = null;
   let _onMembersUpdateCb = null;
   let _onTypingCb = null;
+  let _onJoinRejectedCb = null;
+  let _requireProof = false; // password-locked rooms: no proof → rejected
   let _reconnectTimer = null;
+  let _joinRejected = false; // guest: stop retrying after an explicit reject
   let _activeMembers = new Map(); // memberId -> { id, name, role, lastSeen }
 
   function getHostPeerId(roomId) {
@@ -33,7 +36,7 @@ const P2PSync = (() => {
     return `pchat_g_${cleanRoom}_${cleanMember}_${rand}`;
   }
 
-  function init({ roomId, roomSecret, isHost, memberId, displayName, onMessage, onHistoryRequest, onMembersUpdate, onTyping }) {
+  function init({ roomId, roomSecret, isHost, memberId, displayName, onMessage, onHistoryRequest, onMembersUpdate, onTyping, requireProof, onJoinRejected }) {
     if (typeof Peer === 'undefined') {
       console.warn('[P2PSync] PeerJS library not loaded.');
       return;
@@ -51,6 +54,9 @@ const P2PSync = (() => {
     _onHistoryRequestCb = onHistoryRequest;
     _onMembersUpdateCb = onMembersUpdate;
     _onTypingCb = onTyping;
+    _requireProof = !!requireProof;
+    _onJoinRejectedCb = (typeof onJoinRejected === 'function') ? onJoinRejected : null;
+    _joinRejected = false;
 
     _activeMembers.set(_memberId, {
       memberId: _memberId,
@@ -161,8 +167,13 @@ const P2PSync = (() => {
 
     // Invisible capability check: guests prove invite-link knowledge.
     // No password prompt — proof is computed silently from #k= secret.
-    // Legacy clients without proof are still allowed (transition period).
+    // Legacy clients without proof are still allowed (transition period)
+    // — EXCEPT in password-locked rooms, where proof is mandatory.
     const _proofOf = (d) => (d && (d.proof || (d.member && d.member.proof))) || '';
+    const _rejectGuest = (conn, reason) => {
+      try { conn.send({ type: 'join_rejected', reason: reason || 'wrong_password' }); } catch {}
+      setTimeout(() => { try { conn.close(); } catch {} }, 600);
+    };
     if (_roomSecret && (data.type === 'join' || data.type === 'message')) {
       const proof = _proofOf(data);
       const midProbe = (data.member && (data.member.memberId || data.member.id)) || data.memberId || (data.message && data.message.senderId) || '';
@@ -171,8 +182,18 @@ const P2PSync = (() => {
           const ok = (typeof InstantSecurity !== 'undefined')
             ? InstantSecurity.verifyJoinProof(_roomSecret, midProbe, proof)
             : true;
-          if (!ok) { try { conn.close(); } catch {} return; }
-        } catch { return; }
+          if (!ok) {
+            if (_requireProof) { _rejectGuest(conn, 'wrong_password'); return; }
+            try { conn.close(); } catch {} return;
+          }
+        } catch {
+          if (_requireProof) { _rejectGuest(conn, 'wrong_password'); }
+          return;
+        }
+      } else if (_requireProof) {
+        // No proof at all — password room: reject with feedback, don't hang.
+        _rejectGuest(conn, 'password_required');
+        return;
       }
       // no proof → legacy client: allow (messages are E2EE anyway)
     }
@@ -297,6 +318,7 @@ const P2PSync = (() => {
   }
 
   function _connectToHost() {
+    if (_joinRejected) return;
     if (!_peer || _peer.destroyed) return;
     const hostId = getHostPeerId(_roomId);
     console.log('[P2PSync] Connecting to Host:', hostId);
@@ -341,6 +363,18 @@ const P2PSync = (() => {
   function _handleGuestIncomingData(data) {
     if (!data || typeof data !== 'object') return;
 
+    if (data.type === 'join_rejected') {
+      // Host refused us (usually wrong room password). Stop retrying —
+      // the app surfaces the password gate again with the error.
+      _joinRejected = true;
+      if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+      try { _connections.delete('host'); } catch {}
+      if (_onJoinRejectedCb) {
+        try { _onJoinRejectedCb(data.reason || 'wrong_password'); } catch {}
+      }
+      return;
+    }
+
     if (data.type === 'history' && Array.isArray(data.messages)) {
       if (_onMessageCb) _onMessageCb(data.messages);
     } else if (data.type === 'message' && data.message) {
@@ -359,6 +393,7 @@ const P2PSync = (() => {
   }
 
   function _scheduleGuestReconnect(delay) {
+    if (_joinRejected) return; // explicitly refused — don't hammer the host
     if (_reconnectTimer) clearTimeout(_reconnectTimer);
     _reconnectTimer = setTimeout(() => {
       if (!_isHost && !_connections.has('host') && _peer && !_peer.destroyed) {

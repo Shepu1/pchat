@@ -72,6 +72,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   }
+  // Legacy ?k= links still work (getInviteSecret reads them too) — but the
+  // secret must not linger in history/logs, so strip it unconditionally now.
+  try {
+    if (params.has('k')) {
+      params.delete('k');
+      const qs = params.toString();
+      history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+  } catch {}
 
   if (!deploymentUrl && room) {
     deploymentUrl = room.deploymentUrl;
@@ -83,6 +92,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const nameParam = params.get('n') ? decodeURIComponent(params.get('n')) : null;
+  // Password-locked rooms advertise `&pw=1` in the link (no key material).
+  const pwParam = params.get('pw') === '1';
   // Room kind (?rt=saved|quick) tells the join card which profile icon to show.
   const kindParam = params.get('rt') === 'saved' ? 'saved' : (params.get('rt') === 'quick' ? 'quick' : null);
 
@@ -125,6 +136,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     || (roomInfo.spreadsheetId ? 'saved' : null)
     || ((room && room.spreadsheetId) ? 'saved' : null)
     || 'quick';
+  // Password lock: server flag is authoritative; `&pw=1` covers quick rooms
+  // whose backend (guest's own mock row) cannot know the lock state.
+  roomInfo.passwordLocked = roomInfo.passwordLocked === true || pwParam === true;
 
   // Check room status
   if (roomInfo.status === 'deleted') {
@@ -140,6 +154,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Check if already joined ───────────────────────────────────
   const session = Storage.getSession();
   if (session && session.roomId === roomId && session.memberId && session.sessionToken) {
+    // A newly locked room invalidates keyless sessions: force a fresh join
+    // (with password) instead of sailing into a room we cannot read.
+    try {
+      const needsPw = roomInfo.passwordLocked === true
+        && typeof RoomPassword !== 'undefined' && !RoomPassword.hasStored(roomId);
+      if (needsPw) {
+        Storage.clearSession();
+        showJoinForm(roomInfo);
+        return;
+      }
+    } catch {}
     // Show rejoin card
     showRejoin(roomInfo, session);
     return;
@@ -169,13 +194,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? UI.effectivePicture()
         : (authUser?.picture || '');
 
-      const res = await RoomAPI.join(deploymentUrl, { displayName, picture });
+      // Password-locked rooms: derive the key FIRST (stays on this device),
+      // then prove knowledge with a hash — the password itself never travels.
+      let passwordHash = '';
+      if (roomInfo.passwordLocked === true) {
+        const pwEl = document.getElementById('join-password');
+        const pw = (pwEl && pwEl.value) || '';
+        if (!pw) throw new Error('This room needs a password — ask the owner.');
+        try {
+          await RoomPassword.deriveAndStore(roomId, pw);
+          passwordHash = await RoomPassword.hashForServer(roomId, pw);
+        } catch (err) {
+          throw new Error((err && err.message) || 'Password setup failed.');
+        }
+        try { if (pwEl) pwEl.value = ''; } catch {}
+      }
+
+      const res = await RoomAPI.join(deploymentUrl, { displayName, picture, passwordHash });
 
       if (!res.success) {
         const msgs = {
           BANNED:   'You have been banned from this room.',
           DISABLED: 'This room is currently disabled.',
           INVALID:  'Invalid request.',
+          PASSWORD_REQUIRED: 'This room needs a password.',
+          WRONG_PASSWORD:    'Wrong room password — try again.',
+          RATE_LIMITED: 'Too many attempts — wait a minute and retry.',
         };
         throw new Error(msgs[res.code] || res.error || 'Join failed');
       }
@@ -196,6 +240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         roomName:     roomInfo.name || 'Private Room',
         roomDesc:     roomInfo.description || '',
         roomKind:     roomInfo.kind || kindParam || 'quick',
+        passwordLocked: roomInfo.passwordLocked === true,
         roomSecret:   roomSecret || (room && room.secret) || undefined,
         theme:        inviteTheme || (room && room.theme) || 1,
       };
@@ -213,6 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         joinedAt:    sessionData.joinedAt,
         isOwner:     false,
         kind:        roomInfo.kind || kindParam || 'quick',
+        passwordLocked: roomInfo.passwordLocked === true,
         secret:      roomSecret || (room && room.secret) || undefined,
         theme:       inviteTheme || (room && room.theme) || 1,
       };
@@ -260,6 +306,12 @@ function showUnavailable(title, msg) {
 function showJoinForm(roomInfo) {
   hideLoading();
   document.getElementById('join-form-card').style.display = '';
+
+  // Locked rooms demand the password field.
+  try {
+    const pwGroup = document.getElementById('join-pw-group');
+    if (pwGroup) pwGroup.classList.toggle('hidden', roomInfo.passwordLocked !== true);
+  } catch {}
 
   // Room avatar — saved.webp for sheet rooms, quick.webp otherwise.
   // Letter stays behind as fallback; image covers it, removes itself on error.
@@ -382,6 +434,7 @@ function showRejoin(roomInfo, session) {
       if (freshDep && reg.deploymentUrl !== freshDep) patch.deploymentUrl = freshDep;
       if ((!reg.name || reg.name === 'Private Room') && session.roomName && session.roomName !== 'Private Room') patch.name = session.roomName;
       if (!reg.kind && session.roomKind) patch.kind = session.roomKind;
+      if (roomInfo.passwordLocked === true && !reg.passwordLocked) patch.passwordLocked = true;
       try {
         const thP = qp.get('th');
         if (thP && typeof RoomTheme !== 'undefined' && !reg.theme) patch.theme = RoomTheme.normalize(thP);

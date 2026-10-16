@@ -142,16 +142,21 @@ function getMemberRow(memberId) {
   return null;
 }
 
-// ── Rate limiting ──────────────────────────────────────────────────
-var _rateLimitCache = {};
-function checkRateLimit(memberId) {
-  var key  = memberId;
-  var now_ = Date.now();
-  if (!_rateLimitCache[key]) _rateLimitCache[key] = { count: 0, window: now_ };
-  var rl = _rateLimitCache[key];
-  if (now_ - rl.window > 10000) { rl.count = 0; rl.window = now_; }
-  rl.count++;
-  return rl.count <= 20;
+// ── Rate limiting (CacheService survives across executions — the old
+// in-memory object did not, so floods from fresh memberIds sailed through).
+// Caps normal use generously; only automated floods trip it.
+function checkRateLimit(scope, limit, windowSec) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var bucket = Math.floor(Date.now() / 1000 / (windowSec || 60));
+    var key = 'rl_' + String(scope || 'anon').substring(0, 60) + '_' + bucket;
+    var n = parseInt(cache.get(key) || '0', 10) || 0;
+    if (n >= (limit || 30)) return false;
+    cache.put(key, String(n + 1), (windowSec || 60) + 5);
+    return true;
+  } catch (e) {
+    return true; // fail-open: never lock out real users on cache errors
+  }
 }
 
 // ── GET /room ─────────────────────────────────────────────────────
@@ -165,6 +170,8 @@ function handleGetRoom(e) {
       description: cfg.description || '',
       status:      cfg.room_status || 'active',
       createdAt:   cfg.created_at  || '',
+      // Presence of a password hash = locked. The hash itself never leaves.
+      passwordLocked: !!(cfg.room_password_hash && cfg.room_password_hash !== ''),
     }
   });
 }
@@ -201,6 +208,16 @@ function handleJoin(body) {
   var cfg = getRoomConfig();
   if (cfg.room_status === 'disabled') return errorResponse('Room is disabled', 'DISABLED');
   if (cfg.room_status === 'deleted')  return errorResponse('Room has been deleted', 'DELETED');
+
+  // Join flood guard (global bucket — memberIds are client-chosen).
+  if (!checkRateLimit('join_global', 30, 60)) return errorResponse('Too many joins — try again in a minute', 'RATE_LIMITED');
+
+  // Password-locked rooms: the client sends a SHA-256 verifier, never the
+  // password itself. Missing/wrong → distinct codes so the UI can re-prompt.
+  var needPw = cfg.room_password_hash && cfg.room_password_hash !== '';
+  if (needPw && String(body.passwordHash || '') !== String(cfg.room_password_hash)) {
+    return errorResponse(body.passwordHash ? 'Wrong room password' : 'This room needs a password', body.passwordHash ? 'WRONG_PASSWORD' : 'PASSWORD_REQUIRED');
+  }
 
   var sheet = getSheet('members');
   var data  = sheet.getDataRange().getValues();
@@ -286,6 +303,15 @@ function handleSendMessage(body) {
         sessionToken = parsed.sessionToken;
       }
     } catch(e) {}
+    // Heal-or-reject: a failed rejoin (banned, locked room, missing room
+    // password…) must NOT silently write as 'Unknown' like before.
+    if (!validateSession(memberId, sessionToken)) {
+      return errorResponse('Invalid session — please rejoin', 'UNAUTHORIZED');
+    }
+  }
+  // Flood guard: generous for humans (30/min), fatal for scripts.
+  if (!checkRateLimit('send_' + memberId, 30, 60)) {
+    return errorResponse('Too fast — slow down a little', 'RATE_LIMITED');
   }
   if (!message) return errorResponse('Message cannot be empty', 'INVALID');
   if (messageType === 'text' && message.length > 4000) return errorResponse('Message too long', 'TOO_LONG');
@@ -445,8 +471,30 @@ function handleRoomOp(body) {
     return corsResponse({ success: true });
   }
 
-  if (op === 'get_stats') {
-    var membersSheet  = getSheet('members');
+  if (op === 'set_password') {
+    // Owner locks the room: clients send a SHA-256 verifier, never the password.
+    var hash = String(body.passwordHash || '').trim();
+    if (!/^[0-9a-f]{64}$/i.test(hash)) return errorResponse('Bad password verifier', 'INVALID');
+    updateConfig('room_password_hash', hash.toLowerCase());
+    // Kill every OTHER session: pre-lock members must rejoin with the password.
+    try {
+      var msheet = getSheet('members');
+      var mdata  = msheet.getDataRange().getValues();
+      for (var i = 1; i < mdata.length; i++) {
+        if (mdata[i][0] && String(mdata[i][0]) !== String(memberId)) {
+          msheet.getRange(i + 1, 9).setValue('');
+        }
+      }
+    } catch (e) {}
+    return corsResponse({ success: true, passwordLocked: true });
+  }
+
+  if (op === 'remove_password') {
+    updateConfig('room_password_hash', '');
+    return corsResponse({ success: true, passwordLocked: false });
+  }
+
+  if (op === 'get_stats') {    var membersSheet  = getSheet('members');
     var messagesSheet = getSheet('messages');
     var memberCount   = Math.max(0, membersSheet.getLastRow()  - 1);
     var messageCount  = Math.max(0, messagesSheet.getLastRow() - 1);

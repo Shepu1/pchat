@@ -31,10 +31,13 @@ const NtfySync = (() => {
     return `shepu_pchat_${roomId}`;
   }
 
-  function init({ roomId, roomSecret, onEvent }) {
+  function init({ roomId, roomSecret, onEvent, privateOnly }) {
     try {
       if (typeof InstantSecurity !== 'undefined') {
-        _topics = InstantSecurity.topicsFor(roomId, roomSecret || null);
+        const all = InstantSecurity.topicsFor(roomId, roomSecret || null);
+        // Password-locked rooms: NEVER touch the guessable legacy topic —
+        // not even presence beacons. One private topic only.
+        _topics = (privateOnly === true && all.length) ? [all[0]] : all;
       } else {
         _topics = [topicFor(roomId)];
       }

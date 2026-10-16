@@ -63,6 +63,28 @@
   /* Chat mobile */
   .chat-header .back-btn { display: flex; }
 
+  /* Create page: let long icon-button rows shrink instead of poking out */
+  #create-btn .btn-text { min-width: 0; }
+  #btn-copy-apps-script-code { max-width: 100%; }
+  #btn-copy-apps-script-code svg { flex-shrink: 0; }
+  .apps-script-row { flex-wrap: wrap; gap: 0.5rem; }
+
+  /* E2EE badge: icon-only on phones (full text via aria-label) */
+  .chat-header .e2ee-badge { padding: 0.28rem 0.5rem; }
+  .chat-header .e2ee-badge-text { display: none; }
+
+  /* Declutter the room header so title + badge survive on narrow screens:
+     tighter bar, icon-only Invite; the avatar and the encryption shield
+     step aside on phones (avatar: desktop only; shield: ⋮ menu entry).
+     Music stays outside — it's a headline feature. */
+  .chat-header { padding: 0 0.625rem; gap: 0.5rem; }
+  .chat-header .room-info { gap: 0.5rem; }
+  .chat-header .header-actions { gap: 0.25rem; }
+  .chat-header .header-actions .btn-icon { width: 32px; height: 32px; }
+  #room-qr-btn span { display: none; }
+  #room-qr-btn { padding: 0.35rem 0.5rem !important; }
+  .chat-header .room-avatar, #e2ee-toggle-btn { display: none; }
+
   .msg-row { max-width: 88%; }
 
   .chat-feed { padding: 0.875rem; }

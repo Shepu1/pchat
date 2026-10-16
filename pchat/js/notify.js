@@ -103,7 +103,7 @@ const Notify = (() => {
     let body = '';
     if (typeof msg.message === 'string') {
       // Strip encryption prefix / JSON attachment wrapper for a clean preview
-      if (msg.message.startsWith('enc:')) body = '🔒 Encrypted message';
+      if (msg.message.startsWith('enc:')) body = 'Encrypted message (locked)';
       else if (msg.message.startsWith('{')) {
         try { const p = JSON.parse(msg.message); body = p.text || p.fileName || '📎 Attachment'; }
         catch { body = 'New message'; }

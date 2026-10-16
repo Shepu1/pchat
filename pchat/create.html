@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Room — Pchat shepu</title>
   <meta name="description" content="Create a private chat room backed by your Google Sheet. Share via link or QR code." />
@@ -147,7 +148,7 @@
             placeholder="e.g. https://script.google.com/macros/s/.../exec (optional)"
             style="font-size:0.82rem;padding:0.6rem 0.85rem;"
           />
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;font-size:0.75rem;">
+          <div class="apps-script-row" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;font-size:0.75rem;">
             <a href="https://docs.google.com/spreadsheets/create" target="_blank" rel="noopener" style="color:var(--accent-2);text-decoration:none;font-weight:600;">
               ↗ Open New Google Sheet
             </a>

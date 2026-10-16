@@ -36,7 +36,7 @@ const SpecialEmoji = (() => {
   // same code for the same image. The older `:sp_<base>:` form (sent before
   // the short-code switch) still renders too.
   // When the pack is locked (or on a device that never unlocked it) the
-  // code renders as a 🔒 placeholder instead of leaking the image.
+  // code renders as a lock-shield placeholder instead of leaking the image.
   //
   // IMPORTANT: emojifyShortcodes must run AFTER linkify. It emits absolute
   // blob: URLs, and linkify would mistake the http:// inside them for a
@@ -126,7 +126,7 @@ const SpecialEmoji = (() => {
         return `<img src="${url}" alt="${label}" title="${label}" data-code="${match}" class="custom-emoji" loading="lazy" draggable="false" onerror="this.replaceWith(document.createTextNode(this.dataset.code))" />`;
       }
       const label = match.replace(/"/g, '&quot;');
-      return `<span class="special-emoji-locked" title="Locked special emoji ${label}">🔒</span>`;
+      return `<span class="special-emoji-locked" title="Locked special emoji ${label}" role="img" aria-label="Locked special emoji"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 11.5 11 13.5 15 9.5"></polyline></svg></span>`;
     });
   }
 

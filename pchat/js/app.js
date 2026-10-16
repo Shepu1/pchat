@@ -4,6 +4,143 @@
  * Orchestrates: session validation → room load → initial messages → sync loop → presence.
  */
 
+// Small inline shield (replaces the 🔒 emoji everywhere in UI chrome)
+const PW_SHIELD_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 11.5 11 13.5 15 9.5"></polyline></svg>';
+
+// ── Room-password gate (locked rooms without a derived key stop here) ──
+function showPwGate({ badKey, roomName }) {
+  const params = new URLSearchParams(location.search);
+  const roomId = params.get('r');
+  document.title = 'Locked room — Pchat shepu';
+  const gate = document.getElementById('pw-gate');
+  if (!gate || !roomId) { window.location.href = 'index.html'; return; }
+  gate.classList.remove('hidden');
+  try {
+    const t = document.getElementById('pw-gate-title');
+    if (t) t.innerHTML = `${PW_SHIELD_SVG} <span>${escapeHtml(roomName || 'This room')} is locked</span>`;
+  } catch {}
+  const err = document.getElementById('pw-gate-error');
+  const showErr = (msg) => {
+    if (!err) return;
+    if (!msg) { err.classList.add('hidden'); err.textContent = ''; }
+    else { err.classList.remove('hidden'); err.textContent = msg; }
+  };
+  showErr(badKey ? 'That password was rejected by the room. Try again.' : '');
+  const input = document.getElementById('pw-gate-input');
+  const btn = document.getElementById('pw-gate-unlock');
+  const busy = (on) => {
+    try { btn.disabled = !!on; btn.textContent = on ? 'Unlocking…' : 'Unlock & Enter'; } catch {}
+  };
+  const doUnlock = async () => {
+    const pw = (input && input.value) || '';
+    if (!pw) { showErr('Enter the room password.'); return; }
+    busy(true); showErr('');
+    try {
+      await RoomPassword.deriveAndStore(roomId, pw);
+      try { if (input) input.value = ''; } catch {}
+      window.location.reload();
+    } catch (e) {
+      showErr((e && e.message) || 'Unlock failed.');
+      busy(false);
+    }
+  };
+  try { btn.addEventListener('click', doUnlock); } catch {}
+  try { input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doUnlock(); }); } catch {}
+  try { document.getElementById('pw-gate-leave')?.addEventListener('click', () => { window.location.href = 'index.html'; }); } catch {}
+  setTimeout(() => { try { input.focus(); } catch {} }, 120);
+}
+
+// ── Owner room-password controls (set / change / remove) ─────────────
+async function bindRoomPasswordUI(room, session) {
+  const item = document.getElementById('menu-room-password');
+  if (!item || !room || !session || session.role !== 'owner') return;
+  item.style.display = '';
+  const label = document.getElementById('menu-room-password-text');
+  const paint = () => {
+    try { if (label) label.textContent = room.passwordLocked ? 'Room Password: ON' : 'Room Password: OFF'; } catch {}
+    try {
+      const st = document.getElementById('password-modal-status');
+      if (st) {
+        st.textContent = room.passwordLocked
+          ? 'Status: locked — end-to-end encrypted. Links alone open nothing.'
+          : 'Status: off — anyone with the link can join.';
+        st.style.color = room.passwordLocked ? '#34d399' : 'var(--muted)';
+      }
+    } catch {}
+  };
+  paint();
+  const modal = document.getElementById('password-modal');
+  const pw1 = document.getElementById('room-password-new');
+  const pw2 = document.getElementById('room-password-confirm');
+  const perr = document.getElementById('password-modal-error');
+  const showErr = (msg) => {
+    if (!perr) return;
+    if (!msg) { perr.classList.add('hidden'); perr.textContent = ''; }
+    else { perr.classList.remove('hidden'); perr.textContent = msg; }
+  };
+  item.addEventListener('click', () => {
+    showErr('');
+    try { pw1.value = ''; pw2.value = ''; } catch {}
+    paint();
+    UI.openModal('password-modal');
+    setTimeout(() => { try { pw1.focus(); } catch {} }, 80);
+  });
+  document.getElementById('close-password-btn')?.addEventListener('click', () => UI.closeModal('password-modal'));
+  document.getElementById('cancel-password-btn')?.addEventListener('click', () => UI.closeModal('password-modal'));
+
+  document.getElementById('save-password-btn')?.addEventListener('click', async () => {
+    const a = (pw1 && pw1.value) || '';
+    const b = (pw2 && pw2.value) || '';
+    if (a.length < 4) { showErr('Password must be at least 4 characters. Use a strong one.'); return; }
+    if (a !== b) { showErr('Passwords do not match.'); return; }
+    showErr('');
+    const btn = document.getElementById('save-password-btn');
+    try { btn.disabled = true; btn.textContent = 'Locking…'; } catch {}
+    try {
+      // 1. Key this device first (so we never lock ourselves out).
+      await RoomPassword.deriveAndStore(room.id, a);
+      const hash = await RoomPassword.hashForServer(room.id, a);
+      // 2. Server records the verifier + kills pre-lock sessions.
+      const res = await RoomAPI.roomOp(room.deploymentUrl, {
+        memberId: session.memberId, sessionToken: session.sessionToken,
+        op: 'set_password', passwordHash: hash,
+      });
+      if (!res || !res.success) throw new Error((res && res.error) || 'Server refused.');
+      // 3. Rotate the old link secret — pre-lock links lose key material.
+      try { Rooms.rotateRoomSecret(room.id); } catch {}
+      try { Rooms.updateRoom(room.id, { passwordLocked: true }); } catch {}
+      try { pw1.value = ''; pw2.value = ''; } catch {}
+      UI.toast('success', 'Room Locked', 'Only the password opens it now. Reloading to enforce…');
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      try { RoomPassword.clearStored(room.id); } catch {}
+      showErr((e && e.message) || 'Could not lock the room.');
+      try { btn.disabled = false; btn.textContent = 'Lock Room'; } catch {}
+    }
+  });
+
+  document.getElementById('remove-password-btn')?.addEventListener('click', async () => {
+    showErr('');
+    const btn = document.getElementById('remove-password-btn');
+    try { btn.disabled = true; } catch {}
+    try {
+      const res = await RoomAPI.roomOp(room.deploymentUrl, {
+        memberId: session.memberId, sessionToken: session.sessionToken, op: 'remove_password',
+      });
+      if (!res || !res.success) throw new Error((res && res.error) || 'Server refused.');
+      try { Rooms.updateRoom(room.id, { passwordLocked: false }); } catch {}
+      try { RoomPassword.clearStored(room.id); } catch {}
+      try { Encryption.clearKey(); } catch {}
+      room.passwordLocked = false;
+      UI.toast('info', 'Password Removed', 'Anyone with the link can join again. Reloading…');
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      showErr((e && e.message) || 'Could not remove the password.');
+      try { btn.disabled = false; } catch {}
+    }
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Mobile device detection for theme
   if (/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800) {
@@ -31,6 +168,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } catch { urlRoomSecret = null; }
   }
+  // Legacy ?k= links still work (getInviteSecret reads them too) — but the
+  // secret must not linger in history/logs, so strip it from the address
+  // bar unconditionally right after reading.
+  try {
+    if (params.has('k')) {
+      params.delete('k');
+      const qs = params.toString();
+      history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    }
+  } catch {}
   let urlDeployment = null;
   try {
     const epParam = params.get('ep');
@@ -46,6 +193,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const thP = params.get('th');
     if (thP && typeof RoomTheme !== 'undefined') urlTheme = RoomTheme.normalize(thP);
   } catch { urlTheme = null; }
+  // Password-lock flag (?pw=1). The link carries NO key for locked rooms —
+  // the password derives everything on-device.
+  let urlPwFlag = false;
+  try { urlPwFlag = params.get('pw') === '1'; } catch { urlPwFlag = false; }
   // Room display name (?n=) + kind (?rt=saved|quick) from the invite link.
   // Guests on a fresh device have no registry row, so the link is the only
   // source of truth — without this they see a bare 'Private Room'.
@@ -225,7 +376,48 @@ document.addEventListener('DOMContentLoaded', async () => {
       room.kind = betterKind;
       try { Rooms.updateRoom(roomId, { kind: betterKind }); } catch {}
     }
+    // Adopt the link's lock flag when the registry doesn't know yet.
+    if (urlPwFlag && !room.passwordLocked) {
+      room.passwordLocked = true;
+      try { Rooms.updateRoom(roomId, { passwordLocked: true }); } catch {}
+    }
   } catch { /* non-critical */ }
+
+  // ── Room-password gate ────────────────────────────────────────
+  // Locked rooms stop here without a derived key: no history renders, no
+  // sync starts, no plaintext is touched. Unlocking reloads into this same
+  // flow with the key present in sessionStorage.
+  let pwTopicSecret = null;
+  const roomLocked = (room && room.passwordLocked === true) || urlPwFlag === true;
+  if (roomLocked) {
+    if (!room.passwordLocked) {
+      room.passwordLocked = true;
+      try { Rooms.updateRoom(roomId, { passwordLocked: true }); } catch {}
+    }
+    try {
+      if (typeof RoomPassword !== 'undefined' && RoomPassword.loadStored) {
+        const loaded = await RoomPassword.loadStored(roomId);
+        if (loaded && loaded.topicSecret) pwTopicSecret = loaded.topicSecret;
+      }
+    } catch {}
+    let badKey = false;
+    try { badKey = typeof RoomPassword !== 'undefined' && RoomPassword.wasRejected(roomId); } catch {}
+    if (!pwTopicSecret || badKey) {
+      showPwGate({ badKey, roomName: room.name || 'this room' });
+      return; // gate reloads on successful unlock
+    }
+    // A previously-rejected key is good now (we only get here with a key
+    // the host hasn't refused this session) — clear the stale flag.
+    try { if (badKey && typeof RoomPassword !== 'undefined') RoomPassword.markRejected(roomId, false); } catch {}
+  }
+
+  // Effective wire secret: password-derived topic secret wins over any
+  // link/registry secret (locked-room links carry no key at all).
+  let effSecret = '';
+  try {
+    effSecret = pwTopicSecret
+      || urlRoomSecret || (session && session.roomSecret) || (room && room.secret) || '';
+  } catch { effSecret = ''; }
   // Theme: URL (?th=) wins, then session/registry; apply wallpaper now.
   try {
     const th = (typeof RoomTheme !== 'undefined')
@@ -281,6 +473,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Init chat module ──────────────────────────────────────────
   Chat.init(room, session);
+  // Owner password controls (menu item + modal). No-op for guests.
+  try { bindRoomPasswordUI(room, session); } catch {}
+  // "End-to-end encrypted" badge — ONLY when the room is password-locked
+  // AND this device holds the derived key. Anything else showing it
+  // would be a lie (unlocked rooms are plaintext on the relay).
+  try {
+    const badge = document.getElementById('e2ee-badge');
+    if (badge) {
+      const e2ee = roomLocked === true
+        && typeof Encryption !== 'undefined' && Encryption.isActive
+        && Encryption.isActive();
+      badge.classList.toggle('hidden', !e2ee);
+    }
+  } catch {}
 
   // ── Load cached messages immediately (IDB + localStorage) ─────
   try {
@@ -408,9 +614,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // URL fragment so copying the address bar shares a WORKING link.
   // Fragments never reach servers/logs. Fixes "guest sees only placeholders"
   // caused by sharing the bare room.html?r= URL.
+  // Skipped for password-locked rooms (their links carry no key by design).
   try {
     const sec = session.roomSecret || room.secret || urlRoomSecret;
-    if (sec && typeof InstantSecurity !== 'undefined' && !/[#&]k=/.test(window.location.hash || '')) {
+    if (sec && !roomLocked && typeof InstantSecurity !== 'undefined' && !/[#&]k=/.test(window.location.hash || '')) {
       const frag = (window.location.hash ? window.location.hash + '&' : '#') + 'k=' + InstantSecurity.b64urlEncode(sec);
       history.replaceState(null, '', window.location.pathname + window.location.search + frag);
     }
@@ -444,8 +651,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (note) {
           const onHttp = window.location.protocol === 'http:';
           note.innerHTML = onHttp
-            ? '🔒 <strong>Locked messages?</strong> This page is on insecure <strong>http://</strong> — browsers disable decryption here. Open the <strong>https://</strong> link of this site (e.g. GitHub Pages) in Chrome instead.'
-            : '🔒 <strong>Locked messages?</strong> This browser (in-app viewer?) cannot decrypt messages. Please open this room in <strong>Chrome</strong> and paste the full invite link below.';
+            ? PW_SHIELD_SVG + ' <strong>Locked messages?</strong> This page is on insecure <strong>http://</strong> — browsers disable decryption here. Open the <strong>https://</strong> link of this site (e.g. GitHub Pages) in Chrome instead.'
+            : PW_SHIELD_SVG + ' <strong>Locked messages?</strong> This browser (in-app viewer?) cannot decrypt messages. Please open this room in <strong>Chrome</strong> and paste the full invite link below.';
         }
       }
       keyBanner.classList.toggle('hidden', !needsKey);
@@ -556,7 +763,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof P2PSync !== 'undefined') {
     P2PSync.init({
       roomId:      room.id,
-      roomSecret: session.roomSecret || room.secret || urlRoomSecret || null,
+      roomSecret: effSecret || null,
+      requireProof: roomLocked === true,
+      onJoinRejected: (reason) => {
+        // Host refused us (wrong/no room password). Mark it so the gate
+        // explains instead of looping, then reload into the gate.
+        try { RoomPassword.markRejected(room.id, true); } catch {}
+        window.location.reload();
+      },
       isHost:      session.role === 'owner',
       memberId:    session.memberId,
       displayName: session.displayName,
@@ -596,7 +810,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof NtfySync !== 'undefined') {
     NtfySync.init({
       roomId: room.id,
-      roomSecret: session.roomSecret || room.secret || urlRoomSecret || null,
+      roomSecret: effSecret || null,
+      privateOnly: roomLocked === true,
       onEvent: ({ kind, msg, member, theme }) => {
         // Room-wide wallpaper change from another device (no echo loop:
         // setTheme with broadcast=false only applies + persists).

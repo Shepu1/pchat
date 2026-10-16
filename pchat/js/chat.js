@@ -722,14 +722,7 @@ const Chat = (() => {
       copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
       copyBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        let textToCopy = typeof msg.message === 'string' ? msg.message : '';
-        if (textToCopy.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(textToCopy);
-            textToCopy = parsed.text || parsed.fileName || textToCopy;
-          } catch {}
-        }
-        await UI.copyText(textToCopy);
+        await UI.copyText(await _copyableText(msg.message));
         copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
         setTimeout(() => {
           copyBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
@@ -1053,6 +1046,26 @@ const Chat = (() => {
     return escapeHtml(emoji);
   }
 
+  // ── Copy helper: always copy READABLE text ───────────────────
+  // Raw msg.message may be enc: ciphertext (encrypted rooms) or a JSON
+  // attachment wrapper. Copying it raw pastes gibberish — decrypt first,
+  // then unwrap attachments.
+  async function _copyableText(message) {
+    let t = typeof message === 'string' ? message : '';
+    if (t.startsWith('enc:')) {
+      try {
+        if (typeof Encryption !== 'undefined') t = await Encryption.decrypt(t);
+      } catch {}
+    }
+    if (t.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(t);
+        t = parsed.text || parsed.fileName || t;
+      } catch {}
+    }
+    return t;
+  }
+
   // ── Input handling ────────────────────────────────────────────
   function _bindInput() {
     const charCounter = document.getElementById('chat-char-counter');
@@ -1157,8 +1170,48 @@ const Chat = (() => {
   }
 
   // ── Send message ──────────────────────────────────────────────
+  // Flood guard: max 1 send/sec per device (humans never notice, scripts die).
+  let _lastSendAt = 0;
+  // Plain http:// (non-localhost) has no WebCrypto: nothing can be encrypted
+  // and the relay sees plaintext. The first send of each tab asks for
+  // EXPLICIT consent (LAN testing keeps working); the ack lives in
+  // sessionStorage, so every fresh tab warns again. Receiving always works.
+  // The evil being killed is *silent* plaintext — never the testing itself.
+  const INSECURE_ACK_KEY = 'shepu_insecure_ack';
+  function _insecureHttp() {
+    try {
+      const proto = window.location.protocol || '';
+      const host = window.location.hostname || '';
+      const local = host === 'localhost' || host === '127.0.0.1' || host === '' || proto === 'file:';
+      return proto === 'http:' && !local;
+    } catch { return false; }
+  }
+  function _insecureAcked() {
+    try { return sessionStorage.getItem(INSECURE_ACK_KEY) === '1'; }
+    catch { return false; }
+  }
+
   async function sendMessage() {
     if (_recorder) { await _stopVoiceRecording(true); return; }
+    if (_insecureHttp() && !_insecureAcked()) {
+      let go = false;
+      try {
+        go = await UI.confirmDialog({
+          title: 'Insecure Connection',
+          message: 'This page is on plain http:// — encryption is impossible here, so messages travel as PLAINTEXT. Fine for LAN testing, unsafe for real chats. For real use, open the https:// link (GitHub Pages / Vercel). Send anyway?',
+          confirmText: 'Send Anyway',
+          danger: true,
+        });
+      } catch { go = false; }
+      if (!go) return;
+      try { sessionStorage.setItem(INSECURE_ACK_KEY, '1'); } catch {}
+    }
+    const nowSend = Date.now();
+    if (nowSend - _lastSendAt < 1000) {
+      UI.toast('info', 'Too Fast', 'Wait a second before sending again.');
+      return;
+    }
+    _lastSendAt = nowSend;
     const text = input.value.trim();
     const hasAttachment = !!_pendingAttachment;
     if ((!text && !hasAttachment) || text.length > CONFIG.MAX_MESSAGE_LENGTH) return;
@@ -1392,14 +1445,7 @@ const Chat = (() => {
 
     document.getElementById('ctx-copy').addEventListener('click', async () => {
       if (_contextTarget?.message) {
-        let textToCopy = typeof _contextTarget.message === 'string' ? _contextTarget.message : '';
-        if (textToCopy.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(textToCopy);
-            textToCopy = parsed.text || parsed.fileName || textToCopy;
-          } catch {}
-        }
-        await UI.copyText(textToCopy);
+        await UI.copyText(await _copyableText(_contextTarget.message));
         UI.toast('success', 'Copied', 'Message text copied.');
       }
       closeContextMenu();
@@ -1606,6 +1652,12 @@ const Chat = (() => {
 
     document.getElementById('menu-members')?.addEventListener('click', () => {
       openSidebar();
+    });
+
+    // Mobile overflow entry: proxies the header button hidden on small
+    // screens (see responsive.css) so no function is lost.
+    document.getElementById('menu-encryption')?.addEventListener('click', () => {
+      document.getElementById('e2ee-toggle-btn')?.click();
     });
 
     document.getElementById('menu-owner-panel')?.addEventListener('click', () => {
@@ -1926,6 +1978,7 @@ const Chat = (() => {
     if (input) input.disabled = true;
     if (sendBtn) sendBtn.disabled = true;
   }
+
 // ── Attachments Handling ──────────────────────────────────────
   // ── Shared attachment preview (file picker + special emoji) ───
   // Shows the preview bar so the user can add a caption and press Send.
@@ -2689,7 +2742,7 @@ const Chat = (() => {
         }
       } catch {}
     }
-    if (typeof c === 'string' && c.startsWith('enc:')) return '🔒 Encrypted message';
+    if (typeof c === 'string' && c.startsWith('enc:')) return 'Encrypted message (locked)';
     return (typeof c === 'string' ? c : '').substring(0, 80);
   }
 
@@ -2920,6 +2973,36 @@ const Chat = (() => {
     } catch {}
   }
 
+  // ── Emoji-bubble repaint (post-decrypt sizing) ────────────────
+  // Bubble size is decided at build time from msg.message — but encrypted
+  // rooms store enc: ciphertext, so after a refresh every message builds as
+  // a plain bubble and emojis stay text-sized even after decrypting.
+  // Recompute from the PLAINTEXT on every text render: idempotent, so the
+  // initial build, async decrypts, edits and key-arrivals all converge.
+  const _EMOJI_SIZE_CLASSES = ['msg-bubble-emoji', 'emoji-xl', 'emoji-lg', 'emoji-md', 'emoji-sm', 'emoji-xs'];
+  function _refreshEmojiBubble(container, plainText) {
+    let bubble = null;
+    try { bubble = container && container.closest ? container.closest('.msg-bubble') : null; } catch {}
+    if (!bubble) return;
+    let only = false, count = 0;
+    try {
+      only = !!(plainText && _isEmojiOnly(plainText));
+      if (only) {
+        count = _countEmojis(plainText);
+        try {
+          if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.countShortcodes) {
+            count += SpecialEmoji.countShortcodes(plainText) || 0;
+          }
+        } catch {}
+        if (!(count > 0)) count = Math.max(1, Math.ceil(String(plainText).length / 2));
+      }
+    } catch { only = false; }
+    _EMOJI_SIZE_CLASSES.forEach(c => bubble.classList.remove(c));
+    if (!only) return;
+    bubble.classList.add('msg-bubble-emoji');
+    bubble.classList.add(count === 1 ? 'emoji-xl' : count <= 3 ? 'emoji-lg' : count <= 6 ? 'emoji-md' : count <= 12 ? 'emoji-sm' : 'emoji-xs');
+  }
+
   function _renderBubbleContent(container, content, messageType, msgId) {
     if (!container) return;
     try {
@@ -2972,6 +3055,14 @@ const Chat = (() => {
     } catch (e) { /* fallback to plain text */ }
     container.innerHTML = _renderText(content);
     _paintMediaBubble(container);
+    // Plaintext (never enc:/JSON) → repaint bubble sizing. Covers async
+    // decrypts, edits and late key arrivals uniformly.
+    try {
+      if ((messageType === 'text' || !messageType) && typeof content === 'string'
+        && !content.startsWith('enc:') && !content.startsWith('{')) {
+        _refreshEmojiBubble(container, content);
+      }
+    } catch {}
   }
 
 
