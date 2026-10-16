@@ -1574,15 +1574,27 @@
 
         const handleJoin = (val) => {
           if (!val) return;
-          if (val.includes('join.html?')) {
-            window.location.href = val;
-          } else {
-            const cleanId = val.replace(/[^a-zA-Z0-9]/g, '');
-            if (cleanId.length >= 6) {
-              window.location.href = `join.html?r=${cleanId}`;
-            } else {
-              UI.toast('error', 'Invalid code', 'Please enter a valid room code or link.');
+          // Full links (invite OR room URLs) go through untouched so ?k= / #k=
+          // / ?th= / ?ep= survive. room.html links are rewritten to join.html
+          // with params intact — never alnum-stripped (that created GHOST
+          // rooms: page opens, nobody there, zero errors).
+          if (val.includes('join.html?') || /room\.html\?/.test(val)) {
+            try {
+              const u = new URL(val, window.location.href);
+              if (/room\.html$/.test(u.pathname)) {
+                u.pathname = u.pathname.replace(/room\.html$/, 'join.html');
+              }
+              window.location.href = u.toString();
+            } catch {
+              window.location.href = val;
             }
+            return;
+          }
+          const cleanId = val.replace(/[^a-zA-Z0-9]/g, '');
+          if (cleanId.length >= 6) {
+            window.location.href = `join.html?r=${cleanId}`;
+          } else {
+            UI.toast('error', 'Invalid code', 'Please enter a valid room code or link.');
           }
         };
 
