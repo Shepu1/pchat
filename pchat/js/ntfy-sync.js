@@ -82,23 +82,12 @@ const NtfySync = (() => {
         const url = `${NTFY_HOST}/${topic}/json?poll=1&since=${encodeURIComponent(since)}`;
         const res = await fetch(url, { signal: ctrl.signal, headers: { 'Accept': 'application/x-ndjson' } });
         clearTimeout(timeout);
-        if (!res.ok || !res.body) continue;
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) {
-            if (buffer.trim()) _handleLine(buffer.trim(), topic);
-            break;
-          }
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+        const text = await res.text();
+        if (text) {
+          const lines = text.split('\n');
           for (const line of lines) {
             if (!line.trim()) continue;
-            _handleLine(line, topic);
+            _handleLine(line.trim(), topic);
           }
         }
       } catch (err) {
@@ -119,8 +108,9 @@ const NtfySync = (() => {
     try { evt = JSON.parse(line); } catch { return; }
 
     // Advance cursor ONLY for the topic that actually received this event
-    if (evt.time && forTopic) {
-      _cursors[forTopic] = evt.time;
+    if (forTopic) {
+      if (evt.id) _cursors[forTopic] = evt.id;
+      else if (evt.time) _cursors[forTopic] = evt.time;
     }
 
     // ntfy keep-alives and non-message events carry no payload we need.
