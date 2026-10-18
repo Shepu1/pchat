@@ -23,6 +23,7 @@ const CallManager = (() => {
   let _isMinimized = false;
   let _callTimerInterval = null;
   let _callStartTime = 0;
+  let _currentCallId = null;
   let _incomingCallData = null;
   let _pendingMediaConnection = null;
 
@@ -396,8 +397,66 @@ const CallManager = (() => {
     }
   }
 
+  // ── Absolute Media Tracks Cleanup (Ensures Camera & Mic HW Turn Off) ──
+  function _stopMediaTracks() {
+    if (_localStream) {
+      try {
+        _localStream.getTracks().forEach(t => {
+          try {
+            t.enabled = false;
+            t.stop();
+          } catch {}
+        });
+      } catch {}
+      _localStream = null;
+    }
+    if (_screenStream) {
+      try {
+        _screenStream.getTracks().forEach(t => {
+          try {
+            t.enabled = false;
+            t.stop();
+          } catch {}
+        });
+      } catch {}
+      _screenStream = null;
+    }
+    if (_remoteStream) {
+      try {
+        _remoteStream.getTracks().forEach(t => {
+          try {
+            t.enabled = false;
+            t.stop();
+          } catch {}
+        });
+      } catch {}
+      _remoteStream = null;
+    }
+
+    const localVideo = document.getElementById('call-local-video');
+    if (localVideo) {
+      try { localVideo.pause(); } catch {}
+      localVideo.srcObject = null;
+    }
+    const remoteVideo = document.getElementById('call-remote-video');
+    if (remoteVideo) {
+      try { remoteVideo.pause(); } catch {}
+      remoteVideo.srcObject = null;
+    }
+    const remoteAudio = document.getElementById('call-remote-audio');
+    if (remoteAudio) {
+      try { remoteAudio.pause(); } catch {}
+      remoteAudio.srcObject = null;
+    }
+  }
+
   // ── Start Outgoing Call ─────────────────────────────────────────
   async function startCall(type = 'audio') {
+    if (_callState !== 'idle') {
+      console.warn('[CallManager] Already in call or calling');
+      return;
+    }
+
     _callType = type;
     const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
     const params = new URLSearchParams(location.search);
@@ -408,8 +467,9 @@ const CallManager = (() => {
     _isMuted = false;
     _isVideoOff = false;
     _isScreenSharing = false;
+    _currentCallId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
 
-    // 1. Immediately show the stylish call screen & start outgoing ring
+    // 1. Immediately show call UI & start outgoing ringtone
     _ensureUIElements();
     _showCallOverlay();
 
@@ -454,7 +514,6 @@ const CallManager = (() => {
     }
 
     // 3. Broadcast Call Signal to Peer(s)
-    const callId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
     let callerPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';
     if (!callerPeerId && session?.role === 'owner') {
       const cleanId = String(roomId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
@@ -463,12 +522,14 @@ const CallManager = (() => {
 
     const invitePayload = {
       action: 'invite',
-      callId,
+      callId: _currentCallId,
       roomId,
-      callerId: session?.memberId || 'me',
+      callerId: session?.memberId || 'user',
       callerName: session?.displayName || 'Caller',
       callerPicture: session?.picture || '',
       callerPeerId,
+      fromId: session?.memberId || 'user',
+      fromPeerId: callerPeerId,
       callType: _callType,
       timestamp: Date.now()
     };
@@ -477,37 +538,26 @@ const CallManager = (() => {
       P2PSync.broadcastCallSignal(invitePayload);
     }
 
-    // 4. Initiate PeerJS Media Call to peer(s) if localStream is available
+    // 4. Also call direct peer if guest calling host
     const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
-    if (peer && !peer.destroyed && _localStream) {
-      if (session?.role !== 'owner') {
-        const cleanId = String(roomId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
-        const hostPeerId = `pchat_h_${cleanId}`;
-        try {
-          const mediaConn = peer.call(hostPeerId, _localStream, { metadata: { callType: _callType, callerName: session?.displayName } });
-          _setupMediaConnection(mediaConn);
-        } catch (e) {
-          console.warn('[CallManager] Direct peer call error:', e);
-        }
-      } else if (typeof P2PSync !== 'undefined' && P2PSync.getConnectedPeerIds) {
-        const guestPeerIds = P2PSync.getConnectedPeerIds();
-        guestPeerIds.forEach(gId => {
-          try {
-            const mediaConn = peer.call(gId, _localStream, { metadata: { callType: _callType, callerName: session?.displayName } });
-            _setupMediaConnection(mediaConn);
-          } catch (e) {
-            console.warn('[CallManager] Host call to guest error:', e);
-          }
-        });
+    if (peer && !peer.destroyed && _localStream && session?.role !== 'owner') {
+      const cleanId = String(roomId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
+      const hostPeerId = `pchat_h_${cleanId}`;
+      try {
+        const mediaConn = peer.call(hostPeerId, _localStream, { metadata: { callType: _callType, callerName: session?.displayName, callId: _currentCallId } });
+        _setupMediaConnection(mediaConn);
+      } catch (e) {
+        console.warn('[CallManager] Direct call error:', e);
       }
     }
 
     // 45s Timeout for No Answer
+    const thisCallId = _currentCallId;
     setTimeout(() => {
-      if (_callState === 'calling') {
+      if (_callState === 'calling' && _currentCallId === thisCallId) {
         const st = document.getElementById('call-status-subtitle');
         if (st) st.textContent = 'No Answer';
-        setTimeout(() => endCall(), 2000);
+        setTimeout(() => endCall(true), 2000);
       }
     }, 45000);
   }
@@ -515,20 +565,36 @@ const CallManager = (() => {
   // ── Handle Incoming Signal ──────────────────────────────────────
   function handleIncomingSignal(payload) {
     if (!payload || !payload.action) return;
-    const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
-    const myId = session?.memberId;
 
-    if (payload.callerId === myId) return; // ignore our own signals
+    // Discard stale signals older than 40 seconds (avoids replaying cached Ntfy history)
+    if (payload.timestamp && (Date.now() - payload.timestamp > 40000)) {
+      return;
+    }
+
+    const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
+    const myMemberId = session?.memberId;
+    const myPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';
+
+    // Ignore self echoes (from NtfySync relay)
+    if (myMemberId && (payload.fromId === myMemberId || payload.callerId === myMemberId)) return;
+    if (myPeerId && (payload.fromPeerId === myPeerId || payload.callerPeerId === myPeerId)) return;
 
     if (payload.action === 'invite') {
       if (_callState !== 'idle') {
-        // Send busy signal back
+        // Send busy signal back to caller
         if (typeof P2PSync !== 'undefined') {
-          P2PSync.broadcastCallSignal({ action: 'busy', callId: payload.callId, fromId: myId });
+          P2PSync.broadcastCallSignal({
+            action: 'busy',
+            callId: payload.callId,
+            fromId: myMemberId || 'user',
+            fromPeerId: myPeerId,
+            timestamp: Date.now()
+          });
         }
         return;
       }
 
+      _currentCallId = payload.callId;
       _incomingCallData = payload;
       _callType = payload.callType || 'audio';
       _callState = 'incoming';
@@ -537,7 +603,7 @@ const CallManager = (() => {
       _showIncomingToast(payload);
       _playIncomingRing();
     } else if (payload.action === 'accept') {
-      if (_callState === 'calling') {
+      if (_callState === 'calling' && (!_currentCallId || payload.callId === _currentCallId)) {
         _stopSounds();
         _playConnectedChime();
         _callState = 'connected';
@@ -545,33 +611,45 @@ const CallManager = (() => {
         if (st) st.textContent = 'Connected';
         _startCallTimer();
 
-        if (_pendingMediaConnection && _localStream) {
+        // Connect media call to accepter if not already connected
+        const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
+        const targetPeerId = payload.accepterPeerId || payload.fromPeerId;
+        if (peer && !peer.destroyed && _localStream && targetPeerId && !_activeCall) {
+          try {
+            const mediaConn = peer.call(targetPeerId, _localStream, { metadata: { callType: _callType, callerName: session?.displayName, callId: _currentCallId } });
+            _setupMediaConnection(mediaConn);
+          } catch (e) {
+            console.warn('[CallManager] Call to accepter error:', e);
+          }
+        } else if (_pendingMediaConnection && _localStream) {
           try {
             _pendingMediaConnection.answer(_localStream);
             _setupMediaConnection(_pendingMediaConnection);
           } catch (e) {
-            console.warn('[CallManager] Error answering pending call on accept:', e);
+            console.warn('[CallManager] Answer pending call error:', e);
           }
           _pendingMediaConnection = null;
         }
       }
     } else if (payload.action === 'decline') {
-      if (_callState === 'calling') {
-        document.getElementById('call-status-subtitle').textContent = 'Call Declined';
+      if ((_callState === 'calling' || _callState === 'connected') && (!_currentCallId || payload.callId === _currentCallId)) {
+        const st = document.getElementById('call-status-subtitle');
+        if (st) st.textContent = 'Call Declined';
         _stopSounds();
         _playEndChime();
-        setTimeout(() => endCall(), 1600);
+        setTimeout(() => endCall(false), 1600);
       }
     } else if (payload.action === 'end') {
-      if (_callState !== 'idle') {
+      if (_callState !== 'idle' && (!_currentCallId || !payload.callId || payload.callId === _currentCallId)) {
         endCall(false);
       }
     } else if (payload.action === 'busy') {
-      if (_callState === 'calling') {
-        document.getElementById('call-status-subtitle').textContent = 'User is Busy';
+      if (_callState === 'calling' && (!_currentCallId || payload.callId === _currentCallId)) {
+        const st = document.getElementById('call-status-subtitle');
+        if (st) st.textContent = 'User is Busy';
         _stopSounds();
         _playEndChime();
-        setTimeout(() => endCall(), 2000);
+        setTimeout(() => endCall(false), 2000);
       }
     }
   }
@@ -607,7 +685,7 @@ const CallManager = (() => {
 
     _showCallOverlay();
     document.getElementById('call-peer-name').textContent = _incomingCallData.callerName || 'Room Member';
-    document.getElementById('call-status-subtitle').textContent = 'Connected';
+    document.getElementById('call-status-subtitle').textContent = 'Connecting…';
 
     const localVideo = document.getElementById('call-local-video');
     if (localVideo && _callType === 'video') {
@@ -617,27 +695,36 @@ const CallManager = (() => {
     _playConnectedChime();
     _startCallTimer();
 
-    // Broadcast accept signal
     const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
+    const myPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';
+
+    // Broadcast accept signal with accepterPeerId
     if (typeof P2PSync !== 'undefined' && P2PSync.broadcastCallSignal) {
       P2PSync.broadcastCallSignal({
         action: 'accept',
         callId: _incomingCallData.callId,
-        fromId: session?.memberId || 'guest'
+        fromId: session?.memberId || 'guest',
+        fromPeerId: myPeerId,
+        accepterPeerId: myPeerId,
+        timestamp: Date.now()
       });
     }
 
-    // Answer incoming PeerJS media call if received
+    // If incoming PeerJS media call is already received, answer it
     if (_pendingMediaConnection) {
-      _pendingMediaConnection.answer(_localStream);
-      _setupMediaConnection(_pendingMediaConnection);
+      try {
+        _pendingMediaConnection.answer(_localStream);
+        _setupMediaConnection(_pendingMediaConnection);
+      } catch (e) {
+        console.warn('[CallManager] Pending call answer error:', e);
+      }
       _pendingMediaConnection = null;
     } else if (_incomingCallData.callerPeerId) {
-      // Connect call directly to caller's peer ID
+      // Connect directly to caller
       const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
       if (peer && !peer.destroyed) {
         try {
-          const mediaConn = peer.call(_incomingCallData.callerPeerId, _localStream, { metadata: { callType: _callType } });
+          const mediaConn = peer.call(_incomingCallData.callerPeerId, _localStream, { metadata: { callType: _callType, callId: _incomingCallData.callId } });
           _setupMediaConnection(mediaConn);
         } catch (e) {
           console.warn('[CallManager] Answer call error:', e);
@@ -653,11 +740,14 @@ const CallManager = (() => {
 
     if (_incomingCallData) {
       const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
+      const myPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';
       if (typeof P2PSync !== 'undefined' && P2PSync.broadcastCallSignal) {
         P2PSync.broadcastCallSignal({
           action: 'decline',
           callId: _incomingCallData.callId,
-          fromId: session?.memberId || 'guest'
+          fromId: session?.memberId || 'guest',
+          fromPeerId: myPeerId,
+          timestamp: Date.now()
         });
       }
       _incomingCallData = null;
@@ -668,12 +758,17 @@ const CallManager = (() => {
       _pendingMediaConnection = null;
     }
 
+    _stopMediaTracks();
     _callState = 'idle';
+    _currentCallId = null;
   }
 
   // ── Setup MediaConnection Listeners ─────────────────────────────
   function _setupMediaConnection(conn) {
     if (!conn) return;
+    if (_activeCall && _activeCall !== conn) {
+      try { _activeCall.close(); } catch {}
+    }
     _activeCall = conn;
 
     conn.on('stream', (remoteStream) => {
@@ -683,7 +778,8 @@ const CallManager = (() => {
       _stopSounds();
       _playConnectedChime();
       _callState = 'connected';
-      document.getElementById('call-status-subtitle').textContent = 'Connected';
+      const st = document.getElementById('call-status-subtitle');
+      if (st) st.textContent = 'Connected';
       _startCallTimer();
 
       const remoteAudio = document.getElementById('call-remote-audio');
@@ -698,13 +794,16 @@ const CallManager = (() => {
         remoteVideo.play().catch(() => {});
       }
 
-      // Attach audio analyzer for voice visualizer
       _setupAudioVisualizer(remoteStream);
     });
 
     conn.on('close', () => {
       console.log('[CallManager] MediaConnection closed.');
-      endCall(false);
+      // ONLY end call if it was ALREADY connected AND it is this active connection!
+      // This prevents ringing calls from closing prematurely!
+      if (_callState === 'connected' && _activeCall === conn) {
+        endCall(false);
+      }
     });
 
     conn.on('error', (err) => {
@@ -719,36 +818,39 @@ const CallManager = (() => {
     _stopCallTimer();
     _stopVisualizer();
 
-    if (sendSignal) {
+    if (sendSignal && _currentCallId) {
       const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
+      const myPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';
       if (typeof P2PSync !== 'undefined' && P2PSync.broadcastCallSignal) {
         P2PSync.broadcastCallSignal({
           action: 'end',
-          fromId: session?.memberId || 'guest'
+          callId: _currentCallId,
+          fromId: session?.memberId || 'guest',
+          fromPeerId: myPeerId,
+          timestamp: Date.now()
         });
       }
     }
 
-    // Stop local tracks
-    if (_localStream) {
-      _localStream.getTracks().forEach(t => { try { t.stop(); } catch {} });
-      _localStream = null;
-    }
-    if (_screenStream) {
-      _screenStream.getTracks().forEach(t => { try { t.stop(); } catch {} });
-      _screenStream = null;
-    }
+    _stopMediaTracks();
 
     // Close PeerJS call
     if (_activeCall) {
       try { _activeCall.close(); } catch {}
       _activeCall = null;
     }
-    _pendingMediaConnection = null;
+    if (_pendingMediaConnection) {
+      try { _pendingMediaConnection.close(); } catch {}
+      _pendingMediaConnection = null;
+    }
 
     _callState = 'idle';
+    _currentCallId = null;
     _incomingCallData = null;
     _isMinimized = false;
+    _callType = 'audio';
+    _isMuted = false;
+    _isVideoOff = false;
 
     _hideCallOverlay();
     _hideIncomingToast();
@@ -937,9 +1039,9 @@ const CallManager = (() => {
 
   // ── Hook into PeerJS Incoming Calls ─────────────────────────────
   function onIncomingMediaCall(mediaConn) {
-    console.log('[CallManager] Handling incoming PeerJS MediaConnection:', mediaConn.peer);
-    if ((_callState === 'connected' || _callState === 'calling') && _localStream) {
-      // If we already accepted the call or are in outgoing calling state, answer immediately
+    console.log('[CallManager] Handling incoming PeerJS MediaConnection from:', mediaConn.peer);
+    if (_callState === 'connected' && _localStream) {
+      // If we already accepted the call, answer immediately
       try {
         mediaConn.answer(_localStream);
         _setupMediaConnection(mediaConn);
@@ -982,6 +1084,9 @@ const CallManager = (() => {
       const urlParams = new URLSearchParams(window.location.search);
       const autoCall = urlParams.get('autocall');
       if (autoCall === 'audio' || autoCall === 'video') {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('autocall');
+        window.history.replaceState({}, document.title, cleanUrl.toString());
         setTimeout(() => startCall(autoCall), 600);
       }
     } catch {}
@@ -991,6 +1096,23 @@ const CallManager = (() => {
       const preload = new Audio(CALL_SOUND_SRC);
       preload.preload = 'auto';
     } catch {}
+
+    // Clean up all hardware media tracks immediately if page is hidden/unloaded
+    window.addEventListener('beforeunload', () => {
+      if (_callState !== 'idle') {
+        endCall(true);
+      } else {
+        _stopMediaTracks();
+      }
+    });
+
+    window.addEventListener('pagehide', () => {
+      if (_callState !== 'idle') {
+        endCall(true);
+      } else {
+        _stopMediaTracks();
+      }
+    });
   }
 
   return {
