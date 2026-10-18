@@ -812,7 +812,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       roomId: room.id,
       roomSecret: effSecret || null,
       privateOnly: roomLocked === true,
-      onEvent: ({ kind, msg, member, theme }) => {
+      onEvent: ({ kind, msg, member, theme, payload }) => {
+        if (kind === 'call_signal' && payload) {
+          if (typeof CallManager !== 'undefined' && CallManager.handleIncomingSignal) {
+            CallManager.handleIncomingSignal(payload);
+          }
+          return;
+        }
         // Room-wide wallpaper change from another device (no echo loop:
         // setTheme with broadcast=false only applies + persists).
         if (kind === 'theme' && theme) {

@@ -141,6 +141,8 @@ const NtfySync = (() => {
       if (_onEvent) _onEvent({ kind: 'presence', member: payload.member });
     } else if (payload.type === 'join' && payload.memberId) {
       if (_onEvent) _onEvent({ kind: 'join', member: payload });
+    } else if (payload.type === 'call_signal' && payload.payload) {
+      if (_onEvent) _onEvent({ kind: 'call_signal', payload: payload.payload });
     }
   }
 
@@ -148,11 +150,12 @@ const NtfySync = (() => {
   async function publish(payload) {
     if (!_topics.length) return;
     try {
+      const body = (typeof payload === 'string') ? payload : JSON.stringify(payload);
       await Promise.all(_topics.map(t =>
         fetch(`${NTFY_HOST}/${t}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: body,
         }).catch(() => {})
       ));
     } catch { /* best-effort */ }

@@ -1907,11 +1907,27 @@ const Chat = (() => {
             <span>${escapeHtml(lastSeenText)}</span>
           </div>
         </div>
+        ${!isMe && m.online ? `
+          <div class="member-call-actions">
+            <button class="member-call-btn audio-btn" title="Voice Call ${escapeHtml(name)}" aria-label="Voice Call">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            </button>
+            <button class="member-call-btn video video-btn" title="Video Call ${escapeHtml(name)}" aria-label="Video Call">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            </button>
+          </div>
+        ` : ''}
         ${_session && _session.role === 'owner' && m.memberId !== _session.memberId ? `
           <button class="btn btn-icon btn-ghost member-kick-btn" data-member-id="${escapeHtml(m.memberId)}" title="Remove" aria-label="Remove member"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
         ` : ''}
       `;
 
+      el.querySelector('.member-call-btn.audio-btn')?.addEventListener('click', () => {
+        if (window.CallManager) CallManager.startCall('audio');
+      });
+      el.querySelector('.member-call-btn.video-btn')?.addEventListener('click', () => {
+        if (window.CallManager) CallManager.startCall('video');
+      });
       el.querySelector('.member-kick-btn')?.addEventListener('click', () => ownerKickMember(m.memberId, name));
       list.appendChild(el);
     });

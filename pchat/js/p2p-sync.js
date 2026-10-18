@@ -18,6 +18,8 @@ const P2PSync = (() => {
   let _onMembersUpdateCb = null;
   let _onTypingCb = null;
   let _onJoinRejectedCb = null;
+  let _onCallSignalCb = null;
+  let _onIncomingMediaCallCb = null;
   let _requireProof = false; // password-locked rooms: no proof → rejected
   let _reconnectTimer = null;
   let _joinRejected = false; // guest: stop retrying after an explicit reject
@@ -74,6 +76,31 @@ const P2PSync = (() => {
     }
   }
 
+  // ── ICE Servers (STUN + TURN for NAT/Firewall traversal) ─────
+  function _getIceServers() {
+    return [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelay',
+        credential: 'openrelay'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelay',
+        credential: 'openrelay'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelay',
+        credential: 'openrelay'
+      }
+    ];
+  }
+
   // ── Host Peer Initialization ──────────────────────────────────
   function _initHost() {
     const hostId = getHostPeerId(_roomId);
@@ -83,11 +110,7 @@ const P2PSync = (() => {
       _peer = new Peer(hostId, {
         debug: 1,
         config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-          ]
+          iceServers: _getIceServers()
         }
       });
     } catch (err) {
@@ -104,12 +127,19 @@ const P2PSync = (() => {
       _setupHostConnection(conn);
     });
 
+    _peer.on('call', (mediaConn) => {
+      console.log('[P2PSync] Incoming media call on host from:', mediaConn.peer);
+      if (_onIncomingMediaCallCb) _onIncomingMediaCallCb(mediaConn);
+    });
+
     _peer.on('error', (err) => {
       console.warn('[P2PSync] Host Peer error:', err && err.type, err && err.message);
-      // If host ID is temporarily taken (e.g. reload before timeout), retry with short backoff
+      // If host ID is temporarily taken (e.g. reload before timeout), destroy dead peer and retry
       if (err && err.type === 'unavailable-id') {
+        try { if (_peer && !_peer.destroyed) _peer.destroy(); } catch {}
+        _peer = null;
         setTimeout(() => {
-          if (_isHost && (!_peer || _peer.destroyed)) _initHost();
+          if (_isHost) _initHost();
         }, 3000);
       }
     });
@@ -182,20 +212,19 @@ const P2PSync = (() => {
           const ok = (typeof InstantSecurity !== 'undefined')
             ? InstantSecurity.verifyJoinProof(_roomSecret, midProbe, proof)
             : true;
-          if (!ok) {
-            if (_requireProof) { _rejectGuest(conn, 'wrong_password'); return; }
-            try { conn.close(); } catch {} return;
+          if (!ok && _requireProof) {
+            _rejectGuest(conn, 'wrong_password');
+            return;
           }
         } catch {
-          if (_requireProof) { _rejectGuest(conn, 'wrong_password'); }
-          return;
+          if (_requireProof) { _rejectGuest(conn, 'wrong_password'); return; }
         }
       } else if (_requireProof) {
         // No proof at all — password room: reject with feedback, don't hang.
         _rejectGuest(conn, 'password_required');
         return;
       }
-      // no proof → legacy client: allow (messages are E2EE anyway)
+      // no proof or proof mismatch in unpassworded room → allow (messages are E2EE anyway)
     }
 
     if (data.type === 'join') {
@@ -277,6 +306,18 @@ const P2PSync = (() => {
         _onTypingCb({ memberId: data.memberId, displayName: data.displayName, isTyping: data.isTyping });
       }
     }
+
+    if (data.type === 'call_signal' && data.payload) {
+      // Relay call signal to all other connected guests
+      _connections.forEach((c, peerId) => {
+        if (peerId !== conn.peer && c.open) {
+          try { c.send(data); } catch {}
+        }
+      });
+      if (_onCallSignalCb) {
+        _onCallSignalCb(data.payload);
+      }
+    }
   }
 
   // ── Guest Peer Initialization ─────────────────────────────────
@@ -288,11 +329,7 @@ const P2PSync = (() => {
       _peer = new Peer(guestId, {
         debug: 1,
         config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
-          ]
+          iceServers: _getIceServers()
         }
       });
     } catch (err) {
@@ -303,6 +340,11 @@ const P2PSync = (() => {
     _peer.on('open', (id) => {
       console.log('[P2PSync] Guest online as:', id);
       _connectToHost();
+    });
+
+    _peer.on('call', (mediaConn) => {
+      console.log('[P2PSync] Incoming media call on guest from:', mediaConn.peer);
+      if (_onIncomingMediaCallCb) _onIncomingMediaCallCb(mediaConn);
     });
 
     _peer.on('error', (err) => {
@@ -388,6 +430,10 @@ const P2PSync = (() => {
     } else if (data.type === 'typing' && data.memberId) {
       if (_onTypingCb) {
         _onTypingCb({ memberId: data.memberId, displayName: data.displayName, isTyping: data.isTyping });
+      }
+    } else if (data.type === 'call_signal' && data.payload) {
+      if (_onCallSignalCb) {
+        _onCallSignalCb(data.payload);
       }
     }
   }
@@ -523,6 +569,24 @@ const P2PSync = (() => {
     return !!(hostConn && hostConn.open);
   }
 
+  function broadcastCallSignal(payload) {
+    if (!payload) return;
+    const data = { type: 'call_signal', payload };
+    if (_isHost) {
+      _connections.forEach(conn => {
+        if (conn.open) { try { conn.send(data); } catch {} }
+      });
+    } else {
+      const hostConn = _connections.get('host');
+      if (hostConn && hostConn.open) {
+        try { hostConn.send(data); } catch {}
+      }
+    }
+    if (typeof NtfySync !== 'undefined' && NtfySync.publish) {
+      NtfySync.publish(data).catch(() => {});
+    }
+  }
+
   return {
     init,
     broadcastMessage,
@@ -530,6 +594,12 @@ const P2PSync = (() => {
     broadcastReaction,
     broadcastMusic,
     broadcastTyping,
+    broadcastCallSignal,
+    onCallSignal: (cb) => { _onCallSignalCb = cb; },
+    onIncomingMediaCall: (cb) => { _onIncomingMediaCallCb = cb; },
+    getPeer: () => _peer,
+    getIceServers: _getIceServers,
+    getConnectedPeerIds: () => _isHost ? Array.from(_connections.keys()) : (_connections.has('host') ? [getHostPeerId(_roomId)] : []),
     destroy,
     isConnected,
   };

@@ -188,7 +188,7 @@ const Rooms = {
       topics.forEach(t => {
         fetch(`https://ntfy.sh/${t}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: JSON.stringify({ type: 'room_meta', data: initialData }),
         }).catch(() => {});
       });
@@ -608,12 +608,13 @@ const RoomAPI = {
       if (_regLocked && _topics.length > 1) _topics.splice(1);
     } catch {}
     const _relay = (payload) => {
+      const rawBody = (typeof payload === 'string') ? payload : JSON.stringify(payload);
       _topics.forEach(t => {
         try {
           fetch(`https://ntfy.sh/${t}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            body: rawBody,
           }).catch(() => {});
         } catch {}
       });
