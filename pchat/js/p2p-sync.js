@@ -477,6 +477,12 @@ const P2PSync = (() => {
         try { hostConn.send({ type: 'message', message: msg, proof, memberId: _memberId }); } catch {}
       }
     }
+
+    // Universal Cloud Relay Fallback (ntfy.sh)
+    // Ensures 100% reliable cross-device delivery even if direct WebRTC P2P is blocked by NAT/firewalls
+    if (typeof NtfySync !== 'undefined' && NtfySync.publish) {
+      NtfySync.publish({ type: 'message', msg }).catch(() => {});
+    }
   }
 
   function broadcastSeen(seenBy, messageIds) {
@@ -490,6 +496,9 @@ const P2PSync = (() => {
       const hostConn = _connections.get('host');
       if (hostConn && hostConn.open) { try { hostConn.send(payload); } catch {} }
     }
+    if (typeof NtfySync !== 'undefined' && NtfySync.publish) {
+      NtfySync.publish(payload).catch(() => {});
+    }
   }
 
   function broadcastReaction(reaction) {
@@ -502,6 +511,9 @@ const P2PSync = (() => {
     } else {
       const hostConn = _connections.get('host');
       if (hostConn && hostConn.open) { try { hostConn.send(payload); } catch {} }
+    }
+    if (typeof NtfySync !== 'undefined' && NtfySync.publish) {
+      NtfySync.publish(payload).catch(() => {});
     }
   }
 

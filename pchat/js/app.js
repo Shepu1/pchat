@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         : (authUser.picture || '');
       session = {
         roomId,
-        memberId:     'u_owner_' + roomId.slice(0, 8),
+        memberId:     'u_owner_' + roomId.slice(0, 6),
         sessionToken: 'owner_sess_' + (myRoom.secret || roomId),
         displayName:  ownerName,
         picture:      ownerPicture,
@@ -541,11 +541,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (code === 'DELETED')  { Chat.showUnavailable('This room has been deleted.'); return; }
       if (code === 'BANNED')   { Chat.showUnavailable('You have been banned from this room.'); return; }
 
-      // Persist fresh session token
+      // Persist fresh session token, never demoting the room owner
       const updatedSession = {
         ...session,
         sessionToken: joinRes.sessionToken || session.sessionToken,
-        role:         joinRes.role || session.role,
+        role:         session.role === 'owner' ? 'owner' : (joinRes.role || session.role),
       };
       Storage.setSession(updatedSession);
     }
@@ -771,7 +771,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { RoomPassword.markRejected(room.id, true); } catch {}
         window.location.reload();
       },
-      isHost:      session.role === 'owner',
+      isHost:      session.role === 'owner' || (room && room.isOwner === true) || (typeof Rooms !== 'undefined' && Rooms.getMyRooms().some(r => r.id === room.id)),
       memberId:    session.memberId,
       displayName: session.displayName,
       onMessage: async (msgs) => {
@@ -856,6 +856,20 @@ document.addEventListener('DOMContentLoaded', async () => {
               Storage.saveRoomMessages(room.id, [msg]);
             }
           } catch { /* non-critical */ }
+        }
+        // Seen receipts via cloud relay
+        if (kind === 'seen' && payload) {
+          if (typeof Chat !== 'undefined' && Chat.appendMessages) {
+            Chat.appendMessages([{ _seenEvent: true, seenBy: payload.seenBy, messageIds: payload.messageIds }]);
+          }
+          return;
+        }
+        // Reaction updates via cloud relay
+        if (kind === 'reaction' && payload) {
+          if (typeof Chat !== 'undefined' && Chat.appendMessages) {
+            Chat.appendMessages([{ _reactionEvent: true, ...payload }]);
+          }
+          return;
         }
         // Cross-device presence beacon → merge into the member directory
         // (marked "seen now"), so online status is truthful everywhere.

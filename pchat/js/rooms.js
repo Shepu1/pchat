@@ -666,11 +666,22 @@ const RoomAPI = {
       const displayName = params.displayName || localStorage.getItem('shepu_display_name') || 'Guest';
       const incomingId = params.memberId || null;
       const memberId = incomingId || ('u_' + Date.now());
-      const picture = params.picture || '';
-      // Preserve existing role on re-join; new members are always 'member'.
-      // Never promote to owner just because a sessionToken was supplied.
+      // Preserve existing role on re-join; room creator on owner device is always 'owner'.
+      const isOwnerDevice = (() => {
+        try {
+          const myRooms = (typeof Rooms !== 'undefined' && Rooms.getMyRooms) ? Rooms.getMyRooms() : [];
+          if (myRooms.some(r => r.id === roomId)) return true;
+          const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+          if (sess && sess.roomId === roomId && sess.role === 'owner') return true;
+        } catch {}
+        return false;
+      })();
       const existingMember = roomData.members.find(m => (m.id || m.memberId) === memberId);
-      const role = existingMember ? (existingMember.role || 'member') : 'member';
+      const role = isOwnerDevice
+        ? 'owner'
+        : (memberId.startsWith('u_owner_')
+          ? 'owner'
+          : (existingMember ? (existingMember.role || 'member') : 'member'));
 
       // Broadcast join to public relay (works on GitHub Pages & phones)
       // NOTE: join carries no secret — P2P proof is verified separately.

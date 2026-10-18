@@ -1310,8 +1310,10 @@ const Chat = (() => {
       // Mark sent
       _markOptimisticSent(msgId, optimisticMsg);
       _saveMessageToSheet(wireMsg);
-      if (typeof P2PSync !== 'undefined') {
+      if (typeof P2PSync !== 'undefined' && P2PSync.broadcastMessage) {
         P2PSync.broadcastMessage(wireMsg);
+      } else if (typeof NtfySync !== 'undefined' && NtfySync.publish) {
+        NtfySync.publish({ type: 'message', msg: wireMsg }).catch(() => {});
       }
 
       // Guarantee local storage persistence for sender (encrypted at rest)

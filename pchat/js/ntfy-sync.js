@@ -89,13 +89,16 @@ const NtfySync = (() => {
         // eslint-disable-next-line no-constant-condition
         while (true) {
           const { value, done } = await reader.read();
-          if (done) break;
+          if (done) {
+            if (buffer.trim()) _handleLine(buffer.trim(), topic);
+            break;
+          }
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
           for (const line of lines) {
             if (!line.trim()) continue;
-            _handleLine(line);
+            _handleLine(line, topic);
           }
         }
       } catch (err) {
@@ -111,15 +114,13 @@ const NtfySync = (() => {
   }
 
   // ── Parse one ndjson line from ntfy ─────────────────────────────
-  function _handleLine(line) {
+  function _handleLine(line, forTopic) {
     let evt;
     try { evt = JSON.parse(line); } catch { return; }
 
-    // Advance the cursor of the matching topic so the next poll only
-    // fetches newer events. ntfy doesn't echo the topic; advance all
-    // cursors with this timestamp (monotonic, safe for both topics).
-    if (evt.time) {
-      _topics.forEach(t => { _cursors[t] = evt.time; });
+    // Advance cursor ONLY for the topic that actually received this event
+    if (evt.time && forTopic) {
+      _cursors[forTopic] = evt.time;
     }
 
     // ntfy keep-alives and non-message events carry no payload we need.
@@ -135,6 +136,10 @@ const NtfySync = (() => {
       if (msg.id && _seenIds.has(msg.id)) return;
       if (msg.id) _seenIds.add(msg.id);
       if (_onEvent) _onEvent({ kind: 'message', msg });
+    } else if (payload.type === 'seen') {
+      if (_onEvent) _onEvent({ kind: 'seen', seenBy: payload.seenBy, messageIds: payload.messageIds });
+    } else if (payload.type === 'reaction' && payload.reaction) {
+      if (_onEvent) _onEvent({ kind: 'reaction', reaction: payload.reaction });
     } else if (payload.type === 'theme' && payload.theme) {
       if (_onEvent) _onEvent({ kind: 'theme', theme: payload.theme });
     } else if (payload.type === 'presence' && payload.member) {
