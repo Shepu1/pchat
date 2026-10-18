@@ -666,6 +666,7 @@ const RoomAPI = {
       const displayName = params.displayName || localStorage.getItem('shepu_display_name') || 'Guest';
       const incomingId = params.memberId || null;
       const memberId = incomingId || ('u_' + Date.now());
+      const picture = params.picture || '';
       // Preserve existing role on re-join; room creator on owner device is always 'owner'.
       const isOwnerDevice = (() => {
         try {
