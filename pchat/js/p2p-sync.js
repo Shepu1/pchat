@@ -77,27 +77,28 @@ const P2PSync = (() => {
   }
 
   // ── ICE Servers (STUN + TURN for NAT/Firewall traversal) ─────
+  // CRITICAL: passing `config.iceServers` to `new Peer(...)` REPLACES
+  // PeerJS's bundled default ICE config (they shallow-merge options, so the
+  // `config` key is overwritten) — it does NOT merge. So whatever we list
+  // here is the *only* TURN the app gets.
+  //
+  // The previous list used only `openrelay.metered.ca` (user/pass
+  // openrelay/openrelay), a FREE service that was discontinued years ago —
+  // it never succeeds. STUN alone cannot traverse symmetric NAT / carrier
+  // CGNAT (most mobile phones). Result: a guest on mobile could never reach
+  // a host whose device sat behind such a NAT, yet could reach a host on a
+  // "friendly" home network. That is exactly the reported symptom —
+  // "chat works when I am the host, fails when a friend hosts".
+  //
+  // Fix: use PeerJS's own public TURN relays (the bundled default), which
+  // are actually operational, alongside Google STUN.
   function _getIceServers() {
     return [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:stun.relay.metered.ca:80' },
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelay',
-        credential: 'openrelay'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelay',
-        credential: 'openrelay'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelay',
-        credential: 'openrelay'
-      }
+      { urls: 'turn:eu-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
+      { urls: 'turn:us-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
     ];
   }
 

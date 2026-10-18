@@ -178,20 +178,26 @@ const Rooms = {
     };
     localStorage.setItem(mockStorageKey, JSON.stringify(initialData));
 
-    // Announce to cross-device relay (so mobile phone gets room details)
-    // Publish to BOTH private (secret-derived) + legacy topics for compatibility.
-    // Secret itself is never sent — only the room name/meta (no messages here).
+    // Announce to cross-device relay (so a phone / other browser gets the
+    // room details). Publishes to BOTH private (secret-derived) + legacy
+    // topics, across EVERY configured relay server (failover). The secret
+    // itself is never sent — only the room name/meta.
     try {
       const topics = (typeof InstantSecurity !== 'undefined')
         ? InstantSecurity.topicsFor(roomId, roomSecret)
         : [`shepu_pchat_${roomId}`];
-      topics.forEach(t => {
-        fetch(`https://ntfy.sh/${t}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-          body: JSON.stringify({ type: 'room_meta', data: initialData }),
-        }).catch(() => {});
-      });
+      const body = JSON.stringify({ type: 'room_meta', data: initialData });
+      if (typeof ShepuRelay !== 'undefined' && ShepuRelay.publish) {
+        ShepuRelay.publish(body, topics).catch(() => {});
+      } else {
+        topics.forEach(t => {
+          fetch(`https://ntfy.sh/${t}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+            body,
+          }).catch(() => {});
+        });
+      }
     } catch {}
 
     return room;
@@ -609,6 +615,11 @@ const RoomAPI = {
     } catch {}
     const _relay = (payload) => {
       const rawBody = (typeof payload === 'string') ? payload : JSON.stringify(payload);
+      // Multi-server failover (one blocked relay can no longer kill a room).
+      if (typeof ShepuRelay !== 'undefined' && ShepuRelay.publish) {
+        ShepuRelay.publish(rawBody, _topics).catch(() => {});
+        return;
+      }
       _topics.forEach(t => {
         try {
           fetch(`https://ntfy.sh/${t}`, {

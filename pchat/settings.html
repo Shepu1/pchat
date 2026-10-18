@@ -261,6 +261,26 @@
               </div>
 
               <button class="btn btn-secondary btn-sm" id="clear-idb-btn">Clear IndexedDB Cache</button>
+
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                  Message Relay
+                  <span id="relay-status-badge" class="badge">checking…</span>
+                </div>
+                <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:0.5rem;">
+                  Cross-device messages ride these public ntfy servers (with automatic failover).
+                  If chat only works on your own device, a relay is likely blocked on your network —
+                  keep at least one reachable server below, or use a VPN.
+                </div>
+                <textarea id="relay-servers-input" rows="4" spellcheck="false"
+                  style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem;color:var(--text);"></textarea>
+                <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" id="relay-test-btn">Test connection</button>
+                  <button class="btn btn-primary btn-sm" id="relay-save-btn">Save servers</button>
+                  <button class="btn btn-ghost btn-sm" id="relay-reset-btn">Reset to defaults</button>
+                </div>
+                <pre id="relay-report" style="font-size:0.75rem;max-height:160px;overflow:auto;margin-top:0.6rem;white-space:pre-wrap;"></pre>
+              </div>
             </div>
           </div>
         </section>
@@ -276,7 +296,8 @@
 <script src="js/ui.js?v=20261018a"></script>
 <script src="js/auth.js?v=20261016a"></script>
 <script src="js/instant-security.js?v=20261016a"></script>
-<script src="js/rooms.js?v=20261016a"></script>
+<script src="js/ntfy-sync.js?v=20261019d"></script>
+<script src="js/rooms.js?v=20261019d"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Tab navigation
@@ -457,6 +478,60 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.toast('info', 'Note', 'IndexedDB storage not initialized.');
     }
   });
+
+  // ── Message relay servers (multi-server failover) ──────────────
+  const relayInput  = document.getElementById('relay-servers-input');
+  const relayReport = document.getElementById('relay-report');
+  const relayBadge  = document.getElementById('relay-status-badge');
+  if (relayInput && typeof ShepuRelay !== 'undefined') {
+    relayInput.value = ShepuRelay.servers().join('\n');
+
+    const setBadge = (text, ok) => {
+      if (!relayBadge) return;
+      relayBadge.textContent = text;
+      relayBadge.style.background = ok ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)';
+      relayBadge.style.color = ok ? '#34d399' : '#f87171';
+      relayBadge.style.borderColor = 'transparent';
+    };
+    const runTest = async (showToast) => {
+      setBadge('testing…', true);
+      if (relayReport) relayReport.textContent = 'Testing…';
+      const rep = await ShepuRelay.diagnose();
+      setBadge(rep.reachable + '/' + rep.total + ' reachable', rep.reachable > 0);
+      if (relayReport) {
+        relayReport.textContent = rep.servers.map(s =>
+          (s.ok ? '✔ OK   ' : '✘ DOWN ') + s.server +
+          (s.ms != null ? '  (' + s.ms + 'ms)' : '') +
+          (s.error ? '  — ' + s.error : '')
+        ).join('\n');
+      }
+      if (showToast) {
+        UI.toast(rep.reachable ? 'success' : 'error',
+          rep.reachable ? 'Relay reachable' : 'No relay reachable',
+          rep.reachable
+            ? rep.reachable + '/' + rep.total + ' servers responded — cross-device chat works.'
+            : 'Every relay server is blocked/unreachable on this network.');
+      }
+      return rep;
+    };
+
+    runTest(false);
+    document.getElementById('relay-test-btn').addEventListener('click', () => runTest(true));
+    document.getElementById('relay-save-btn').addEventListener('click', async () => {
+      const list = relayInput.value.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+      if (!list.length) { UI.toast('error', 'Empty', 'Add at least one relay server.'); return; }
+      ShepuRelay.setServers(list);
+      relayInput.value = ShepuRelay.servers().join('\n');
+      UI.toast('success', 'Saved', 'Relay servers updated. Reload the chat tab to apply.');
+      runTest(true);
+    });
+    document.getElementById('relay-reset-btn').addEventListener('click', () => {
+      ShepuRelay.resetServers();
+      relayInput.value = ShepuRelay.servers().join('\n');
+      UI.toast('info', 'Reset', 'Relay servers reset to defaults.');
+      runTest(false);
+    });
+  }
 
   // Google Client ID in settings
   const clientIdInput = document.getElementById('settings-client-id');
