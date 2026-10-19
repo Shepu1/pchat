@@ -2047,8 +2047,386 @@
  },
  {
   "file": "victory_hand.png",
-  "unicode": "✒️",
+  "unicode": "✌️",
   "category": "hand",
   "name": "victory hand"
+ },
+ {
+  "file": "bear.png",
+  "unicode": "🐻",
+  "category": "animal",
+  "name": "bear"
+ },
+ {
+  "file": "butterfly.png",
+  "unicode": "🦋",
+  "category": "animal",
+  "name": "butterfly"
+ },
+ {
+  "file": "cat.png",
+  "unicode": "🐱",
+  "category": "animal",
+  "name": "cat"
+ },
+ {
+  "file": "chick.png",
+  "unicode": "🐤",
+  "category": "animal",
+  "name": "chick"
+ },
+ {
+  "file": "dog.png",
+  "unicode": "🐶",
+  "category": "animal",
+  "name": "dog"
+ },
+ {
+  "file": "fox.png",
+  "unicode": "🦊",
+  "category": "animal",
+  "name": "fox"
+ },
+ {
+  "file": "frog.png",
+  "unicode": "🐸",
+  "category": "animal",
+  "name": "frog"
+ },
+ {
+  "file": "koala.png",
+  "unicode": "🐨",
+  "category": "animal",
+  "name": "koala"
+ },
+ {
+  "file": "monkey.png",
+  "unicode": "🐵",
+  "category": "animal",
+  "name": "monkey"
+ },
+ {
+  "file": "panda.png",
+  "unicode": "🐼",
+  "category": "animal",
+  "name": "panda"
+ },
+ {
+  "file": "penguin.png",
+  "unicode": "🐧",
+  "category": "animal",
+  "name": "penguin"
+ },
+ {
+  "file": "rabbit.png",
+  "unicode": "🐰",
+  "category": "animal",
+  "name": "rabbit"
+ },
+ {
+  "file": "snake.png",
+  "unicode": "🐍",
+  "category": "animal",
+  "name": "snake"
+ },
+ {
+  "file": "spider.png",
+  "unicode": "🕷️",
+  "category": "animal",
+  "name": "spider"
+ },
+ {
+  "file": "tyrannosaurus.png",
+  "unicode": "🦖",
+  "category": "animal",
+  "name": "tyrannosaurus"
+ },
+ {
+  "file": "unicorn.png",
+  "unicode": "🦄",
+  "category": "animal",
+  "name": "unicorn"
+ },
+ {
+  "file": "back_of_hand.png",
+  "unicode": "🤚",
+  "category": "hand",
+  "name": "back of hand"
+ },
+ {
+  "file": "finger_heart.png",
+  "unicode": "🫰",
+  "category": "hand",
+  "name": "finger heart"
+ },
+ {
+  "file": "fist_bump.png",
+  "unicode": "👊",
+  "category": "hand",
+  "name": "fist bump"
+ },
+ {
+  "file": "left_facing_fist.png",
+  "unicode": "🤛",
+  "category": "hand",
+  "name": "left facing fist"
+ },
+ {
+  "file": "middle_finger.png",
+  "unicode": "🖕",
+  "category": "hand",
+  "name": "middle finger"
+ },
+ {
+  "file": "open_hands.png",
+  "unicode": "👐",
+  "category": "hand",
+  "name": "open hands"
+ },
+ {
+  "file": "palms_up_together.png",
+  "unicode": "🤲",
+  "category": "hand",
+  "name": "palms up together"
+ },
+ {
+  "file": "pinched_fingers.png",
+  "unicode": "🤌",
+  "category": "hand",
+  "name": "pinched fingers"
+ },
+ {
+  "file": "point_at_viewer.png",
+  "unicode": "🫵",
+  "category": "hand",
+  "name": "point at viewer"
+ },
+ {
+  "file": "point_left.png",
+  "unicode": "👈",
+  "category": "hand",
+  "name": "point left"
+ },
+ {
+  "file": "point_right.png",
+  "unicode": "👉",
+  "category": "hand",
+  "name": "point right"
+ },
+ {
+  "file": "raised_fist.png",
+  "unicode": "✊",
+  "category": "hand",
+  "name": "raised fist"
+ },
+ {
+  "file": "raised_hand.png",
+  "unicode": "✋",
+  "category": "hand",
+  "name": "raised hand"
+ },
+ {
+  "file": "right_facing_fist.png",
+  "unicode": "🤜",
+  "category": "hand",
+  "name": "right facing fist"
+ },
+ {
+  "file": "splayed_hand.png",
+  "unicode": "🖐️",
+  "category": "hand",
+  "name": "splayed hand"
+ },
+ {
+  "file": "nail_polish_gesture.png",
+  "unicode": "💅",
+  "category": "hand",
+  "name": "nail polish gesture"
+ },
+ {
+  "file": "confounded.png",
+  "unicode": "😖",
+  "category": "face",
+  "name": "confounded"
+ },
+ {
+  "file": "downcast-sweaty.png",
+  "unicode": "😓",
+  "category": "face",
+  "name": "downcast sweaty"
+ },
+ {
+  "file": "face-exhaling.png",
+  "unicode": "😮‍💨",
+  "category": "face",
+  "name": "face exhaling"
+ },
+ {
+  "file": "ghost.png",
+  "unicode": "👻",
+  "category": "face",
+  "name": "ghost"
+ },
+ {
+  "file": "mind-blown.png",
+  "unicode": "🤯",
+  "category": "face",
+  "name": "mind blown"
+ },
+ {
+  "file": "moai.png",
+  "unicode": "🗿",
+  "category": "face",
+  "name": "moai"
+ },
+ {
+  "file": "peeking.png",
+  "unicode": "🫣",
+  "category": "face",
+  "name": "peeking"
+ },
+ {
+  "file": "persevering.png",
+  "unicode": "😣",
+  "category": "face",
+  "name": "persevering"
+ },
+ {
+  "file": "poop.png",
+  "unicode": "💩",
+  "category": "face",
+  "name": "poop"
+ },
+ {
+  "file": "relieved.png",
+  "unicode": "😌",
+  "category": "face",
+  "name": "relieved"
+ },
+ {
+  "file": "sad-relieved.png",
+  "unicode": "😥",
+  "category": "face",
+  "name": "sad relieved"
+ },
+ {
+  "file": "shaking.png",
+  "unicode": "🫨",
+  "category": "face",
+  "name": "shaking"
+ },
+ {
+  "file": "skull.png",
+  "unicode": "💀",
+  "category": "face",
+  "name": "skull"
+ },
+ {
+  "file": "sleepy.png",
+  "unicode": "😪",
+  "category": "face",
+  "name": "sleepy"
+ },
+ {
+  "file": "star-struck.png",
+  "unicode": "🤩",
+  "category": "face",
+  "name": "star struck"
+ },
+ {
+  "file": "swearing.png",
+  "unicode": "🤬",
+  "category": "face",
+  "name": "swearing"
+ },
+ {
+  "file": "double_exclamation.png",
+  "unicode": "‼️",
+  "category": "symbol",
+  "name": "double exclamation"
+ },
+ {
+  "file": "flying_money.png",
+  "unicode": "💸",
+  "category": "symbol",
+  "name": "flying money"
+ },
+ {
+  "file": "hundred_points.png",
+  "unicode": "💯",
+  "category": "symbol",
+  "name": "hundred points"
+ },
+ {
+  "file": "impact_burst.png",
+  "unicode": "💥",
+  "category": "symbol",
+  "name": "impact burst"
+ },
+ {
+  "file": "megaphone.png",
+  "unicode": "📣",
+  "category": "symbol",
+  "name": "megaphone"
+ },
+ {
+  "file": "muted_bell.png",
+  "unicode": "🔕",
+  "category": "symbol",
+  "name": "muted bell"
+ },
+ {
+  "file": "notification_bell.png",
+  "unicode": "🔔",
+  "category": "symbol",
+  "name": "notification bell"
+ },
+ {
+  "file": "question_exclamation.png",
+  "unicode": "⁉️",
+  "category": "symbol",
+  "name": "question exclamation"
+ },
+ {
+  "file": "red_flag.png",
+  "unicode": "🚩",
+  "category": "symbol",
+  "name": "red flag"
+ },
+ {
+  "file": "sleep.png",
+  "unicode": "💤",
+  "category": "symbol",
+  "name": "sleep"
+ },
+ {
+  "file": "sos.png",
+  "unicode": "🆘",
+  "category": "symbol",
+  "name": "sos"
+ },
+ {
+  "file": "speech_bubble.png",
+  "unicode": "💬",
+  "category": "symbol",
+  "name": "speech bubble"
+ },
+ {
+  "file": "thought_bubble.png",
+  "unicode": "💭",
+  "category": "symbol",
+  "name": "thought bubble"
+ },
+ {
+  "file": "brain.png",
+  "unicode": "🧠",
+  "category": "medical",
+  "name": "brain"
+ },
+ {
+  "file": "speaking_head.png",
+  "unicode": "🗣️",
+  "category": "people",
+  "name": "speaking head"
  }
 ]

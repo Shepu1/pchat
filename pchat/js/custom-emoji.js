@@ -11,7 +11,7 @@ const CustomEmoji = (() => {
   const MAP_SUFFIX = 'emoji-map.json';
   // Known categories (folder names). 'All' is virtual.
   const CATEGORY_ORDER = [
-    'face', 'drinks', 'festival', 'fruit', 'love', 'medical',
+    'face', 'animal', 'drinks', 'festival', 'fruit', 'love', 'medical',
     'music&games', 'nature', 'people', 'romantic', 'rood',
     'symbol', 'technology', 'vehicle', 'hand',
   ];
