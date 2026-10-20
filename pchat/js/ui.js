@@ -120,6 +120,70 @@ const UI = {
     });
   },
 
+  // ── Password fields: keep the browser's password manager away ──
+  // On Android Chrome the saved-password sheet pops over the field and
+  // the soft keyboard jumps away the moment the first character is typed.
+  // Chrome ignores autocomplete="off" on password fields, so the field is
+  // marked as a brand-new password, given a throw-away name, the usual
+  // password managers are told to ignore it, and it stays readonly until
+  // the user actually touches it. A focus watchdog grabs the focus back
+  // if Chrome's autofill preview steals it.
+  hardenPassword(input) {
+    if (!input || input.dataset.pwHardened === '1') return input;
+    input.dataset.pwHardened = '1';
+    try {
+      input.setAttribute('autocomplete', 'new-password');
+      input.setAttribute('autocapitalize', 'none');
+      input.setAttribute('autocorrect', 'off');
+      input.setAttribute('spellcheck', 'false');
+      input.setAttribute('data-1p-ignore', 'true');
+      input.setAttribute('data-lpignore', 'true');
+      input.setAttribute('data-form-type', 'other');
+      input.setAttribute('data-bwignore', 'true');
+      // Chrome matches saved logins by name/id — a random name keeps it away.
+      input.setAttribute('name', 'pw_' + Math.random().toString(36).slice(2, 10));
+      // readonly until the first real touch: Chrome never offers a saved
+      // password for a readonly field, and dropping the attribute on
+      // touch keeps the soft keyboard open.
+      input.setAttribute('readonly', '');
+      const wake = () => {
+        try { input.removeAttribute('readonly'); } catch {}
+        input.removeEventListener('touchstart', wake);
+        input.removeEventListener('pointerdown', wake);
+        input.removeEventListener('keydown', wake);
+      };
+      input.addEventListener('touchstart', wake, { passive: true });
+      input.addEventListener('pointerdown', wake);
+      input.addEventListener('keydown', wake);
+      input.addEventListener('focus', () => {
+        // Once the user has touched the page the field may be filled in
+        // by code (auto-focus) — then it must behave like a normal input.
+        if (UI._userTouched) wake();
+        // Chrome's autofill preview sometimes blurs the field (the
+        // keyboard dies). Take the focus back — but never steal it from
+        // another field the user tapped.
+        setTimeout(() => {
+          try {
+            const ae = document.activeElement;
+            if (ae === input) return;
+            if (ae && ae !== document.body) return;
+            input.focus({ preventScroll: true });
+          } catch {}
+        }, 350);
+      });
+    } catch {}
+    return input;
+  },
+
+  // Apply the hardening to every password field of the page.
+  hardenPasswords(root) {
+    const scope = root || document;
+    let list = [];
+    try { list = Array.from(scope.querySelectorAll('input[type="password"]')); } catch {}
+    list.forEach(el => UI.hardenPassword(el));
+    return list.length;
+  },
+
   // ── Show/Hide ─────────────────────────────────────────────────
   show(id) {
     const el = document.getElementById(id);
@@ -427,6 +491,17 @@ UI.processAvatarFile = function (file) {
 // Make globally available
 window.UI = UI;
 
+// Has the user touched the page yet? Password fields stay readonly until
+// they do — that is what keeps Chrome's password sheet from stealing the
+// keyboard on a phone.
+UI._userTouched = false;
+try {
+  const markTouched = () => { UI._userTouched = true; };
+  document.addEventListener('pointerdown', markTouched, { capture: true, passive: true });
+  document.addEventListener('touchstart', markTouched, { capture: true, passive: true });
+  document.addEventListener('keydown', markTouched, { capture: true });
+} catch { /* ignore */ }
+
 // ── Utility ───────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({
@@ -439,4 +514,7 @@ window.escapeHtml = escapeHtml;
 // ── Auto-init progress step icons ────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   UI.initStepIcons();
+  // Keep Chrome's / Google's password suggestions away from every
+  // password field on the page (phone keyboards hate that sheet).
+  try { UI.hardenPasswords(); } catch {}
 });
