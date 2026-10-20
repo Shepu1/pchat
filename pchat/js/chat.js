@@ -1662,6 +1662,12 @@ const Chat = (() => {
       document.getElementById('e2ee-toggle-btn')?.click();
     });
 
+    // Same idea for the notification bell: it only exists in the ⋮ menu on
+    // a phone. The bell's own toast reports whether it turned on or off.
+    document.getElementById('menu-notify')?.addEventListener('click', () => {
+      document.getElementById('notify-toggle-btn')?.click();
+    });
+
     document.getElementById('menu-owner-panel')?.addEventListener('click', () => {
       window.location.href = `owner.html?r=${_room.id}`;
     });
@@ -2636,6 +2642,8 @@ const Chat = (() => {
     const btn = document.getElementById('notify-toggle-btn');
     if (!btn || typeof Notify === 'undefined' || !Notify.isSupported()) {
       if (btn) btn.style.display = 'none';
+      const menuItem = document.getElementById('menu-notify');
+      if (menuItem) menuItem.style.display = 'none';
       return;
     }
     // ON = normal bell, OFF = bell with a slash so the state is obvious.
@@ -2648,6 +2656,8 @@ const Chat = (() => {
       btn.title = on ? 'Notifications on' : 'Notifications off';
       btn.setAttribute('aria-label', on ? 'Turn notifications off' : 'Turn notifications on');
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      const menuText = document.getElementById('menu-notify-text');
+      if (menuText) menuText.textContent = on ? 'Notifications on' : 'Notifications off';
     };
     paint();
     btn.addEventListener('click', async () => {

@@ -84,7 +84,49 @@ const SpecialEmoji = (() => {
     return null;
   }
 
+  // ── Public "Pchat" custom set ───────────────────────────────────
+  // assets/emoji/pchat holds the images that have no Unicode emoji at
+  // all. They use the very same 5-character shortcode shape, but they
+  // are NOT password protected: their code always resolves to the
+  // plain image, even while the Special pack stays locked.
+  const PCHAT_MAP_URL = 'assets/emoji/pchat/emoji-map.json';
+  let _publicCodes = new Map();   // ':a7k2p:' -> 'assets/emoji/pchat/file.png'
+
+  function _loadPublicCodes() {
+    if (typeof fetch !== 'function') return;
+    try {
+      fetch(PCHAT_MAP_URL, { cache: 'no-cache' })
+        .then(r => (r && r.ok) ? r.json() : null)
+        .then(map => {
+          if (!map || typeof map !== 'object') return;
+          const m = new Map();
+          for (const [file, code] of Object.entries(map)) {
+            if (typeof code !== 'string' || !code) continue;
+            if (!/^[A-Za-z0-9 _+.\-]+\.png$/.test(file)) continue;
+            const key = String(code).toLowerCase();
+            m.set(key, 'assets/emoji/pchat/' + encodeURIComponent(file));
+          }
+          if (m.size) _publicCodes = m;
+        })
+        .catch(() => { /* public set stays optional */ });
+    } catch { /* ignore */ }
+  }
+
+  function publicUrlForCode(code) {
+    if (!code) return null;
+    const key = String(code).toLowerCase();
+    const inner = key.replace(/^:/, '').replace(/:$/, '');
+    return _publicCodes.get(':' + inner + ':') || null;
+  }
+
+  // Public map is tiny — load it right away so Pchat codes render even
+  // before the Special pack is unlocked.
+  _loadPublicCodes();
+
   function urlForShortcode(code) {
+    // Public Pchat codes first — they need no password.
+    const pub = publicUrlForCode(code);
+    if (pub) return pub;
     if (!isUnlocked()) return null;
     const it = _findByCode(code);
     return (it && it.url) || null;

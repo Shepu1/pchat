@@ -214,13 +214,16 @@ pre { padding: 1rem; overflow-x: auto; }
 
 /* ── Animations ─────────────────────────────────────────────────── */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  /* Opacity only: the content used to rise 8px, which read as a jump every
+     time a page (or a settings section) appeared. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  /* Was a 20px rise; the landing page slides in now instead of jumping. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideInRight {
@@ -229,8 +232,9 @@ pre { padding: 1rem; overflow-x: auto; }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.9); }
-  to   { opacity: 1; transform: scale(1); }
+  /* Was a 90% -> 100% zoom; cards pop in without moving. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes pulse {

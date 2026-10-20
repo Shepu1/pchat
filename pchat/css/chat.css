@@ -749,6 +749,10 @@
 /* Main input bubble wrapper */
 .chat-input-wrap {
   flex: 1;
+  /* A flex item may not sink below its content, and the text area inside is
+     ~200px wide on its own: without this the row cannot fit on a phone and
+     the send button is pushed past the right edge. */
+  min-width: 0;
   position: relative;
   background: linear-gradient(180deg, rgba(26, 34, 58, 0.92), rgba(18, 24, 42, 0.88));
   backdrop-filter: blur(16px);
@@ -782,6 +786,7 @@
 
 .chat-input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
@@ -2506,8 +2511,10 @@ img.custom-emoji-picker {
 .chat-feed::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.5); }
 
 @keyframes msgIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  /* Fade only: the 8px rise made a whole room's history ripple when it was
+     drawn. */
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .msg-row { animation: msgIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
 

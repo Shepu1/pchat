@@ -26,6 +26,9 @@ const CallManager = (() => {
   let _currentCallId = null;
   let _incomingCallData = null;
   let _pendingMediaConnection = null;
+  let _accepterPeerId = null;     // peer that accepted our outgoing call
+  let _remotePeerId = null;       // peer on the active media connection
+  let _placeholderTrack = null;   // black video track to keep a video m-line
 
   // Web Audio Context & Synthesizer
   let _audioCtx = null;
@@ -448,6 +451,127 @@ const CallManager = (() => {
       try { remoteAudio.pause(); } catch {}
       remoteAudio.srcObject = null;
     }
+    _stopPlaceholderTrack();
+  }
+
+  // ── Local media acquisition (never blocks the call itself) ──────
+  // Permission is only needed to SEND media — not to place/answer a
+  // call. Getting media must never delay the ring or drop the call.
+  const MEDIA_ERROR_TEXT = {
+    NotAllowedError:  'Permission denied — open the address-bar lock icon, allow the mic/camera, then press the mic/camera button again.',
+    SecurityError:    'The browser blocked mic/camera access. Allow it in site settings, then retry.',
+    NotFoundError:    'No microphone/camera was found on this device.',
+    DevicesNotFoundError: 'No microphone/camera was found on this device.',
+    OverconstrainedError: 'This device cannot provide the requested camera settings.',
+    NotReadableError: 'The mic/camera is busy in another app/tab. Close it and retry.',
+    TrackStartError:  'The mic/camera could not start. Close other apps using it and retry.',
+    AbortError:       'The mic/camera request was interrupted. Try again.'
+  };
+  function _mediaErrorText(err) {
+    const key = (err && (err.name || err.code)) || '';
+    return MEDIA_ERROR_TEXT[key] || (err && err.message) || 'Microphone/camera unavailable.';
+  }
+  function _notifyMediaProblem(wantedVideo, err) {
+    console.warn('[CallManager] Media unavailable:', err);
+    if (typeof UI === 'undefined' || !UI.toast) return;
+    const label = wantedVideo ? 'Camera/Mic blocked' : 'Microphone blocked';
+    UI.toast('warning', label, _mediaErrorText(err) + ' The call still connects — you just won\'t send ' + (wantedVideo ? 'audio/video' : 'audio') + '.', 9000);
+  }
+  async function _acquireLocalMedia(type) {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+      _notifyMediaProblem(type === 'video', new Error('Media devices need HTTPS (or localhost).'));
+      return null;
+    }
+    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+    if (type !== 'video') {
+      try { return await navigator.mediaDevices.getUserMedia({ audio }); }
+      catch (err) { _notifyMediaProblem(false, err); return null; }
+    }
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio, video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } });
+    } catch (err) {
+      // Camera missing/denied but the mic may still be fine → keep a voice channel.
+      try {
+        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio });
+        _notifyMediaProblem(true, err);
+        return audioOnly;
+      } catch (err2) {
+        _notifyMediaProblem(true, err2);
+        return null;
+      }
+    }
+  }
+  function _attachLocalPreview() {
+    if (!_localStream) return;
+    try {
+      const localVideo = document.getElementById('call-local-video');
+      if (localVideo) localVideo.srcObject = _localStream;
+    } catch {}
+  }
+  // A muted black track keeps a video m-line in the offer so the other side
+  // can still send its camera/screen to us when our own camera is missing.
+  function _placeholderVideoTrack() {
+    try {
+      if (_placeholderTrack && _placeholderTrack.readyState === 'live') return _placeholderTrack;
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext('2d');
+      if (ctx) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 16, 16); }
+      const stream = canvas.captureStream(1);
+      _placeholderTrack = stream.getVideoTracks()[0] || null;
+      return _placeholderTrack;
+    } catch {
+      return null;
+    }
+  }
+  function _stopPlaceholderTrack() {
+    if (!_placeholderTrack) return;
+    try { _placeholderTrack.stop(); } catch {}
+    _placeholderTrack = null;
+  }
+  // Best-effort: push a newly granted track into the live connection.
+  function _addLocalTracksToActiveCall() {
+    if (!_activeCall || !_activeCall.peerConnection || !_localStream) return;
+    try {
+      const pc = _activeCall.peerConnection;
+      const senders = pc.getSenders();
+      _localStream.getTracks().forEach(track => {
+        if (!senders.some(s => s.track === track)) pc.addTrack(track, _localStream);
+      });
+    } catch (e) {
+      console.warn('[CallManager] addTrack failed:', e);
+    }
+  }
+  function _outgoingStream() {
+    let outgoing = _localStream;
+    if (!outgoing) return null;
+    if (_callType === 'video' && outgoing.getVideoTracks().length === 0) {
+      const placeholder = _placeholderVideoTrack();
+      if (placeholder) outgoing = new MediaStream([...outgoing.getTracks(), placeholder]);
+    }
+    return outgoing;
+  }
+  // PeerJS does not renegotiate reliably, so when mic/camera permission is
+  // granted mid-call we rebuild the media connection with the new stream.
+  // Closing is done after detaching the old connection so its 'close'
+  // listener cannot mistake this for a hang-up.
+  function _restartMediaConnection(stream) {
+    const outgoing = stream || _outgoingStream();
+    if (!outgoing) return false;
+    const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
+    const target = _remotePeerId || _accepterPeerId;
+    if (!peer || peer.destroyed || !target) return false;
+    try {
+      // Send the new offer first; _setupMediaConnection() then swaps the
+      // active connection and closes the old one without hanging up.
+      const mediaConn = peer.call(target, outgoing, { metadata: { callType: _callType, callId: _currentCallId, restart: true } });
+      _setupMediaConnection(mediaConn);
+      return true;
+    } catch (e) {
+      console.warn('[CallManager] Media reconnect failed:', e);
+      return false;
+    }
   }
 
   // ── Start Outgoing Call ─────────────────────────────────────────
@@ -467,7 +591,9 @@ const CallManager = (() => {
     _isMuted = false;
     _isVideoOff = false;
     _isScreenSharing = false;
+    _accepterPeerId = null;
     _currentCallId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    const myCallId = _currentCallId;
 
     // 1. Immediately show call UI & start outgoing ringtone
     _ensureUIElements();
@@ -480,40 +606,10 @@ const CallManager = (() => {
 
     _playOutgoingRing();
 
-    // 2. Safely acquire local media
-    if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
-      try {
-        const constraints = {
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: (type === 'video') ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false
-        };
-        _localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        const localVideo = document.getElementById('call-local-video');
-        if (localVideo && _callType === 'video') {
-          localVideo.srcObject = _localStream;
-        }
-      } catch (err) {
-        console.warn('[CallManager] Camera/Mic access warning:', err);
-        if (type === 'video') {
-          try {
-            _localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            _callType = 'audio';
-            _updateStageDisplay();
-          } catch (e) {
-            console.warn('[CallManager] Mic fallback failed:', e);
-          }
-        }
-      }
-    } else {
-      console.warn('[CallManager] navigator.mediaDevices unavailable (requires localhost or HTTPS)');
-      if (statusEl) statusEl.textContent = 'Calling (No microphone on HTTP)';
-    }
-
-    if (statusEl && statusEl.textContent === 'Calling…') {
-      statusEl.textContent = 'Ringing…';
-    }
-
-    // 3. Broadcast Call Signal to Peer(s)
+    // 2. RING FIRST. Getting mic/camera permission can hang on the prompt
+    //    (or take seconds on a slow device). Previously the invite was only
+    //    broadcast after that await, so the other side never saw the call.
+    //    Send the invite now, then acquire media in the background.
     let callerPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';
     if (!callerPeerId && session?.role === 'owner') {
       const cleanId = String(roomId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
@@ -538,23 +634,34 @@ const CallManager = (() => {
       P2PSync.broadcastCallSignal(invitePayload);
     }
 
-    // 4. Also call direct peer if guest calling host
-    const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
-    if (peer && !peer.destroyed && _localStream && session?.role !== 'owner') {
-      const cleanId = String(roomId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
-      const hostPeerId = `pchat_h_${cleanId}`;
-      try {
-        const mediaConn = peer.call(hostPeerId, _localStream, { metadata: { callType: _callType, callerName: session?.displayName, callId: _currentCallId } });
-        _setupMediaConnection(mediaConn);
-      } catch (e) {
-        console.warn('[CallManager] Direct call error:', e);
-      }
+    // 3. Acquire local media without blocking the ring. Failure is not fatal:
+    //    the call continues receive-only and can be retried from the buttons.
+    _localStream = await _acquireLocalMedia(type);
+    // The user may have cancelled while the permission prompt was open.
+    if (_localStream && (_callState === 'idle' || _currentCallId !== myCallId)) {
+      try { _localStream.getTracks().forEach(t => t.stop()); } catch {}
+      _localStream = null;
+      return;
+    }
+    if (_localStream) {
+      _attachLocalPreview();
+      if (statusEl && _callState === 'calling') statusEl.textContent = 'Ringing…';
+    } else if (statusEl && _callState === 'calling') {
+      statusEl.textContent = 'Ringing (no mic/camera)';
+    }
+
+    // 4. The CALLEE is the only side that starts the media connection (see
+    //    acceptCall). The caller never calls first, so both sides cannot
+    //    create competing connections and tear the call down. We only
+    //    reconnect if we had already answered the callee receive-only while
+    //    waiting for our own permission.
+    if (_localStream && _activeCall && _callState === 'connected') {
+      _restartMediaConnection();
     }
 
     // 45s Timeout for No Answer
-    const thisCallId = _currentCallId;
     setTimeout(() => {
-      if (_callState === 'calling' && _currentCallId === thisCallId) {
+      if (_callState === 'calling' && _currentCallId === myCallId) {
         const st = document.getElementById('call-status-subtitle');
         if (st) st.textContent = 'No Answer';
         setTimeout(() => endCall(true), 2000);
@@ -608,27 +715,55 @@ const CallManager = (() => {
         _playConnectedChime();
         _callState = 'connected';
         const st = document.getElementById('call-status-subtitle');
-        if (st) st.textContent = 'Connected';
+        if (st) st.textContent = _localStream ? 'Connected' : 'Connected (no mic/camera)';
         _startCallTimer();
 
-        // Connect media call to accepter if not already connected
-        const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
-        const targetPeerId = payload.accepterPeerId || payload.fromPeerId;
-        if (peer && !peer.destroyed && _localStream && targetPeerId && !_activeCall) {
+        // Remember who accepted. The callee starts the media connection;
+        // we may still be waiting on our own permission prompt.
+        _accepterPeerId = payload.accepterPeerId || payload.fromPeerId || _accepterPeerId;
+
+        // Prefer answering an offer the accepter already sent us. This works
+        // even when WE have no mic/camera (answer without a stream = receive-only).
+        // The callee is the side that starts media (see acceptCall); if it
+        // cannot, it sends 'media-ready' and we call it instead. The caller
+        // never calls first, which avoids two competing connections.
+        if (_pendingMediaConnection) {
           try {
-            const mediaConn = peer.call(targetPeerId, _localStream, { metadata: { callType: _callType, callerName: session?.displayName, callId: _currentCallId } });
-            _setupMediaConnection(mediaConn);
-          } catch (e) {
-            console.warn('[CallManager] Call to accepter error:', e);
-          }
-        } else if (_pendingMediaConnection && _localStream) {
-          try {
-            _pendingMediaConnection.answer(_localStream);
+            _pendingMediaConnection.answer(_localStream || undefined);
             _setupMediaConnection(_pendingMediaConnection);
           } catch (e) {
             console.warn('[CallManager] Answer pending call error:', e);
           }
           _pendingMediaConnection = null;
+        }
+      }
+    } else if (payload.action === 'media-ready') {
+      // The callee accepted but could not start media itself (no mic/camera,
+      // or it has no peer id for us). Call it so media can flow; it answers
+      // with its stream, or receive-only when it has no device.
+      if (!_currentCallId || !payload.callId || payload.callId === _currentCallId) {
+        // 'media-ready' implies the call was accepted. The accept signal can
+        // arrive after it on a multi-server relay, so finalize here too.
+        if (_callState === 'calling') {
+          _stopSounds();
+          _playConnectedChime();
+          _callState = 'connected';
+          const st = document.getElementById('call-status-subtitle');
+          if (st) st.textContent = 'Connected';
+          _startCallTimer();
+        }
+        if (_callState === 'connected') {
+          _accepterPeerId = payload.fromPeerId || payload.accepterPeerId || _accepterPeerId;
+          const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
+          const outgoing = _outgoingStream();
+          if (peer && !peer.destroyed && outgoing && !_activeCall && _accepterPeerId) {
+            try {
+              const mediaConn = peer.call(_accepterPeerId, outgoing, { metadata: { callType: _callType, callerName: session?.displayName, callId: _currentCallId, fallback: true } });
+              _setupMediaConnection(mediaConn);
+            } catch (e) {
+              console.warn('[CallManager] Media-ready call error:', e);
+            }
+          }
         }
       }
     } else if (payload.action === 'decline') {
@@ -656,41 +791,24 @@ const CallManager = (() => {
 
   // ── Accept Incoming Call ────────────────────────────────────────
   async function acceptCall() {
-    if (!_incomingCallData) return;
+    if (!_incomingCallData || _callState !== 'incoming') return;
     _stopSounds();
     _hideIncomingToast();
 
-    _callType = _incomingCallData.callType || 'audio';
+    const incoming = _incomingCallData;
+    _callType = incoming.callType || 'audio';
 
-    try {
-      const constraints = {
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: (_callType === 'video') ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } : false
-      };
-      _localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch {
-      try {
-        _localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        _callType = 'audio';
-      } catch {
-        if (typeof UI !== 'undefined') UI.toast('error', 'Error', 'Cannot access audio device.');
-        declineCall();
-        return;
-      }
-    }
-
+    // Show the call and tell the caller we accepted IMMEDIATELY. Waiting for
+    // the permission prompt here used to make an accepted call look unanswered.
     _callState = 'connected';
     _isMuted = false;
     _isVideoOff = false;
 
     _showCallOverlay();
-    document.getElementById('call-peer-name').textContent = _incomingCallData.callerName || 'Room Member';
-    document.getElementById('call-status-subtitle').textContent = 'Connecting…';
-
-    const localVideo = document.getElementById('call-local-video');
-    if (localVideo && _callType === 'video') {
-      localVideo.srcObject = _localStream;
-    }
+    const peerNameEl = document.getElementById('call-peer-name');
+    if (peerNameEl) peerNameEl.textContent = incoming.callerName || 'Room Member';
+    const statusEl = document.getElementById('call-status-subtitle');
+    if (statusEl) statusEl.textContent = 'Connecting…';
 
     _playConnectedChime();
     _startCallTimer();
@@ -702,7 +820,7 @@ const CallManager = (() => {
     if (typeof P2PSync !== 'undefined' && P2PSync.broadcastCallSignal) {
       P2PSync.broadcastCallSignal({
         action: 'accept',
-        callId: _incomingCallData.callId,
+        callId: incoming.callId,
         fromId: session?.memberId || 'guest',
         fromPeerId: myPeerId,
         accepterPeerId: myPeerId,
@@ -710,26 +828,64 @@ const CallManager = (() => {
       });
     }
 
-    // If incoming PeerJS media call is already received, answer it
+    // Acquire local media, but NEVER decline because permission is missing.
+    // A blocked camera/mic must not swallow the call: join receive-only and
+    // let the user allow it, then retry from the mic/camera button.
+    _localStream = await _acquireLocalMedia(_callType);
+    // Cancelled/declined while the permission prompt was open?
+    if (_callState === 'idle' || _incomingCallData !== incoming) {
+      if (_localStream) {
+        try { _localStream.getTracks().forEach(t => t.stop()); } catch {}
+        _localStream = null;
+      }
+      return;
+    }
+
+    if (_localStream) {
+      _attachLocalPreview();
+      // If we already answered the caller receive-only while the permission
+      // prompt was open, reconnect now so they can hear/see us too.
+      if (_activeCall) _restartMediaConnection();
+      if (statusEl) statusEl.textContent = 'Connecting…';
+    } else if (statusEl) {
+      statusEl.textContent = 'Connected (no mic/camera)';
+    }
+
+    // The callee starts the media connection: answer a pending offer, or call
+    // the caller with our stream. If we have no mic/camera, tell the caller so
+    // it can call us and we answer receive-only. On a video call, only start
+    // the offer if we have a camera: an audio-only offer cannot carry the
+    // caller's video back to us, so let the caller start it instead.
+    const canStartMedia = !!_localStream && (_callType !== 'video' || _localStream.getVideoTracks().length > 0);
     if (_pendingMediaConnection) {
       try {
-        _pendingMediaConnection.answer(_localStream);
+        _pendingMediaConnection.answer(_localStream || undefined);
         _setupMediaConnection(_pendingMediaConnection);
       } catch (e) {
         console.warn('[CallManager] Pending call answer error:', e);
       }
       _pendingMediaConnection = null;
-    } else if (_incomingCallData.callerPeerId) {
-      // Connect directly to caller
+    } else if (canStartMedia && !_activeCall && incoming.callerPeerId) {
       const peer = (typeof P2PSync !== 'undefined') ? P2PSync.getPeer() : null;
       if (peer && !peer.destroyed) {
         try {
-          const mediaConn = peer.call(_incomingCallData.callerPeerId, _localStream, { metadata: { callType: _callType, callId: _incomingCallData.callId } });
+          const mediaConn = peer.call(incoming.callerPeerId, _localStream, { metadata: { callType: _callType, callId: incoming.callId } });
           _setupMediaConnection(mediaConn);
         } catch (e) {
           console.warn('[CallManager] Answer call error:', e);
         }
       }
+    } else if (!_activeCall && typeof P2PSync !== 'undefined' && P2PSync.broadcastCallSignal) {
+      // We could not start the media call ourselves (no device, or the invite
+      // did not carry the caller's peer id). Ask the caller to call us.
+      P2PSync.broadcastCallSignal({
+        action: 'media-ready',
+        callId: incoming.callId,
+        fromId: session?.memberId || 'guest',
+        fromPeerId: myPeerId,
+        hasMedia: !!_localStream,
+        timestamp: Date.now()
+      });
     }
   }
 
@@ -766,10 +922,14 @@ const CallManager = (() => {
   // ── Setup MediaConnection Listeners ─────────────────────────────
   function _setupMediaConnection(conn) {
     if (!conn) return;
-    if (_activeCall && _activeCall !== conn) {
-      try { _activeCall.close(); } catch {}
-    }
+    const old = _activeCall;
     _activeCall = conn;
+    _remotePeerId = conn.peer || _remotePeerId;
+    // Close a replaced connection only after swapping _activeCall, so its
+    // 'close' listener does not mistake the swap for a hang-up.
+    if (old && old !== conn) {
+      try { old.close(); } catch {}
+    }
 
     conn.on('stream', (remoteStream) => {
       console.log('[CallManager] Remote stream received:', remoteStream.id);
@@ -793,6 +953,15 @@ const CallManager = (() => {
         remoteVideo.srcObject = remoteStream;
         remoteVideo.play().catch(() => {});
       }
+
+      // A video track can arrive mid-call (camera enabled later, or screen
+      // share). Switch the receiver from the audio stage to the video stage.
+      try {
+        if (remoteStream.getVideoTracks && remoteStream.getVideoTracks().length > 0 && _callType !== 'video') {
+          _callType = 'video';
+          _updateStageDisplay();
+        }
+      } catch {}
 
       _setupAudioVisualizer(remoteStream);
     });
@@ -847,6 +1016,7 @@ const CallManager = (() => {
     _callState = 'idle';
     _currentCallId = null;
     _incomingCallData = null;
+    _accepterPeerId = null;
     _isMinimized = false;
     _callType = 'audio';
     _isMuted = false;
@@ -857,8 +1027,29 @@ const CallManager = (() => {
   }
 
   // ── Controls: Mute, Camera, Screen Share ────────────────────────
-  function toggleMic() {
-    if (!_localStream) return;
+  async function toggleMic() {
+    if (!_localStream) {
+      // Permission may have been granted after the call started — retry now.
+      const retryStream = await _acquireLocalMedia(_callType);
+      if (!retryStream) return;
+      if (_callState !== 'connected') {
+        try { retryStream.getTracks().forEach(t => t.stop()); } catch {}
+        return;
+      }
+      _localStream = retryStream;
+      _attachLocalPreview();
+      if (!_restartMediaConnection()) _addLocalTracksToActiveCall();
+      _isMuted = false;
+      const retryBtn = document.getElementById('call-dock-mic');
+      const retryOn = document.getElementById('icon-mic-on');
+      const retryOff = document.getElementById('icon-mic-off');
+      const retryStatus = document.getElementById('call-status-subtitle');
+      if (retryStatus && _callState === 'connected') retryStatus.textContent = 'Connected';
+      if (retryBtn) retryBtn.classList.remove('is-off');
+      if (retryOn) retryOn.classList.remove('hidden');
+      if (retryOff) retryOff.classList.add('hidden');
+      return;
+    }
     const audioTrack = _localStream.getAudioTracks()[0];
     if (audioTrack) {
       _isMuted = !_isMuted;
@@ -874,8 +1065,33 @@ const CallManager = (() => {
     }
   }
 
-  function toggleCamera() {
-    if (!_localStream) return;
+  async function toggleCamera() {
+    if (!_localStream) {
+      // Permission may have been granted after the call started — retry now.
+      const retryStream = await _acquireLocalMedia('video');
+      if (!retryStream) return;
+      if (_callState !== 'connected') {
+        try { retryStream.getTracks().forEach(t => t.stop()); } catch {}
+        return;
+      }
+      _localStream = retryStream;
+      _attachLocalPreview();
+      if (!_restartMediaConnection()) _addLocalTracksToActiveCall();
+      if (_localStream.getVideoTracks().length) {
+        _callType = 'video';
+        _isVideoOff = false;
+        _updateStageDisplay();
+        const retryBtn = document.getElementById('call-dock-cam');
+        const retryOn = document.getElementById('icon-cam-on');
+        const retryOff = document.getElementById('icon-cam-off');
+        const retryStatus = document.getElementById('call-status-subtitle');
+        if (retryStatus && _callState === 'connected') retryStatus.textContent = 'Connected';
+        if (retryBtn) retryBtn.classList.remove('is-off');
+        if (retryOn) retryOn.classList.remove('hidden');
+        if (retryOff) retryOff.classList.add('hidden');
+      }
+      return;
+    }
     const videoTrack = _localStream.getVideoTracks()[0];
 
     if (videoTrack) {
@@ -889,20 +1105,26 @@ const CallManager = (() => {
       if (btn) btn.classList.toggle('is-off', _isVideoOff);
       if (camOn) camOn.classList.toggle('hidden', _isVideoOff);
       if (camOff) camOff.classList.toggle('hidden', !_isVideoOff);
-    } else if (_callType === 'audio') {
-      // Upgrade audio call to video call on the fly!
+    } else {
+      // Upgrade audio-only → video on the fly (also retries a blocked camera).
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        _notifyMediaProblem(true, new Error('Media devices need HTTPS (or localhost).'));
+        return;
+      }
       navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } })
         .then(newStream => {
           const newVideoTrack = newStream.getVideoTracks()[0];
           _localStream.addTrack(newVideoTrack);
           _callType = 'video';
+          _isVideoOff = false;
           _updateStageDisplay();
 
           const localVideo = document.getElementById('call-local-video');
           if (localVideo) localVideo.srcObject = _localStream;
 
-          // Replace track in active peer connection
-          if (_activeCall && _activeCall.peerConnection) {
+          // PeerJS does not renegotiate new tracks reliably → rebuild the
+          // media connection with the full audio+video stream.
+          if (!_restartMediaConnection() && _activeCall && _activeCall.peerConnection) {
             const sender = _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
             if (sender) {
               sender.replaceTrack(newVideoTrack);
@@ -912,7 +1134,7 @@ const CallManager = (() => {
           }
         })
         .catch(err => {
-          console.warn('[CallManager] Cannot add camera:', err);
+          _notifyMediaProblem(true, err);
         });
     }
   }
@@ -929,9 +1151,10 @@ const CallManager = (() => {
 
       if (_localStream) {
         const camTrack = _localStream.getVideoTracks()[0];
-        if (camTrack && _activeCall && _activeCall.peerConnection) {
+        if (_activeCall && _activeCall.peerConnection) {
           const sender = _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-          if (sender) sender.replaceTrack(camTrack);
+          // replaceTrack(null) stops sending video if there is no camera.
+          if (sender) sender.replaceTrack(camTrack || null);
         }
         const localVideo = document.getElementById('call-local-video');
         if (localVideo) localVideo.srcObject = _localStream;
@@ -950,13 +1173,20 @@ const CallManager = (() => {
         toggleScreenShare();
       };
 
-      if (_activeCall && _activeCall.peerConnection) {
-        const sender = _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(screenTrack);
-        } else {
-          _activeCall.peerConnection.addTrack(screenTrack, _screenStream);
-        }
+      // If a video sender already exists, swapping tracks needs no
+      // renegotiation. Otherwise rebuild the connection with screen + audio
+      // so the other side actually receives the shared screen.
+      const screenSender = (_activeCall && _activeCall.peerConnection)
+        ? _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video')
+        : null;
+      if (screenSender) {
+        screenSender.replaceTrack(screenTrack);
+      } else {
+        const outgoing = new MediaStream([
+          ...(_localStream ? _localStream.getAudioTracks() : []),
+          screenTrack
+        ]);
+        _restartMediaConnection(outgoing);
       }
 
       // Preview screen on local video PiP
@@ -1040,17 +1270,42 @@ const CallManager = (() => {
   // ── Hook into PeerJS Incoming Calls ─────────────────────────────
   function onIncomingMediaCall(mediaConn) {
     console.log('[CallManager] Handling incoming PeerJS MediaConnection from:', mediaConn.peer);
-    if (_callState === 'connected' && _localStream) {
-      // If we already accepted the call, answer immediately
+    if (_callState === 'connected') {
+      // Already accepted: answer immediately. If we have no mic/camera, answer
+      // without a stream (receive-only) so the other side is still heard/seen.
       try {
-        mediaConn.answer(_localStream);
+        mediaConn.answer(_localStream || undefined);
         _setupMediaConnection(mediaConn);
       } catch (e) {
         console.warn('[CallManager] Error answering incoming media call:', e);
       }
-    } else {
-      // Store connection until user clicks "Accept"
+    } else if (_callState === 'calling') {
+      // The callee's media offer proves it accepted; the accept signal can
+      // arrive later on a multi-server relay. Finalize the call now.
+      const meta = mediaConn.metadata || {};
+      if (!meta.callId || meta.callId === _currentCallId) {
+        _stopSounds();
+        _playConnectedChime();
+        _callState = 'connected';
+        const st = document.getElementById('call-status-subtitle');
+        if (st) st.textContent = 'Connected';
+        _startCallTimer();
+        _accepterPeerId = mediaConn.peer || _accepterPeerId;
+        try {
+          mediaConn.answer(_localStream || undefined);
+          _setupMediaConnection(mediaConn);
+        } catch (e) {
+          console.warn('[CallManager] Error answering incoming media call:', e);
+        }
+      } else {
+        _pendingMediaConnection = mediaConn;
+      }
+    } else if (_callState === 'incoming') {
+      // Store connection until the user clicks "Accept"
       _pendingMediaConnection = mediaConn;
+    } else {
+      // Stray offer while idle — don't leave it hanging.
+      try { mediaConn.close(); } catch {}
     }
   }
 

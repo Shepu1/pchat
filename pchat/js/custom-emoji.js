@@ -13,7 +13,7 @@ const CustomEmoji = (() => {
   const CATEGORY_ORDER = [
     'face', 'animal', 'drinks', 'festival', 'fruit', 'love', 'medical',
     'music&games', 'nature', 'people', 'romantic', 'rood',
-    'symbol', 'technology', 'vehicle', 'hand',
+    'symbol', 'technology', 'vehicle', 'hand', 'pchat',
   ];
 
   let _items = [];          // [{file, unicode, category, name, src}]
@@ -26,6 +26,27 @@ const CustomEmoji = (() => {
   function prettyName(cat) {
     return cat.replace('&', ' & ').replace(/\s+/g, ' ')
       .split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+  }
+
+  // ── Pchat shortcodes ──────────────────────────────────────────
+  // The Pchat set (assets/emoji/pchat) has no Unicode emoji at all, so
+  // every image gets a deterministic 5-character shortcode — exactly
+  // like the password-locked "Special" set (`:a7k2p:`). The code is
+  // plain text in the message, so it looks and behaves like every
+  // other emoji; the renderer swaps it for the image on screen.
+  // Same file name → same code on every device, forever.
+  const CODE_LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+  const CODE_ALPHANUM = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+  function pchatShortcode(file, attempt) {
+    let h = 2166136261 >>> 0;
+    const s = 'pchat-set:' + String(file) + '#' + (attempt || 0);
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    h >>>= 0;
+    let code = CODE_LETTERS[h % 26];
+    h = Math.floor(h / 26);
+    for (let i = 0; i < 4; i++) { code += CODE_ALPHANUM[h % 36]; h = Math.floor(h / 36); }
+    return ':' + code + ':';
   }
 
   function safeSrc(category, file) {
@@ -207,6 +228,7 @@ const CustomEmoji = (() => {
     lookup,
     emojifyEscaped,
     twemojifyEscaped,
+    pchatShortcode,
     isLoaded: () => _loaded,
     count: () => _items.length,
   };

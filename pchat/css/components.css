@@ -1204,7 +1204,10 @@
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--t-base);
+  /* One step, not two: a backdrop that fades in before the card slides up
+     reads as "something else flashed, then the card". The sheet has to be
+     complete the moment it is opened. */
+  transition: none;
 }
 .bottom-sheet-overlay.active {
   opacity: 1;
@@ -1222,7 +1225,7 @@
   padding: 1.5rem 1.5rem 2.5rem;
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
   transform: translateY(100%);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
 }
 .bottom-sheet-overlay.active .bottom-sheet-card {
   transform: translateY(0);
