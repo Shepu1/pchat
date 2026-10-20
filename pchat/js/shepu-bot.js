@@ -200,7 +200,13 @@ const ShepuBot = (() => {
   }
 
   function showQuestionSuggestions(questions, at) {
-    const items = questions.map(q => ({ label: q, desc: '', _mention: false, insert: q }));
+    // Prefix the bot mention: previously clicking a suggested question
+    // replaced the "@…" prefix with bare question text, so the message was
+    // never addressed to @shepu-ai and the bot never answered.
+    const items = questions.map(q => {
+      const label = /^@shepu-ai\b/i.test(q) ? q : '@shepu-ai ' + q;
+      return { label, desc: '', _mention: false, insert: label };
+    });
     _renderPopup(items, true);
   }
 

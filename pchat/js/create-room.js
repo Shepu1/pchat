@@ -56,7 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const res = await fetch('apps-script/Code.gs');
         const code = await res.text();
-        await navigator.clipboard.writeText(code);
+        const ok = await UI.copyText(code);
+        if (!ok) throw new Error('Clipboard access was blocked. Select and copy the code manually.');
         UI.toast('success', 'Copied', 'Apps Script code copied to clipboard!');
       } catch (err) {
         UI.toast('error', 'Copy failed', err.message || 'Could not copy code.');

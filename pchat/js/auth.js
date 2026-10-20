@@ -107,11 +107,13 @@ const Auth = (() => {
   }
 
   // ── Get valid access token (refresh if needed) ────────────────
-  async function getAccessToken() {
+  // forceRefresh=true bypasses the cached token. A 401 means the cached
+  // token is dead even if expiresAt says otherwise, so callers must force.
+  async function getAccessToken(forceRefresh = false) {
     const auth = Storage.getAuth();
 
     // If token still valid
-    if (auth && auth.accessToken && Date.now() < auth.expiresAt) {
+    if (!forceRefresh && auth && auth.accessToken && Date.now() < auth.expiresAt) {
       return auth.accessToken;
     }
 

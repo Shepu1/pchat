@@ -39,6 +39,28 @@ const Notify = (() => {
     _memberId = memberId;
     _roomName = roomName || 'Chat';
     _enabled = _supported() && Notification.permission === 'granted';
+    // Register the service worker early (HTTPS/localhost only). Android
+    // Chrome cannot construct `new Notification(...)`; it must go through a
+    // ServiceWorkerRegistration, so having one ready is what makes mobile
+    // notifications work at all.
+    if (_enabled) _ensureSW().catch(() => {});
+  }
+
+  async function _ensureSW() {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return null;
+    try {
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) reg = await navigator.serviceWorker.register('sw.js');
+      // `ready` can stay pending while a new worker activates; never let a
+      // chat alert wait forever on it.
+      try {
+        reg = (await Promise.race([
+          navigator.serviceWorker.ready,
+          new Promise((resolve) => setTimeout(() => resolve(reg), 1500)),
+        ])) || reg;
+      } catch {}
+      return reg || null;
+    } catch { return null; }
   }
 
   function _supported() {
@@ -48,11 +70,16 @@ const Notify = (() => {
   // Ask the user for permission (must be called from a user gesture for best results).
   async function requestPermission() {
     if (!_supported()) return 'unsupported';
-    if (Notification.permission === 'granted') { _enabled = true; return 'granted'; }
+    if (Notification.permission === 'granted') {
+      _enabled = true;
+      await _ensureSW().catch(() => {});
+      return 'granted';
+    }
     if (Notification.permission === 'denied') return 'denied';
     try {
       const result = await Notification.requestPermission();
       _enabled = result === 'granted';
+      if (_enabled) await _ensureSW().catch(() => {});
       return result;
     } catch {
       return 'error';
@@ -83,7 +110,7 @@ const Notify = (() => {
 
   // Called for every incoming message. Only notifies for others' messages
   // and only when the chat is not in front of the user.
-  function notifyMessage(msg) {
+  async function notifyMessage(msg) {
     if (!msg) return;
     // Sender-local / unconfirmed rows must never notify (also guards against
     // stale peers that still broadcast _optimistic on the wire).
@@ -114,18 +141,28 @@ const Notify = (() => {
       body = 'New message';
     }
 
+    const options = {
+      body,
+      tag: id || undefined,
+      icon: 'assets/icons/icon.png',
+      badge: 'assets/icons/icon.png',
+    };
+
+    // Prefer the service worker path: Android Chrome throws on
+    // `new Notification(...)` and the old silent catch meant notifications
+    // simply never appeared on phones.
+    const reg = await _ensureSW();
+    if (reg && typeof reg.showNotification === 'function') {
+      try { await reg.showNotification(`${sender} · ${_roomName}`, options); return; } catch {}
+    }
+
     try {
-      const n = new Notification(`${sender} · ${_roomName}`, {
-        body,
-        tag: id || undefined,
-        icon: 'assets/icons/icon.png',
-        badge: 'assets/icons/icon.png',
-      });
+      const n = new Notification(`${sender} · ${_roomName}`, options);
       n.onclick = () => {
         try { window.focus(); } catch {}
-        n.close();
+        try { n.close(); } catch {}
       };
-    } catch { /* some browsers require a service worker; ignore */ }
+    } catch { /* permission revoked or unsupported */ }
   }
 
   return { init, requestPermission, notifyMessage, isEnabled, isSupported: _supported, isSoundOn, getUserPref, setUserPref };

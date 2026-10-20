@@ -221,6 +221,42 @@ const Rooms = {
     return fresh;
   },
 
+  // Ensure the owner has a valid members-sheet row with role=owner.
+  // Legacy rooms (created before this row was written at creation time) had
+  // no owner row, so every Apps Script room_op failed with FORBIDDEN.
+  async ensureOwnerMemberRow(room, session) {
+    if (!room || !room.spreadsheetId || !session || session.role !== 'owner') return false;
+    if (typeof Sheets === 'undefined' || !Sheets.readValues) return false;
+    if (!room.deploymentUrl || room.deploymentUrl.startsWith('mock://')) return false;
+    const token = session.sessionToken || ('owner_sess_' + (room.secret || room.id));
+    const now = new Date().toISOString();
+    try {
+      const rows = await Sheets.readValues(room.spreadsheetId, `${CONFIG.SHEETS.MEMBERS}!A:I`);
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0] || '') !== String(session.memberId)) continue;
+        // Repair fields that drifted instead of appending a duplicate row.
+        if (String(rows[i][5] || '') !== 'owner') {
+          await Sheets.updateCell(room.spreadsheetId, CONFIG.SHEETS.MEMBERS, i + 1, 6, 'owner');
+        }
+        if (String(rows[i][8] || '') !== token) {
+          await Sheets.updateCell(room.spreadsheetId, CONFIG.SHEETS.MEMBERS, i + 1, 9, token);
+        }
+        if (String(rows[i][7] || '').toUpperCase() !== 'TRUE') {
+          await Sheets.updateCell(room.spreadsheetId, CONFIG.SHEETS.MEMBERS, i + 1, 8, 'TRUE');
+        }
+        return true;
+      }
+      await Sheets.appendRows(room.spreadsheetId, CONFIG.SHEETS.MEMBERS, [[
+        session.memberId, session.displayName || 'Owner', session.joinedAt || now, now,
+        'online', 'owner', 'FALSE', 'TRUE', token,
+      ]]);
+      return true;
+    } catch (e) {
+      console.warn('[Rooms] Could not ensure owner membership:', e && e.message);
+      return false;
+    }
+  },
+
   // ── Create room with Google Sheet backend (async) ─────────────
   // Sheet-backup mode (no per-user setup):
   //   1. Create Google Sheet in user's Drive (inside SHEPU ROOMS folder)
@@ -236,6 +272,8 @@ const Rooms = {
     const roomId = Crypto.generateRoomId();
     const roomSecret = Crypto.generateSecret();
     const now = new Date().toISOString();
+    const memberId = 'u_owner_' + roomId.slice(0, 6);
+    const ownerSessionToken = 'owner_sess_' + roomSecret;
     const name = (roomName && roomName.trim()) || 'Private Room';
     const description = (roomDesc && roomDesc.trim()) || 'Private chat room';
 
@@ -277,6 +315,14 @@ const Rooms = {
         deployment_url: '',
       }), 60000, 'Sheet ট্যাব তৈরি');
 
+      // Register the creator as the owner in the members tab. The Apps Script
+      // backend validates that role for every room_op, and without this row a
+      // custom-backend room had no owner at all (FORBIDDEN on lock/delete/etc).
+      progress('Registering room owner…');
+      await googleStep(Sheets.appendRows(spreadsheetId, CONFIG.SHEETS.MEMBERS, [[
+        memberId, resolvedOwner, now, now, 'online', 'owner', 'FALSE', 'TRUE', ownerSessionToken,
+      ]]), 30000, 'Owner row তৈরি');
+
       // ── Step 3: Backend — P2P mesh + Sheet backup (zero user setup) ──
       // Chat runs on the P2P mesh; the owner's device auto-logs every message
       // to the Sheet. (Programmatic Apps Script deploy was removed: it needs
@@ -311,11 +357,10 @@ const Rooms = {
     };
     this.addMyRoom(room);
 
-    const memberId = 'u_owner_' + roomId.slice(0, 6);
     const sessionData = {
       roomId,
       memberId,
-      sessionToken: 'owner_sess_' + roomSecret,
+      sessionToken: ownerSessionToken,
       displayName: resolvedOwner,
       role: 'owner',
       joinedAt: now,
@@ -434,9 +479,22 @@ const Rooms = {
     let githubUrl = localUrl;
 
     const primaryUrl = isLocalhost ? phoneUrl : localUrl;
-    // Fallback remote QR (used only if local QR lib is missing).
-    // NOTE: prefer InstantSecurity.renderQR() so the secret never leaves the device.
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(primaryUrl)}`;
+    // Generate the QR in-page so the secret fragment (#k=...) never leaves
+    // the device. Only if the bundled library is missing do we fall back to
+    // a remote image — and even then the fragment is stripped first.
+    let qrCodeUrl = '';
+    try {
+      if (typeof qrcode !== 'undefined') {
+        const qr = qrcode(0, 'M');
+        qr.addData(primaryUrl);
+        qr.make();
+        qrCodeUrl = qr.createDataURL(4, 8);
+      }
+    } catch { qrCodeUrl = ''; }
+    if (!qrCodeUrl) {
+      const safeUrl = primaryUrl.split('#')[0];
+      qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(safeUrl)}`;
+    }
 
     return {
       phoneUrl,
@@ -655,11 +713,14 @@ const RoomAPI = {
           if (sess && sess.roomId === roomId && sess.roomName && sess.roomName !== 'Private Room') fallbackName = sess.roomName;
         }
       } catch {}
+      // Status is persisted by owner ops; never hardcode 'active' or the
+      // UI would keep reporting a disabled/locked/deleted room as live.
+      const roomStatus = roomData.status || 'active';
       const roomObj = {
         id: roomId,
         name: roomData.name || fallbackName || 'Private Room',
         description: roomData.description || 'Welcome to the room!',
-        status: 'active',
+        status: roomStatus,
         created_at: roomData.created_at || new Date().toISOString(),
         passwordLocked: !!(roomData.passwordLocked || fallbackLocked),
       };
@@ -668,12 +729,16 @@ const RoomAPI = {
         room: roomObj,
         room_id: roomId,
         room_name: roomObj.name,
-        status: 'active',
+        status: roomStatus,
         created_at: roomObj.created_at,
       };
     }
 
     if (action === 'join') {
+      // Match the Apps Script backend: disabled/deleted rooms reject joins.
+      const joinStatus = roomData.status || 'active';
+      if (joinStatus === 'disabled') return { success: false, code: 'DISABLED', error: 'Room is disabled' };
+      if (joinStatus === 'deleted')  return { success: false, code: 'DELETED',  error: 'Room has been deleted' };
       const displayName = params.displayName || localStorage.getItem('shepu_display_name') || 'Guest';
       const incomingId = params.memberId || null;
       const memberId = incomingId || ('u_' + Date.now());
@@ -737,6 +802,10 @@ const RoomAPI = {
     }
 
     if (action === 'message') {
+      const sendStatus = roomData.status || 'active';
+      if (sendStatus === 'locked')   return { success: false, code: 'LOCKED',   error: 'Room is locked' };
+      if (sendStatus === 'disabled') return { success: false, code: 'DISABLED', error: 'Room is disabled' };
+      if (sendStatus === 'deleted')  return { success: false, code: 'DELETED',  error: 'Room has been deleted' };
       const senderName = params.displayName || localStorage.getItem('shepu_display_name') || 'Guest';
       const senderPicture = params.picture || '';
       const msgId = params.messageId || ('m_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
@@ -817,6 +886,18 @@ const RoomAPI = {
 
     if (action === 'room_op') {
       const op = params.op;
+      // Mock rooms have no server-side session table, so enforce ownership
+      // locally: only the creating device's session may run owner operations.
+      const isOwnerDevice = (() => {
+        try {
+          const myRooms = (typeof Rooms !== 'undefined' && Rooms.getMyRooms) ? Rooms.getMyRooms() : [];
+          if (myRooms.some(r => r.id === roomId)) return true;
+          const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+          return !!(sess && sess.roomId === roomId && sess.role === 'owner');
+        } catch { return false; }
+      })();
+      if (!isOwnerDevice) return { success: false, code: 'FORBIDDEN', error: 'Owner only' };
+
       if (op === 'get_stats') {
         return {
           success: true,
@@ -832,11 +913,15 @@ const RoomAPI = {
       if (op === 'lock' || op === 'unlock' || op === 'disable' || op === 'enable') {
         roomData.status = op === 'lock' ? 'locked' : op === 'disable' ? 'disabled' : 'active';
         localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        // Tell connected guests immediately; otherwise only this device
+        // sees the room as locked/disabled.
+        _relay({ type: 'room_status', status: roomData.status, roomId, updatedBy: params.memberId });
         return { success: true };
       }
       if (op === 'delete') {
         roomData.status = 'deleted';
         localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _relay({ type: 'room_status', status: 'deleted', roomId, updatedBy: params.memberId });
         return { success: true };
       }
       if (op === 'rename' && params.name) {

@@ -29,6 +29,7 @@ const CallManager = (() => {
   let _accepterPeerId = null;     // peer that accepted our outgoing call
   let _remotePeerId = null;       // peer on the active media connection
   let _placeholderTrack = null;   // black video track to keep a video m-line
+  const _seenInviteIds = new Map(); // callId -> ts, dedupes P2P+Ntfy copies
 
   // Web Audio Context & Synthesizer
   let _audioCtx = null;
@@ -457,12 +458,18 @@ const CallManager = (() => {
   // ── Local media acquisition (never blocks the call itself) ──────
   // Permission is only needed to SEND media — not to place/answer a
   // call. Getting media must never delay the ring or drop the call.
+  const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const VIDEO_CONSTRAINTS = { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' };
+  // Some cameras reject facingMode/720p ideals while still working with a
+  // plain video request; retry with this before giving up on video.
+  const VIDEO_CONSTRAINTS_RELAXED = { width: { ideal: 1280 }, height: { ideal: 720 } };
   const MEDIA_ERROR_TEXT = {
     NotAllowedError:  'Permission denied — open the address-bar lock icon, allow the mic/camera, then press the mic/camera button again.',
     SecurityError:    'The browser blocked mic/camera access. Allow it in site settings, then retry.',
     NotFoundError:    'No microphone/camera was found on this device.',
     DevicesNotFoundError: 'No microphone/camera was found on this device.',
     OverconstrainedError: 'This device cannot provide the requested camera settings.',
+    ConstraintNotSatisfiedError: 'This device cannot provide the requested camera settings.',
     NotReadableError: 'The mic/camera is busy in another app/tab. Close it and retry.',
     TrackStartError:  'The mic/camera could not start. Close other apps using it and retry.',
     AbortError:       'The mic/camera request was interrupted. Try again.'
@@ -477,26 +484,57 @@ const CallManager = (() => {
     const label = wantedVideo ? 'Camera/Mic blocked' : 'Microphone blocked';
     UI.toast('warning', label, _mediaErrorText(err) + ' The call still connects — you just won\'t send ' + (wantedVideo ? 'audio/video' : 'audio') + '.', 9000);
   }
+  // One device worked, the other did not. Say clearly what still works —
+  // the old all-or-nothing message wrongly claimed nothing was being sent
+  // when the mic (or camera) fallback had in fact succeeded.
+  function _notifyMediaPartial(kind, err) {
+    console.warn('[CallManager] Partial media (' + kind + ' missing):', err);
+    if (typeof UI === 'undefined' || !UI.toast) return;
+    if (kind === 'video') {
+      UI.toast('warning', 'Camera blocked', _mediaErrorText(err) + ' Voice is still being sent; tap the camera button to retry.', 9000);
+    } else {
+      UI.toast('warning', 'Microphone blocked', _mediaErrorText(err) + ' Camera is on, but others cannot hear you yet — tap the mic button to retry.', 9000);
+    }
+  }
   async function _acquireLocalMedia(type) {
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
       _notifyMediaProblem(type === 'video', new Error('Media devices need HTTPS (or localhost).'));
       return null;
     }
-    const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
     if (type !== 'video') {
-      try { return await navigator.mediaDevices.getUserMedia({ audio }); }
+      try { return await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS }); }
       catch (err) { _notifyMediaProblem(false, err); return null; }
     }
+
+    let firstErr = null;
     try {
-      return await navigator.mediaDevices.getUserMedia({ audio, video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } });
+      return await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: VIDEO_CONSTRAINTS });
     } catch (err) {
-      // Camera missing/denied but the mic may still be fine → keep a voice channel.
+      firstErr = err;
+      if (err && (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError')) {
+        try {
+          return await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS, video: VIDEO_CONSTRAINTS_RELAXED });
+        } catch (err2) { firstErr = err2; }
+      }
+    }
+
+    // Camera missing/denied but the mic may still be fine → keep a voice channel.
+    try {
+      const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+      _notifyMediaPartial('video', firstErr);
+      return audioOnly;
+    } catch (audioErr) {
+      // Mic denied but camera allowed → keep the camera instead of dropping
+      // both. The user can grant/retry the mic from the mic button later.
       try {
-        const audioOnly = await navigator.mediaDevices.getUserMedia({ audio });
-        _notifyMediaProblem(true, err);
-        return audioOnly;
-      } catch (err2) {
-        _notifyMediaProblem(true, err2);
+        const videoOnly = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS });
+        _notifyMediaPartial('audio', audioErr);
+        return videoOnly;
+      } catch (videoErr) {
+        // Prefer an explicit permission error over a secondary device error.
+        const finalErr = (audioErr && (audioErr.name === 'NotAllowedError' || audioErr.name === 'SecurityError'))
+          ? audioErr : videoErr;
+        _notifyMediaProblem(true, finalErr);
         return null;
       }
     }
@@ -575,7 +613,7 @@ const CallManager = (() => {
   }
 
   // ── Start Outgoing Call ─────────────────────────────────────────
-  async function startCall(type = 'audio') {
+  async function startCall(type = 'audio', targetMemberId = null, targetName = '') {
     if (_callState !== 'idle') {
       console.warn('[CallManager] Already in call or calling');
       return;
@@ -586,6 +624,10 @@ const CallManager = (() => {
     const params = new URLSearchParams(location.search);
     const roomId = session?.roomId || params.get('r') || 'room';
     const roomName = session?.roomName || params.get('n') || 'Room Call';
+    // Per-member call button: invite only that member. The header call
+    // buttons pass no target and keep ringing the whole room.
+    const callTargetId = targetMemberId || null;
+    const callTargetName = targetName || '';
 
     _callState = 'calling';
     _isMuted = false;
@@ -600,9 +642,9 @@ const CallManager = (() => {
     _showCallOverlay();
 
     const nameEl = document.getElementById('call-peer-name');
-    if (nameEl) nameEl.textContent = roomName;
+    if (nameEl) nameEl.textContent = callTargetName || roomName;
     const statusEl = document.getElementById('call-status-subtitle');
-    if (statusEl) statusEl.textContent = 'Calling…';
+    if (statusEl) statusEl.textContent = callTargetName ? `Calling ${callTargetName}…` : 'Calling…';
 
     _playOutgoingRing();
 
@@ -627,6 +669,10 @@ const CallManager = (() => {
       fromId: session?.memberId || 'user',
       fromPeerId: callerPeerId,
       callType: _callType,
+      // Optional 1:1 target. Receivers ignore targeted invites addressed to
+      // someone else, so a member-row call no longer rings the whole room.
+      targetMemberId: callTargetId || undefined,
+      targetName: callTargetName || undefined,
       timestamp: Date.now()
     };
 
@@ -687,6 +733,26 @@ const CallManager = (() => {
     if (myPeerId && (payload.fromPeerId === myPeerId || payload.callerPeerId === myPeerId)) return;
 
     if (payload.action === 'invite') {
+      // A targeted (per-member) call must only reach that member.
+      if (payload.targetMemberId && payload.targetMemberId !== myMemberId) return;
+
+      // The same invite is sent over BOTH P2P and Ntfy (belt & braces), so
+      // the second copy would otherwise look like a second call and answer
+      // "busy", killing the caller's ring. Dedupe by callId first.
+      const inviteId = payload.callId || '';
+      const now = Date.now();
+      if (_seenInviteIds.size > 20) {
+        for (const [k, t] of _seenInviteIds) {
+          if (now - t > 120000) _seenInviteIds.delete(k);
+        }
+      }
+      if (inviteId && _seenInviteIds.has(inviteId)) {
+        return; // duplicate copy of an invite we already handled
+      }
+      // Remember it before the busy branch too, otherwise the duplicate
+      // copy would send a second busy signal.
+      if (inviteId) _seenInviteIds.set(inviteId, now);
+
       if (_callState !== 'idle') {
         // Send busy signal back to caller
         if (typeof P2PSync !== 'undefined') {
@@ -1027,42 +1093,51 @@ const CallManager = (() => {
   }
 
   // ── Controls: Mute, Camera, Screen Share ────────────────────────
+  function _paintMicUI(muted) {
+    const btn = document.getElementById('call-dock-mic');
+    const micOn = document.getElementById('icon-mic-on');
+    const micOff = document.getElementById('icon-mic-off');
+    if (btn) btn.classList.toggle('is-off', muted);
+    if (micOn) micOn.classList.toggle('hidden', muted);
+    if (micOff) micOff.classList.toggle('hidden', !muted);
+  }
+
   async function toggleMic() {
-    if (!_localStream) {
-      // Permission may have been granted after the call started — retry now.
-      const retryStream = await _acquireLocalMedia(_callType);
+    const liveAudio = _localStream
+      ? _localStream.getAudioTracks().find(t => t.readyState === 'live')
+      : null;
+
+    if (!liveAudio) {
+      // No mic track yet (permission denied earlier, or camera-only fallback).
+      // Ask for audio only so an existing camera track is preserved.
+      const retryStream = await _acquireLocalMedia('audio');
       if (!retryStream) return;
       if (_callState !== 'connected') {
         try { retryStream.getTracks().forEach(t => t.stop()); } catch {}
         return;
       }
-      _localStream = retryStream;
+      if (_localStream) {
+        // Remove dead audio tracks, then attach only the new audio.
+        _localStream.getAudioTracks().forEach(t => {
+          if (t.readyState !== 'live') { try { _localStream.removeTrack(t); } catch {} }
+        });
+        retryStream.getVideoTracks().forEach(t => { try { t.stop(); } catch {} });
+        retryStream.getAudioTracks().forEach(t => _localStream.addTrack(t));
+      } else {
+        _localStream = retryStream;
+      }
       _attachLocalPreview();
       if (!_restartMediaConnection()) _addLocalTracksToActiveCall();
       _isMuted = false;
-      const retryBtn = document.getElementById('call-dock-mic');
-      const retryOn = document.getElementById('icon-mic-on');
-      const retryOff = document.getElementById('icon-mic-off');
+      _paintMicUI(false);
       const retryStatus = document.getElementById('call-status-subtitle');
       if (retryStatus && _callState === 'connected') retryStatus.textContent = 'Connected';
-      if (retryBtn) retryBtn.classList.remove('is-off');
-      if (retryOn) retryOn.classList.remove('hidden');
-      if (retryOff) retryOff.classList.add('hidden');
       return;
     }
-    const audioTrack = _localStream.getAudioTracks()[0];
-    if (audioTrack) {
-      _isMuted = !_isMuted;
-      audioTrack.enabled = !_isMuted;
 
-      const btn = document.getElementById('call-dock-mic');
-      const micOn = document.getElementById('icon-mic-on');
-      const micOff = document.getElementById('icon-mic-off');
-
-      if (btn) btn.classList.toggle('is-off', _isMuted);
-      if (micOn) micOn.classList.toggle('hidden', _isMuted);
-      if (micOff) micOff.classList.toggle('hidden', !_isMuted);
-    }
+    _isMuted = !_isMuted;
+    liveAudio.enabled = !_isMuted;
+    _paintMicUI(_isMuted);
   }
 
   async function toggleCamera() {
@@ -1092,7 +1167,7 @@ const CallManager = (() => {
       }
       return;
     }
-    const videoTrack = _localStream.getVideoTracks()[0];
+    const videoTrack = _localStream.getVideoTracks().find(t => t.readyState === 'live');
 
     if (videoTrack) {
       _isVideoOff = !_isVideoOff;
@@ -1111,9 +1186,18 @@ const CallManager = (() => {
         _notifyMediaProblem(true, new Error('Media devices need HTTPS (or localhost).'));
         return;
       }
-      navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } })
+      navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS })
         .then(newStream => {
           const newVideoTrack = newStream.getVideoTracks()[0];
+          if (!newVideoTrack) {
+            try { newStream.getTracks().forEach(t => t.stop()); } catch {}
+            _notifyMediaProblem(true, new Error('No camera track was provided.'));
+            return;
+          }
+          // Drop a dead video track before attaching the fresh one.
+          _localStream.getVideoTracks().forEach(t => {
+            if (t.readyState !== 'live') { try { _localStream.removeTrack(t); } catch {} }
+          });
           _localStream.addTrack(newVideoTrack);
           _callType = 'video';
           _isVideoOff = false;
@@ -1139,6 +1223,19 @@ const CallManager = (() => {
     }
   }
 
+  async function _acquireDisplayMedia() {
+    try {
+      return await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    } catch (err) {
+      // System-audio capture is optional and unsupported in some browsers;
+      // retry video-only instead of failing the whole share.
+      if (err && (err.name === 'NotSupportedError' || err.name === 'OverconstrainedError' || err.name === 'TypeError')) {
+        return await navigator.mediaDevices.getDisplayMedia({ video: true });
+      }
+      throw err;
+    }
+  }
+
   async function toggleScreenShare() {
     if (_isScreenSharing) {
       // Revert from screen share to camera
@@ -1150,7 +1247,7 @@ const CallManager = (() => {
       document.getElementById('call-dock-screen')?.classList.remove('is-active');
 
       if (_localStream) {
-        const camTrack = _localStream.getVideoTracks()[0];
+        const camTrack = _localStream.getVideoTracks().find(t => t.readyState === 'live');
         if (_activeCall && _activeCall.peerConnection) {
           const sender = _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
           // replaceTrack(null) stops sending video if there is no camera.
@@ -1162,9 +1259,15 @@ const CallManager = (() => {
       return;
     }
 
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+      UI.toast('warning', 'Screen share unavailable', 'This browser or device does not support screen sharing.');
+      return;
+    }
+
     try {
-      _screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      _screenStream = await _acquireDisplayMedia();
       const screenTrack = _screenStream.getVideoTracks()[0];
+      if (!screenTrack) throw new Error('No screen video track was provided.');
       _isScreenSharing = true;
       document.getElementById('call-dock-screen')?.classList.add('is-active');
 
@@ -1199,7 +1302,17 @@ const CallManager = (() => {
       }
     } catch (err) {
       console.warn('[CallManager] Screen share error/cancelled:', err);
+      if (_screenStream) {
+        try { _screenStream.getTracks().forEach(t => t.stop()); } catch {}
+        _screenStream = null;
+      }
       _isScreenSharing = false;
+      document.getElementById('call-dock-screen')?.classList.remove('is-active');
+      if (err && err.name === 'NotAllowedError') {
+        UI.toast('info', 'Screen share cancelled', 'No screen was shared.');
+      } else if (typeof UI !== 'undefined' && UI.toast) {
+        UI.toast('warning', 'Screen share failed', 'Screen sharing is not available on this device/browser, or permission was blocked.');
+      }
     }
   }
 
@@ -1229,12 +1342,20 @@ const CallManager = (() => {
     _ensureUIElements();
     _updateStageDisplay();
     const overlay = document.getElementById('active-call-overlay');
-    if (overlay) overlay.style.display = 'flex';
+    if (overlay) {
+      // Always sync the PiP class with the actual state; a stale 'minimized'
+      // class from a previous call used to make every new call open tiny.
+      overlay.classList.toggle('minimized', _isMinimized);
+      overlay.style.display = 'flex';
+    }
   }
 
   function _hideCallOverlay() {
     const overlay = document.getElementById('active-call-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.classList.remove('minimized');
+    }
   }
 
   function _showIncomingToast(data) {
@@ -1252,10 +1373,25 @@ const CallManager = (() => {
 
     const av = document.getElementById('incoming-avatar');
     if (av) {
-      if (data.callerPicture && /^(data:|https?:)/i.test(data.callerPicture)) {
-        av.innerHTML = `<img src="${data.callerPicture}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+      const pic = (typeof data.callerPicture === 'string') ? data.callerPicture.trim() : '';
+      // Only image URLs; reject anything with raw quotes/angle brackets/space.
+      // Build with DOM properties (not innerHTML) so the value can never
+      // break out of the src attribute.
+      const picSafe = pic
+        && /^(data:image\/|https?:\/\/)/i.test(pic)
+        && !/[\s"'<>]/.test(pic);
+      av.textContent = '';
+      if (picSafe) {
+        const img = document.createElement('img');
+        img.src = pic;
+        img.alt = '';
+        img.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;';
+        img.onerror = () => {
+          av.textContent = (data.callerName ? String(data.callerName)[0] : '?').toUpperCase();
+        };
+        av.appendChild(img);
       } else {
-        av.textContent = (data.callerName ? data.callerName[0] : '?').toUpperCase();
+        av.textContent = (data.callerName ? String(data.callerName)[0] : '?').toUpperCase();
       }
     }
 

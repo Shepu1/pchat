@@ -96,8 +96,9 @@ const InstantSecurity = (() => {
   }
 
   // ── Render QR locally (secret never leaves the device) ─────────
-  // Uses qrcode-generator CDN lib if present (generates in-page),
-  // otherwise falls back to the <img> + qrserver URL.
+  // Uses the bundled qrcode-generator lib (generates in-page). If that
+  // lib is unavailable, the remote fallback MUST NOT receive the URL
+  // fragment (#k=...), because that fragment carries the room secret.
   function renderQR({ qrImg, qrBox, text, size = 240 }) {
     try {
       if (typeof qrcode !== 'undefined' && qrBox) {
@@ -118,8 +119,10 @@ const InstantSecurity = (() => {
     } catch {}
     try {
       if (qrImg) {
+        // Strip the fragment (secret carrier) before any network request.
+        const safeText = String(text || '').split('#')[0];
         qrImg.style.display = '';
-        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(text)}`;
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(safeText)}`;
       }
       if (qrBox) qrBox.style.display = 'none';
     } catch {}

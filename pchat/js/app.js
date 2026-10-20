@@ -141,6 +141,13 @@ async function bindRoomPasswordUI(room, session) {
   });
 }
 
+// Build the join.html redirect without losing any invite parameter.
+function buildJoinRedirect(params, roomId, hash) {
+  const fwd = new URLSearchParams(params);
+  fwd.set('r', roomId);
+  return `join.html?${fwd.toString()}${hash || ''}`;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Mobile device detection for theme
   if (/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800) {
@@ -203,7 +210,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   let urlRoomName = null;
   try {
     const nP = params.get('n');
-    if (nP) urlRoomName = decodeURIComponent(nP) || null;
+    // URLSearchParams already decoded once; a second decode broke '%' names.
+    if (nP) urlRoomName = nP || null;
   } catch { urlRoomName = null; }
   let urlRoomKind = null;
   try {
@@ -270,8 +278,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         Storage.setSession(session);
         Storage.setCurrentRoom(roomId);
       } else {
-        // No valid session for this room — go to join
-        window.location.href = `join.html?r=${roomId}`;
+        // No valid session for this room — go to join, forwarding the full
+        // invite (endpoint, name, theme, lock flag and #k= key). Dropping
+        // these made the joiner lose E2EE key + endpoint.
+        window.location.href = buildJoinRedirect(params, roomId, window.location.hash);
         return;
       }
     }
@@ -382,6 +392,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       try { Rooms.updateRoom(roomId, { passwordLocked: true }); } catch {}
     }
   } catch { /* non-critical */ }
+
+  // ── Owner membership repair (Google-Sheets-backed rooms) ─────
+  // Without a members row with role=owner, every Apps Script room_op returns
+  // FORBIDDEN. New rooms get the row at creation; this repairs legacy rooms.
+  try {
+    if (session.role === 'owner' && room.spreadsheetId && !room.deploymentUrl.startsWith('mock://')) {
+      await Rooms.ensureOwnerMemberRow(room, session);
+    }
+  } catch (e) { console.warn('[app] owner membership repair skipped:', e && e.message); }
 
   // ── Room-password gate ────────────────────────────────────────
   // Locked rooms stop here without a derived key: no history renders, no
@@ -509,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (unique.length) {
       Chat.appendMessages(unique);
-      try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
+      try { updateKeyBanner(); } catch {}
     }
   } catch { /* non-critical */ }
 
@@ -519,7 +538,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const sheetMsgs = await Chat.loadSheetMessages();
       if (sheetMsgs && sheetMsgs.length) {
         Chat.appendMessages(sheetMsgs);
-      try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
+      try { updateKeyBanner(); } catch {}
       }
     }
   } catch (err) {
@@ -536,18 +555,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     if (joinRes && joinRes.success) {
+      // Adopt the backend-issued memberId too: on a fresh custom-backend
+      // room the server generates one, and keeping the old client-side id
+      // caused member-id/token drift and duplicate member rows on rejoin.
+      // Mutate in place — Chat.init already holds this object by reference.
+      session.memberId     = joinRes.memberId || session.memberId;
+      session.sessionToken = joinRes.sessionToken || session.sessionToken;
+      session.role         = session.role === 'owner' ? 'owner' : (joinRes.role || session.role);
+      Storage.setSession(session);
+    } else if (joinRes && joinRes.success === false) {
       const code = joinRes.code;
       if (code === 'DISABLED') { Chat.showUnavailable('This room is currently disabled.'); return; }
       if (code === 'DELETED')  { Chat.showUnavailable('This room has been deleted.'); return; }
       if (code === 'BANNED')   { Chat.showUnavailable('You have been banned from this room.'); return; }
-
-      // Persist fresh session token, never demoting the room owner
-      const updatedSession = {
-        ...session,
-        sessionToken: joinRes.sessionToken || session.sessionToken,
-        role:         session.role === 'owner' ? 'owner' : (joinRes.role || session.role),
-      };
-      Storage.setSession(updatedSession);
     }
 
   } catch (err) {
@@ -599,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             await Chat.refreshDecryption();
           }
         } catch {}
-        try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
+        try { updateKeyBanner(); } catch {}
       }
     } else if (typeof Encryption !== 'undefined' && Encryption.isManual
                && Encryption.isManual()
@@ -628,8 +648,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // decrypt (no active key) — e.g. owner enabled passphrase-E2EE. Normal
   // readable chat never triggers it. Also covers browsers WITHOUT WebCrypto
   // (http:// LAN, some in-app WebViews): those can NEVER decrypt.
-  // Global so message handlers below can re-check after every batch.
-  window.updateKeyBanner = function () {
+  // Function declaration (not an assignment) so it is hoisted: earlier code
+  // in this same callback calls it while loading cached history, which
+  // previously ran before the assignment existed and never showed the banner.
+  function updateKeyBanner() {
     try {
       const keyBanner = document.getElementById('key-banner');
       if (!keyBanner) return;
@@ -657,7 +679,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       keyBanner.classList.toggle('hidden', !needsKey);
     } catch { /* non-critical */ }
-  };
+  }
+  window.updateKeyBanner = updateKeyBanner;
   try {
     document.getElementById('key-banner-btn')?.addEventListener('click', async () => {
       const keyBanner = document.getElementById('key-banner');
@@ -776,7 +799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       displayName: session.displayName,
       onMessage: async (msgs) => {
         Chat.appendMessages(msgs);
-          try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
+          try { updateKeyBanner(); } catch {}
         try {
           if (typeof IDBStorage !== 'undefined') {
             await IDBStorage.putMessages(msgs.map(m => ({ ...m, roomId: room.id })));
@@ -847,7 +870,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (already) return;
           }
           Chat.appendMessages([msg]);
-          try { if (typeof window.updateKeyBanner === 'function') window.updateKeyBanner(); } catch {}
+          try { updateKeyBanner(); } catch {}
           try {
             if (typeof IDBStorage !== 'undefined') {
               IDBStorage.putMessages([{ ...msg, roomId: room.id }]).catch(() => {});
@@ -865,9 +888,31 @@ document.addEventListener('DOMContentLoaded', async () => {
           return;
         }
         // Reaction updates via cloud relay
-        if (kind === 'reaction' && payload) {
+        if (kind === 'reaction' && payload && payload.reaction) {
           if (typeof Chat !== 'undefined' && Chat.appendMessages) {
-            Chat.appendMessages([{ _reactionEvent: true, ...payload }]);
+            // payload.reaction holds {msgId, emoji, memberId, memberName,
+            // action}; spreading `payload` itself dropped all of those and
+            // the reaction was silently ignored.
+            Chat.appendMessages([{ _reactionEvent: true, ...payload.reaction }]);
+          }
+          return;
+        }
+        // Owner changed the room status (quick rooms have no server, so the
+        // mock backend relays it). Apply it on every connected guest.
+        if (kind === 'room_status' && payload && payload.status) {
+          const st = payload.status;
+          room.status = st;
+          try { Rooms.updateRoom(room.id, { status: st }); } catch {}
+          if (st === 'deleted') { Chat.showUnavailable('This room has been deleted.'); return; }
+          if (st === 'disabled') { Chat.showUnavailable('This room is currently disabled.'); return; }
+          if (st === 'locked') { Chat.setStatus('Locked (read-only)', true); return; }
+          if (st === 'active') {
+            try {
+              document.getElementById('room-unavailable-overlay')?.classList.add('hidden');
+              const ci = document.getElementById('chat-input'); if (ci) ci.disabled = false;
+              const sb = document.getElementById('send-btn'); if (sb) sb.disabled = false;
+              Chat.setStatus(session.displayName || 'Online', true);
+            } catch {}
           }
           return;
         }
@@ -976,6 +1021,20 @@ document.addEventListener('DOMContentLoaded', async () => {
               await Encryption.deriveKeyFromRoomSecret(fresh, room.id);
             }
           } catch {}
+          // Follow the new secret immediately: drop the revoked Ntfy topic,
+          // verify new P2P proofs against it, and keep the address bar's #k=
+          // in sync so a reload/reshare does not resurrect the old link.
+          try {
+            if (typeof NtfySync !== 'undefined' && NtfySync.setSecret) NtfySync.setSecret(fresh);
+          } catch {}
+          try {
+            if (typeof P2PSync !== 'undefined' && P2PSync.updateSecret) P2PSync.updateSecret(fresh);
+          } catch {}
+          try {
+            const encoded = btoa(fresh).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            history.replaceState(null, '', window.location.pathname + window.location.search + '#k=' + encoded);
+          } catch {}
+          try { if (typeof Presence !== 'undefined' && Presence.heartbeat) Presence.heartbeat(); } catch {}
           const urls2 = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
           const url2 = urls2.defaultUrl;
           const urlDisplay2 = document.getElementById('modal-share-url');

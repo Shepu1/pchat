@@ -244,12 +244,27 @@
 <script src="js/config.js?v=20261016a"></script>
 <script src="js/storage.js?v=20261016a"></script>
 <script src="js/ui.js?v=20261020e"></script>
-<script src="js/auth.js?v=20261016a"></script>
+<script src="js/auth.js?v=20261020f"></script>
 <script>
+// ?redirect= must only ever navigate to a same-origin relative page. This
+// blocks open redirects and javascript:/data: URLs.
+function safeRedirect(raw, fallback) {
+  fallback = fallback || 'index.html';
+  const val = String(raw == null ? '' : raw).trim();
+  if (!val) return fallback;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(val)) return fallback; // any scheme: javascript:, data:, https:, mailto:…
+  if (val.startsWith('//') || val.startsWith('\\')) return fallback; // protocol-relative / backslash tricks
+  try {
+    const u = new URL(val, location.href);
+    if (u.origin !== location.origin) return fallback;
+    return u.pathname + u.search + u.hash;
+  } catch { return fallback; }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(location.search);
   const reason = params.get('reason');
-  const redirect = params.get('redirect') || 'index.html';
+  const redirect = safeRedirect(params.get('redirect'));
 
   if (reason) {
     const reasonMessages = {

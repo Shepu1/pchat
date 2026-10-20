@@ -91,7 +91,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     deploymentUrl = `mock://local/${roomId}`;
   }
 
-  const nameParam = params.get('n') ? decodeURIComponent(params.get('n')) : null;
+  // URLSearchParams.get() already percent-decodes once; decoding again broke names containing '%'.
+  const nameParam = params.get('n') || null;
   // Password-locked rooms advertise `&pw=1` in the link (no key material).
   const pwParam = params.get('pw') === '1';
   // Room kind (?rt=saved|quick) tells the join card which profile icon to show.
@@ -105,6 +106,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Fetch room info from Apps Script ──────────────────────────
   showLoading();
   let roomInfo;
+  // True only when the backend actually answered with a room object; an
+  // unreachable backend must never be treated as "password removed".
+  let roomInfoTrusted = false;
   try {
     const res = await RoomAPI.getRoom(deploymentUrl);
     roomInfo = res && res.room ? res.room : {
@@ -112,6 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       name: nameParam || 'Private Room',
       status: 'active'
     };
+    roomInfoTrusted = !!(res && res.room);
   } catch (err) {
     // If backend unreachable, still allow joining with name from URL or local room
     roomInfo = {
@@ -295,6 +300,26 @@ function showError(title, msg) {
   document.getElementById('join-error-msg').textContent   = msg;
 }
 
+// Decide the registry's passwordLocked flag after reading the room.
+// A link (&pw=1) or the backend saying "locked" means locked. Only a
+// *trusted* backend answer may clear a stale lock — an unreachable backend
+// must never silently unlock a room we cannot verify.
+function passwordLockPatch(regLocked, infoLocked, infoTrusted, pwFlag) {
+  if (pwFlag === true || infoLocked === true) return true;
+  if (infoTrusted) return false;
+  return !!regLocked;
+}
+
+// Early-warning badge text for an invite that carries no key. Password rooms
+// intentionally ship no key material (the password derives it), so telling
+// those users "no key in link" sent them chasing a link that cannot have one.
+function inviteKeyWarning(hasKey, passwordLocked) {
+  if (hasKey) return '';
+  return passwordLocked
+    ? '🔒 Password protected — enter the room password'
+    : '⚠ No key in link — ask owner for the FULL invite link';
+}
+
 function showUnavailable(title, msg) {
   hideLoading();
   const el = document.getElementById('join-unavailable');
@@ -344,10 +369,12 @@ function showJoinForm(roomInfo) {
   }
   // Early warning: this invite carries NO room key (fragment stripped or
   // partial link). Joining anyway means locked messages — tell them now.
+  // Password rooms are the exception: their links never carry a key.
   try {
     const storedSecret = (room && room.secret) ? room.secret : null;
-    if (!roomSecret && !storedSecret && badges) {
-      badges.innerHTML += ' <span class="badge badge-warning">⚠ No key in link — ask owner for the FULL invite link</span>';
+    const warning = inviteKeyWarning(!!roomSecret || !!storedSecret, roomInfo.passwordLocked === true);
+    if (warning && badges) {
+      badges.innerHTML += ' <span class="badge badge-warning">' + warning + '</span>';
     }
   } catch {}
 
@@ -402,7 +429,7 @@ function showRejoin(roomInfo, session) {
     // A fresh invite may also carry a truer room name (?n=) / kind (?rt=):
     // adopt them when the stored ones are blank or still 'Private Room'.
     try {
-      const nP = qp.get('n') ? decodeURIComponent(qp.get('n')) : null;
+      const nP = qp.get('n') || null; // already decoded by URLSearchParams
       if (nP && (!session.roomName || session.roomName === 'Private Room') && (!roomInfo || !roomInfo.name || roomInfo.name === 'Private Room')) {
         session.roomName = nP;
         if (roomInfo) roomInfo.name = nP;
@@ -430,11 +457,17 @@ function showRejoin(roomInfo, session) {
     const reg = Rooms.getRoom(session.roomId);
     if (reg) {
       const patch = {};
-      if (freshSecret && !reg.secret) patch.secret = freshSecret;
+      // A fresh invite link is authoritative: after the owner rotates the
+      // link, a rejoin must adopt the new secret instead of keeping the
+      // stale registry copy (which caused unreadable history + old topic).
+      if (freshSecret && reg.secret !== freshSecret) patch.secret = freshSecret;
       if (freshDep && reg.deploymentUrl !== freshDep) patch.deploymentUrl = freshDep;
       if ((!reg.name || reg.name === 'Private Room') && session.roomName && session.roomName !== 'Private Room') patch.name = session.roomName;
       if (!reg.kind && session.roomKind) patch.kind = session.roomKind;
-      if (roomInfo.passwordLocked === true && !reg.passwordLocked) patch.passwordLocked = true;
+      // Owner may have removed the password: clear the stale flag so rejoin
+      // stops prompting forever. Uses all four signals (link/backend/trust).
+      const desiredLocked = passwordLockPatch(reg.passwordLocked, roomInfo.passwordLocked, roomInfoTrusted, pwParam);
+      if (desiredLocked !== !!reg.passwordLocked) patch.passwordLocked = desiredLocked;
       try {
         const thP = qp.get('th');
         if (thP && typeof RoomTheme !== 'undefined' && !reg.theme) patch.theme = RoomTheme.normalize(thP);

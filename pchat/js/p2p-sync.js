@@ -22,6 +22,10 @@ const P2PSync = (() => {
   let _onIncomingMediaCallCb = null;
   let _requireProof = false; // password-locked rooms: no proof → rejected
   let _reconnectTimer = null;
+  let _connectTimeout = null;
+  let _connectingToHost = false;
+  let _connectAttempt = 0;      // token: stale conn events must not clear newer timers
+  let _active = false;          // false after destroy()/leave — stops retries
   let _joinRejected = false; // guest: stop retrying after an explicit reject
   let _activeMembers = new Map(); // memberId -> { id, name, role, lastSeen }
 
@@ -46,6 +50,7 @@ const P2PSync = (() => {
 
     // Clean up any existing instance
     destroy();
+    _active = true;
 
     _roomId = roomId;
     _roomSecret = roomSecret || null;
@@ -104,6 +109,7 @@ const P2PSync = (() => {
 
   // ── Host Peer Initialization ──────────────────────────────────
   function _initHost() {
+    if (!_active) return;
     const hostId = getHostPeerId(_roomId);
     console.log('[P2PSync] Starting Host Peer:', hostId);
 
@@ -140,7 +146,7 @@ const P2PSync = (() => {
         try { if (_peer && !_peer.destroyed) _peer.destroy(); } catch {}
         _peer = null;
         setTimeout(() => {
-          if (_isHost) _initHost();
+          if (_active && _isHost && !_peer) _initHost();
         }, 3000);
       }
     });
@@ -157,13 +163,10 @@ const P2PSync = (() => {
       console.log('[P2PSync] Guest connection open:', conn.peer);
       _connections.set(conn.peer, conn);
 
-      // Send recent message history to the newly connected guest
-      if (_onHistoryRequestCb) {
-        const history = _onHistoryRequestCb() || [];
-        if (history.length) {
-          conn.send({ type: 'history', messages: history });
-        }
-      }
+      // NOTE: history is NOT sent here. It is sent only after the guest
+      // sends `join` with a proof that matches the room secret — otherwise
+      // anyone who merely knows/guesses the room ID could pull the chat
+      // history before proving invite-link knowledge.
     });
 
     conn.on('data', (data) => {
@@ -193,6 +196,19 @@ const P2PSync = (() => {
     });
   }
 
+  // Send history to a connection, but only once and only when the room has
+  // no secret or the guest already proved invite knowledge.
+  function _sendHistoryTo(conn) {
+    if (!conn || conn._pchatHistorySent || !conn.open) return;
+    if (!_onHistoryRequestCb) return;
+    if (_roomSecret && !conn._pchatProofOk) return;
+    const history = _onHistoryRequestCb() || [];
+    if (history.length) {
+      try { conn.send({ type: 'history', messages: history }); } catch { return; }
+    }
+    conn._pchatHistorySent = true;
+  }
+
   function _handleHostIncomingData(conn, data) {
     if (!data || typeof data !== 'object') return;
 
@@ -217,6 +233,7 @@ const P2PSync = (() => {
             _rejectGuest(conn, 'wrong_password');
             return;
           }
+          if (ok) conn._pchatProofOk = true;
         } catch {
           if (_requireProof) { _rejectGuest(conn, 'wrong_password'); return; }
         }
@@ -243,11 +260,15 @@ const P2PSync = (() => {
         });
         _notifyMembersUpdate();
       }
+      // History is released only now — after the join (and its proof, when
+      // the room has a secret) has been processed.
+      _sendHistoryTo(conn);
       return;
     }
 
     if (data.type === 'message' && data.message) {
       const msg = data.message;
+      _touchMember(msg.senderId, { displayName: msg.senderName });
       // 1. Fire local message callback on host (which updates UI & saves to Google Sheet!)
       if (_onMessageCb) {
         _onMessageCb([msg]);
@@ -262,6 +283,7 @@ const P2PSync = (() => {
     }
 
     if (data.type === 'seen' && data.seenBy) {
+      _touchMember(data.seenBy);
       // Relay seen event to all connections (so sender's tick turns blue)
       _connections.forEach((c, peerId) => {
         if (c.open) {
@@ -275,6 +297,7 @@ const P2PSync = (() => {
     }
 
     if (data.type === 'reaction' && data.reaction) {
+      _touchMember(data.reaction.memberId, { displayName: data.reaction.memberName });
       // Relay reaction to all connections
       _connections.forEach((c) => {
         if (c.open) { try { c.send({ type: 'reaction', reaction: data.reaction }); } catch {} }
@@ -297,6 +320,7 @@ const P2PSync = (() => {
     }
 
     if (data.type === 'typing' && data.memberId) {
+      _touchMember(data.memberId, { displayName: data.displayName });
       // Relay typing indicator to all OTHER connections
       _connections.forEach((c, peerId) => {
         if (peerId !== conn.peer && c.open) {
@@ -309,6 +333,7 @@ const P2PSync = (() => {
     }
 
     if (data.type === 'call_signal' && data.payload) {
+      _touchMember(data.payload.fromId || data.payload.callerId);
       // Relay call signal to all other connected guests
       _connections.forEach((c, peerId) => {
         if (peerId !== conn.peer && c.open) {
@@ -323,6 +348,7 @@ const P2PSync = (() => {
 
   // ── Guest Peer Initialization ─────────────────────────────────
   function _initGuest() {
+    if (!_active) return;
     const guestId = getGuestPeerId(_roomId, _memberId);
     console.log('[P2PSync] Starting Guest Peer:', guestId);
 
@@ -340,7 +366,7 @@ const P2PSync = (() => {
 
     _peer.on('open', (id) => {
       console.log('[P2PSync] Guest online as:', id);
-      _connectToHost();
+      if (_active) _connectToHost();
     });
 
     _peer.on('call', (mediaConn) => {
@@ -357,19 +383,67 @@ const P2PSync = (() => {
       if (_peer && !_peer.destroyed) {
         try { _peer.reconnect(); } catch {}
       }
+      // reconnect() does not always re-emit 'open'; make sure the host
+      // connection is re-established once the signalling socket is back.
+      if (_active && !_isHost) _scheduleGuestReconnect(3000);
     });
   }
 
   function _connectToHost() {
-    if (_joinRejected) return;
-    if (!_peer || _peer.destroyed) return;
+    if (!_active || _joinRejected) return;
+    if (!_peer || _peer.destroyed) { _scheduleGuestReconnect(3000); return; }
+    if (_peer.disconnected) {
+      try { _peer.reconnect(); } catch {}
+      _scheduleGuestReconnect(3000);
+      return;
+    }
+    // Never stack connections: while one is pending, or one is already open,
+    // reconnect timers/peer events must be no-ops. Previously each retry could
+    // open another host connection and produce duplicate joins/messages.
+    if (_connectingToHost) return;
+    const existing = _connections.get('host');
+    if (existing) {
+      if (existing.open) return;
+      _connections.delete('host');
+    }
+
     const hostId = getHostPeerId(_roomId);
     console.log('[P2PSync] Connecting to Host:', hostId);
 
-    const conn = _peer.connect(hostId, { reliable: true });
+    let conn;
+    try {
+      conn = _peer.connect(hostId, { reliable: true });
+    } catch (err) {
+      console.warn('[P2PSync] Host connect threw:', err && err.message);
+      _scheduleGuestReconnect(4000);
+      return;
+    }
+    if (!conn) { _scheduleGuestReconnect(4000); return; }
+    _connectingToHost = true;
+    const attempt = ++_connectAttempt;
+
+    const stopConnecting = () => {
+      if (_connectAttempt !== attempt) return; // a newer attempt owns the flags
+      _connectingToHost = false;
+      if (_connectTimeout) { clearTimeout(_connectTimeout); _connectTimeout = null; }
+    };
+
+    // A connect attempt that never opens (host offline/ICE stuck) must not
+    // block reconnects forever or leave an orphan peer connection.
+    _connectTimeout = setTimeout(() => {
+      if (_connectAttempt !== attempt) return;
+      _connectTimeout = null;
+      if (!_active) { _connectingToHost = false; return; }
+      if (_connections.get('host') === conn) { _connectingToHost = false; return; }
+      try { conn.close(); } catch {}
+      _connectingToHost = false;
+      _scheduleGuestReconnect(2000);
+    }, 8000);
 
     conn.on('open', () => {
+      if (!_active || _connectAttempt !== attempt) { try { conn.close(); } catch {} return; }
       console.log('[P2PSync] Connected to Host successfully!');
+      stopConnecting();
       _connections.set('host', conn);
 
       // Announce identity + invisible capability proof (no user prompt)
@@ -387,18 +461,25 @@ const P2PSync = (() => {
     });
 
     conn.on('data', (data) => {
+      if (!_active || _connectAttempt !== attempt) return;
       _handleGuestIncomingData(data);
     });
 
     conn.on('close', () => {
+      if (_connectAttempt !== attempt) return;
+      stopConnecting();
+      if (!_active) return;
       console.log('[P2PSync] Host connection lost. Will retry…');
-      _connections.delete('host');
+      if (_connections.get('host') === conn) _connections.delete('host');
       _scheduleGuestReconnect(4000);
     });
 
     conn.on('error', (err) => {
+      if (_connectAttempt !== attempt) return;
+      stopConnecting();
+      if (!_active) return;
       console.warn('[P2PSync] Conn to host failed:', err);
-      _connections.delete('host');
+      if (_connections.get('host') === conn) _connections.delete('host');
       _scheduleGuestReconnect(4000);
     });
   }
@@ -440,12 +521,15 @@ const P2PSync = (() => {
   }
 
   function _scheduleGuestReconnect(delay) {
-    if (_joinRejected) return; // explicitly refused — don't hammer the host
+    if (!_active || _isHost || _joinRejected) return; // left room / refused — don't hammer
     if (_reconnectTimer) clearTimeout(_reconnectTimer);
     _reconnectTimer = setTimeout(() => {
-      if (!_isHost && !_connections.has('host') && _peer && !_peer.destroyed) {
-        _connectToHost();
-      }
+      _reconnectTimer = null;
+      if (!_active || _isHost || _joinRejected) return;
+      const hostConn = _connections.get('host');
+      if (hostConn && hostConn.open) return;
+      if (_connectingToHost) return; // an attempt is already in flight
+      _connectToHost();
     }, delay);
   }
 
@@ -543,6 +627,23 @@ const P2PSync = (() => {
     }
   }
 
+  // Keep a member's lastSeen fresh whenever we see activity from them.
+  // P2P only set lastSeen on join, so after ~2 minutes every connected guest
+  // looked "offline" in the host's roster even while actively chatting.
+  function _touchMember(memberId, extra = {}) {
+    if (!memberId) return false;
+    const cur = _activeMembers.get(memberId);
+    if (!cur) return false;
+    cur.lastSeen = Date.now();
+    if (extra.displayName && (!cur.displayName || cur.displayName === 'Guest')) {
+      cur.displayName = extra.displayName;
+      if (!cur.name || cur.name === 'Guest') cur.name = extra.displayName;
+    }
+    if (extra.picture && !cur.picture) cur.picture = extra.picture;
+    _notifyMembersUpdate();
+    return true;
+  }
+
   function _notifyMembersUpdate() {
     if (_onMembersUpdateCb) {
       // Emit shape expected by chat.js renderMembers:
@@ -560,8 +661,13 @@ const P2PSync = (() => {
   }
 
   function destroy() {
+    _active = false;
+    _connectingToHost = false;
+    _connectAttempt++;
     if (_reconnectTimer) clearTimeout(_reconnectTimer);
     _reconnectTimer = null;
+    if (_connectTimeout) clearTimeout(_connectTimeout);
+    _connectTimeout = null;
 
     _connections.forEach(c => {
       try { c.close(); } catch {}
@@ -580,6 +686,13 @@ const P2PSync = (() => {
     }
     const hostConn = _connections.get('host');
     return !!(hostConn && hostConn.open);
+  }
+
+  // Called after link rotation so join proofs from guests holding the new
+  // invite are verified against the new secret (without a full re-init,
+  // which would drop the live P2P mesh).
+  function updateSecret(roomSecret) {
+    _roomSecret = roomSecret || null;
   }
 
   function broadcastCallSignal(payload) {
@@ -608,6 +721,7 @@ const P2PSync = (() => {
     broadcastMusic,
     broadcastTyping,
     broadcastCallSignal,
+    updateSecret,
     onCallSignal: (cb) => { _onCallSignalCb = cb; },
     onIncomingMediaCall: (cb) => { _onIncomingMediaCallCb = cb; },
     getPeer: () => _peer,

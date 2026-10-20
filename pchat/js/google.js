@@ -36,9 +36,11 @@ const GoogleAPI = (() => {
         if (res.status === 204) return null; // No content
 
         if (res.status === 401) {
-          // Token expired — get fresh token and retry once
+          // Token expired/revoked — force a real refresh. The previous call
+          // reused the cached (dead) token because expiresAt still looked
+          // valid, so the retry failed the same way.
           log('401 — refreshing token');
-          const freshToken = await Auth.getAccessToken();
+          const freshToken = await Auth.getAccessToken(true);
           fetchOptions.headers['Authorization'] = `Bearer ${freshToken}`;
           const retryRes = await fetch(url, fetchOptions);
           if (!retryRes.ok) throw await toApiError(retryRes);

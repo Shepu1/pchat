@@ -341,15 +341,33 @@ const Chat = (() => {
 
   // ── Broadcast seen for currently visible messages ─────────────
   let _seenBroadcastDebounce = null;
+  const _seenSentIds = new Set(); // already-reported msg ids (avoid replay)
   function _broadcastSeenForVisible() {
     clearTimeout(_seenBroadcastDebounce);
     _seenBroadcastDebounce = setTimeout(() => {
-      const otherMsgIds = _messages
-        .filter(m => m.senderId !== _session.memberId && m.id && !m.deleted)
-        .map(m => m.id);
-      if (!otherMsgIds.length) return;
+      if (!feed || !_messages.length) return;
+      // Only report messages that are actually inside the feed viewport.
+      // Previously every loaded message (including months of history the
+      // user never scrolled to) was marked as seen.
+      const fr = feed.getBoundingClientRect();
+      if (!fr || !(fr.height > 0)) return;
+      const visibleIds = [];
+      _messages.forEach(m => {
+        if (!m.id || m.deleted || !m.senderId) return;
+        if (m.senderId === _session.memberId) return;
+        if (_seenSentIds.has(m.id)) return;
+        const el = document.getElementById(`msg-${m.id}`) || document.getElementById(`opt-${m.id}`);
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        if (!r || (r.width === 0 && r.height === 0)) return;
+        const visible = r.bottom > fr.top && r.top < fr.bottom &&
+                        r.right > fr.left && r.left < fr.right;
+        if (visible) visibleIds.push(m.id);
+      });
+      if (!visibleIds.length) return;
+      visibleIds.forEach(id => _seenSentIds.add(id));
       if (typeof P2PSync !== 'undefined' && P2PSync.broadcastSeen) {
-        P2PSync.broadcastSeen(_session.memberId, otherMsgIds);
+        P2PSync.broadcastSeen(_session.memberId, visibleIds);
       }
     }, 600);
   }
@@ -684,7 +702,7 @@ const Chat = (() => {
 
     const meta = document.createElement('div');
     meta.className = 'msg-meta';
-    meta.innerHTML = `<span class="msg-time" title="${msg.createdAt || ''}">${UI.formatTime(msg.createdAt)}</span>`;
+    meta.innerHTML = `<span class="msg-time" title="${escapeHtml(msg.createdAt || '')}">${escapeHtml(UI.formatTime(msg.createdAt))}</span>`;
     if (isMe && !isDeleted) {
       // Double checkmark (sent) — WhatsApp style
       meta.innerHTML += `<span class="msg-status sent" aria-label="Sent" title="Sent">
@@ -1191,8 +1209,15 @@ const Chat = (() => {
     catch { return false; }
   }
 
+  // Pending outbound payload used by the Retry button: rebuilds the exact
+  // wire message (including attachment JSON / ciphertext) instead of just
+  // resending the caption as a brand-new plain text message.
+  let _retryPayload = null;
+
   async function sendMessage() {
     if (_recorder) { await _stopVoiceRecording(true); return; }
+    const retry = _retryPayload;
+    _retryPayload = null;
     if (_insecureHttp() && !_insecureAcked()) {
       let go = false;
       try {
@@ -1207,21 +1232,21 @@ const Chat = (() => {
       try { sessionStorage.setItem(INSECURE_ACK_KEY, '1'); } catch {}
     }
     const nowSend = Date.now();
-    if (nowSend - _lastSendAt < 1000) {
+    if (!retry && nowSend - _lastSendAt < 1000) {
       UI.toast('info', 'Too Fast', 'Wait a second before sending again.');
       return;
     }
-    _lastSendAt = nowSend;
-    const text = input.value.trim();
-    const hasAttachment = !!_pendingAttachment;
+    if (!retry) _lastSendAt = nowSend;
+    const text = retry ? (retry.text || '') : input.value.trim();
+    const hasAttachment = retry ? (retry.messageType && retry.messageType !== 'text') : !!_pendingAttachment;
     if ((!text && !hasAttachment) || text.length > CONFIG.MAX_MESSAGE_LENGTH) return;
 
-    const msgId     = 'm_' + Crypto.randomBase62(16);
-    const replyToId = _replyTo?.id || null;
-    let finalMessage = text;
-    let msgType = 'text';
+    const msgId     = retry ? retry.id : 'm_' + Crypto.randomBase62(16);
+    const replyToId = retry ? (retry.replyToId || null) : (_replyTo?.id || null);
+    let finalMessage = retry ? retry.message : text;
+    let msgType = retry ? (retry.messageType || 'text') : 'text';
 
-    if (_pendingAttachment) {
+    if (!retry && _pendingAttachment) {
       const at = _pendingAttachment;
       msgType = at.type.startsWith('image/') ? 'image'
               : at.type.startsWith('audio/') ? 'audio' : 'file';
@@ -1243,11 +1268,12 @@ const Chat = (() => {
 
     // Encrypt new messages ONLY in explicit passphrase mode.
     // The automatic invite-link key is decrypt-only so guests never get blocked.
-    if (typeof Encryption !== 'undefined' && Encryption.shouldEncrypt && Encryption.shouldEncrypt()) {
+    // Retried payloads are already in their final wire form.
+    if (!retry && typeof Encryption !== 'undefined' && Encryption.shouldEncrypt && Encryption.shouldEncrypt()) {
       finalMessage = await Encryption.encrypt(finalMessage);
     }
 
-    const nowTs     = new Date().toISOString();
+    const nowTs     = retry ? (retry.timestamp || new Date().toISOString()) : new Date().toISOString();
 
     // Optimistic UI
     // UI shows plaintext immediately; wire/persistence uses finalMessage
@@ -1260,8 +1286,9 @@ const Chat = (() => {
       senderName:     _session.displayName,
       senderPicture:  _session.picture || '',
       messageType:    msgType,
-      // Non-text attachments render instantly from the built payload
-      message:        msgType === 'text' ? text : finalMessage,
+      // Non-text attachments render instantly from the built payload.
+      // On retry, reuse the originally displayed (decrypted/decoded) text.
+      message:        retry ? (retry.displayMessage || finalMessage) : (msgType === 'text' ? text : finalMessage),
       replyTo:        replyToId,
       edited:         false,
       deleted:        false,
@@ -1343,8 +1370,18 @@ const Chat = (() => {
       _markOptimisticFailed(msgId, err.message);
 
       if (err.isNetwork) {
-        // Queue for retry
-        Storage.addPendingMessage(_room.id, { id: msgId, text, replyToId, timestamp: nowTs });
+        // Queue for retry with the exact wire payload so attachments
+        // (file JSON, voice notes, images) survive the retry instead of
+        // being reduced to a bare caption.
+        Storage.addPendingMessage(_room.id, {
+          id: msgId,
+          text,
+          replyToId,
+          timestamp: nowTs,
+          message: finalMessage,
+          messageType: msgType,
+          displayMessage: optimisticMsg.message,
+        });
       }
     }
   }
@@ -1405,9 +1442,19 @@ const Chat = (() => {
         if (!pending) { el.remove(); return; }
         el.remove();
         _pendingIds.delete(msgId);
-        input.value = pending.text;
-        sendMessage();
         Storage.removePendingMessage(_room.id, msgId);
+        if (!pending.message) {
+          // Legacy queue entry (pre-payload save): resend the text only.
+          input.value = pending.text || '';
+          UI.autoResize(input);
+          sendMessage();
+          return;
+        }
+        // Reuse the original message id + full wire payload.
+        _retryPayload = pending;
+        input.value = pending.text || '';
+        UI.autoResize(input);
+        await sendMessage();
       });
     }
   }
@@ -1417,7 +1464,10 @@ const Chat = (() => {
     _contextTarget = msg;
     const isMe    = msg.senderId === _session.memberId;
     const isOwner = _session.role === 'owner';
-    const canEdit = isMe && !msg.deleted;
+    // Attachments/voice notes are JSON payloads: editing them as text would
+    // replace (and corrupt) the whole message. Only plain text is editable.
+    const msgType = msg.messageType || 'text';
+    const canEdit = isMe && !msg.deleted && msgType === 'text';
     const canDel  = (isMe || isOwner) && !msg.deleted;
 
     document.getElementById('ctx-edit').style.display   = canEdit ? '' : 'none';
@@ -1479,11 +1529,43 @@ const Chat = (() => {
   }
 
   // ── Edit modal ────────────────────────────────────────────────
-  function openEditModal(msg) {
+  async function openEditModal(msg) {
+    const editInput = document.getElementById('edit-input');
+    if (!editInput) return;
+    const raw = (typeof msg.message === 'string') ? msg.message : '';
+
+    // Encrypted message: show plaintext, never the enc:... ciphertext, and
+    // refuse if this device has no key to re-encrypt it (otherwise saving
+    // would silently downgrade the message to plaintext).
+    if (raw.startsWith('enc:')) {
+      const keyActive = (typeof Encryption !== 'undefined' && Encryption.isActive) ? Encryption.isActive() : false;
+      if (!keyActive) {
+        UI.toast('error', 'Locked message', 'Ask the owner for the invite link or passphrase to edit this message.');
+        return;
+      }
+      _editTarget = msg;
+      editInput.value = '';
+      editInput.placeholder = 'Decrypting…';
+      UI.openModal('edit-modal');
+      editInput.focus();
+      let plain = '';
+      try { plain = await Encryption.decrypt(raw); } catch { plain = ''; }
+      if (_editTarget !== msg) return; // modal closed/reopened meanwhile
+      if (!plain || plain.startsWith("[Couldn't decrypt")) {
+        UI.closeModal('edit-modal');
+        UI.toast('error', 'Locked message', 'This encrypted message could not be decrypted on this device.');
+        return;
+      }
+      editInput.value = plain;
+      editInput.placeholder = '';
+      return;
+    }
+
     _editTarget = msg;
-    document.getElementById('edit-input').value = msg.message || '';
+    editInput.value = raw;
+    editInput.placeholder = '';
     UI.openModal('edit-modal');
-    document.getElementById('edit-input').focus();
+    editInput.focus();
   }
 
   async function saveEdit() {
@@ -1495,17 +1577,30 @@ const Chat = (() => {
     UI.setLoading(saveBtn, true, 'Saving…');
 
     try {
+      // Re-encrypt edits of encrypted messages. Without this the new text was
+      // written to the backend as plaintext, silently downgrading E2EE.
+      const wasEncrypted = typeof _editTarget.message === 'string' && _editTarget.message.startsWith('enc:');
+      let wireMessage = newText;
+      if (wasEncrypted) {
+        const canEncrypt = (typeof Encryption !== 'undefined' && Encryption.isActive && Encryption.isActive());
+        if (!canEncrypt) throw new Error('Encryption key unavailable — cannot edit this message.');
+        wireMessage = await Encryption.encrypt(newText);
+        if (typeof wireMessage !== 'string' || !wireMessage.startsWith('enc:')) {
+          throw new Error('Encryption failed — message left unchanged.');
+        }
+      }
+
       // Always call the backend (including mock://) so edits persist across reloads.
       const res = await RoomAPI.editMessage(_room.deploymentUrl, {
         memberId:     _session.memberId,
         sessionToken: _session.sessionToken,
         messageId:    _editTarget.id,
-        message:      newText,
+        message:      wireMessage,
       });
       if (!res.success) throw new Error(res.error || 'Edit failed');
 
       // Update local
-      const updatedMsg = { ..._editTarget, message: newText, edited: true };
+      const updatedMsg = { ..._editTarget, message: wireMessage, edited: true };
       _updateMessageEl(updatedMsg);
 
       // Broadcast edit to all connected peers in real time
@@ -1931,10 +2026,10 @@ const Chat = (() => {
       `;
 
       el.querySelector('.member-call-btn.audio-btn')?.addEventListener('click', () => {
-        if (window.CallManager) CallManager.startCall('audio');
+        if (window.CallManager) CallManager.startCall('audio', m.memberId, name);
       });
       el.querySelector('.member-call-btn.video-btn')?.addEventListener('click', () => {
-        if (window.CallManager) CallManager.startCall('video');
+        if (window.CallManager) CallManager.startCall('video', m.memberId, name);
       });
       el.querySelector('.member-kick-btn')?.addEventListener('click', () => ownerKickMember(m.memberId, name));
       list.appendChild(el);
@@ -1942,7 +2037,7 @@ const Chat = (() => {
   }
 
   // ── Owner ops ─────────────────────────────────────────────────
-  async function ownerOp(op, extra = {}) {
+  async function ownerOp(op, extra = {}, successText = '') {
     try {
       const res = await RoomAPI.roomOp(_room.deploymentUrl, {
         memberId:     _session.memberId,
@@ -1950,9 +2045,11 @@ const Chat = (() => {
         op, ...extra,
       });
       if (!res.success) throw new Error(res.error || 'Operation failed');
-      UI.toast('success', 'Done', `Room ${op} applied.`);
+      UI.toast('success', 'Done', successText || `Room ${op} applied.`);
+      return true;
     } catch (err) {
       UI.toast('error', 'Failed', err.message);
+      return false;
     }
   }
 
@@ -1964,8 +2061,9 @@ const Chat = (() => {
       danger: true,
     });
     if (!okKick) return;
-    await ownerOp('remove_member', { targetId });
-    UI.toast('info', 'Removed', `${name} has been removed.`);
+    // Only confirm removal when the backend actually accepted it; the old
+    // code printed "has been removed" even when the request failed.
+    await ownerOp('remove_member', { targetId }, `${name} has been removed.`);
   }
 
   // ── Leave room ────────────────────────────────────────────────
@@ -2135,6 +2233,24 @@ const Chat = (() => {
     }
   }
 
+  function _micErrorText(err) {
+    switch (err && err.name) {
+      case 'NotAllowedError':
+      case 'SecurityError':
+        return 'Microphone blocked — allow mic access in the address bar/site settings, then try again.';
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+        return 'No microphone was found on this device.';
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return 'The microphone is busy in another app or tab. Close it and retry.';
+      case 'AbortError':
+        return 'The microphone request was interrupted. Try again.';
+      default:
+        return (err && err.message) || 'Please allow microphone access to record voice.';
+    }
+  }
+
   async function _startVoiceRecording(micBtn) {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2147,7 +2263,7 @@ const Chat = (() => {
       }
       _recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
-      UI.toast('error', 'Mic blocked', 'Please allow microphone access to record voice.');
+      UI.toast('error', 'Mic unavailable', _micErrorText(err));
       return;
     }
     try {
@@ -2672,10 +2788,20 @@ const Chat = (() => {
       Notify.setUserPref('on');
       paint();
       try {
-        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        if (typeof Notification === 'undefined') {
+          UI.toast('warning', 'Sounds On', 'Sounds are on, but this browser does not support system notifications.');
+          return;
+        }
+        if (Notification.permission === 'denied') {
+          UI.toast('warning', 'Sounds On', 'System popups are blocked in browser settings — sounds are still on.');
+          return;
+        }
+        if (Notification.permission === 'default') {
           const result = await Notify.requestPermission();
-          if (result === 'denied') {
-            UI.toast('warning', 'Notifications On', 'Sounds are on, but system popups are blocked in browser settings.');
+          if (result !== 'granted') {
+            UI.toast('warning', 'Sounds On', result === 'denied'
+              ? 'System popups are blocked in browser settings — sounds are still on.'
+              : 'Sounds are on, but notification permission was not granted.');
             return;
           }
         }

@@ -188,15 +188,20 @@ const NtfySync = (() => {
   let _abortCtrls = [];
   let _restartTimers = new Set();
   let _streams = [];        // { base, topic }
+  let _roomId = null;
+  let _privateOnly = false;
   const _seenIds = new Set();      // message ids (logical dedupe)
-  const _payloadSeen = new Set();  // raw payload fingerprints (cross-server dedupe)
+  const _payloadSeen = new Map();  // raw payload -> first-seen ts (short-window)
   const PAYLOAD_SEEN_MAX = 800;
+  const PAYLOAD_DEDUPE_MS = 5000;  // same text from another server/topic copy
 
   function topicFor(roomId) {
     return `shepu_pchat_${roomId}`;
   }
 
   function init({ roomId, roomSecret, onEvent, privateOnly }) {
+    _roomId = roomId || _roomId;
+    _privateOnly = privateOnly === true;
     try {
       if (typeof InstantSecurity !== 'undefined') {
         const all = InstantSecurity.topicsFor(roomId, roomSecret || null);
@@ -262,6 +267,19 @@ const NtfySync = (() => {
     _streams = [];
   }
 
+  // Link rotation: drop the old topics and subscribe to the new secret's
+  // private topic. Without this the current tab kept listening/publishing on
+  // the revoked topic, so freshly-invited guests and existing members split.
+  function setSecret(roomSecret) {
+    if (!_roomId) return;
+    const wasRunning = _running;
+    stop();
+    init({ roomId: _roomId, roomSecret: roomSecret || null, onEvent: _onEvent, privateOnly: _privateOnly });
+    if (wasRunning) start();
+  }
+
+  function getTopics() { return _topics.slice(); }
+
   // ── One long-lived stream per (server, topic) ───────────────────
   async function _startStream(base, topic) {
     if (!_running) return;
@@ -326,6 +344,27 @@ const NtfySync = (() => {
     try { return ShepuRelay._failCount(base) || 0; } catch { return 0; }
   }
 
+  // Short-window payload dedupe: identical text arriving within a few seconds
+  // is the same event echoed by another relay server/topic. Identical text
+  // arriving later is a new, intentional event and must be delivered.
+  function _isDuplicatePayload(fp) {
+    const now = Date.now();
+    if (_payloadSeen.size >= PAYLOAD_SEEN_MAX) {
+      for (const [k, t] of _payloadSeen) {
+        if (now - t > PAYLOAD_DEDUPE_MS) _payloadSeen.delete(k);
+      }
+      // Still full of active entries: drop the oldest quarter.
+      if (_payloadSeen.size >= PAYLOAD_SEEN_MAX) {
+        let n = Math.floor(PAYLOAD_SEEN_MAX / 4);
+        for (const k of _payloadSeen.keys()) { _payloadSeen.delete(k); if (--n <= 0) break; }
+      }
+    }
+    const seenAt = _payloadSeen.get(fp);
+    if (seenAt != null && now - seenAt < PAYLOAD_DEDUPE_MS) return true;
+    _payloadSeen.set(fp, now);
+    return false;
+  }
+
   // ── Parse one ndjson line from ntfy ─────────────────────────────
   function _handleLine(line, forTopic) {
     let evt;
@@ -335,16 +374,11 @@ const NtfySync = (() => {
     if (evt.event && evt.event !== 'message') return;
     if (evt.message == null) return;
 
-    // Cross-server / cross-topic duplicate suppression: the exact same
-    // payload text is published to every server, so the first copy wins.
-    const fp = evt.message;
-    if (_payloadSeen.has(fp)) return;
-    if (_payloadSeen.size >= PAYLOAD_SEEN_MAX) {
-      // Drop the oldest ~quarter to keep the set bounded.
-      let n = Math.floor(PAYLOAD_SEEN_MAX / 4);
-      for (const v of _payloadSeen) { _payloadSeen.delete(v); if (--n <= 0) break; }
-    }
-    _payloadSeen.add(fp);
+    // Cross-server / cross-topic duplicate suppression, but only for a short
+    // window. The previous forever-dedupe dropped legitimate repeats (the
+    // same presence heartbeat, the same theme re-applied, an identical
+    // reaction action) because their payload text was byte-identical.
+    if (_isDuplicatePayload(evt.message)) return;
 
     let payload;
     try { payload = JSON.parse(evt.message); } catch { return; }
@@ -367,6 +401,8 @@ const NtfySync = (() => {
       if (_onEvent) _onEvent({ kind: 'join', member: payload });
     } else if (payload.type === 'call_signal' && payload.payload) {
       if (_onEvent) _onEvent({ kind: 'call_signal', payload: payload.payload, payload });
+    } else if (payload.type === 'room_status' && payload.status) {
+      if (_onEvent) _onEvent({ kind: 'room_status', status: payload.status, payload });
     }
   }
 
@@ -376,7 +412,11 @@ const NtfySync = (() => {
     return ShepuRelay.publish(payload, _topics);
   }
 
-  return { init, start, stop, publish, health: () => ShepuRelay.health(), diagnose: () => ShepuRelay.diagnose() };
+  return {
+    init, start, stop, publish, setSecret, getTopics,
+    health: () => ShepuRelay.health(),
+    diagnose: () => ShepuRelay.diagnose(),
+  };
 })();
 
 window.NtfySync = NtfySync;

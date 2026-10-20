@@ -170,8 +170,9 @@
               <div class="panel" style="background:var(--surface-2);">
                 <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg> What does Pchat shepu store?</h4>
                 <p style="font-size:0.875rem;color:var(--text-2);">
-                  Pchat shepu stores only: room ID → deployment URL mappings in your browser's
-                  localStorage. No message content is stored on external third-party servers.
+                  Pchat shepu stores room ID → deployment URL mappings in your browser's
+                  localStorage, plus a local offline cache of room messages in IndexedDB.
+                  No message content is stored on external third-party servers.
                 </p>
               </div>
 
@@ -186,7 +187,7 @@
 
             <div style="margin-top:1.5rem;">
               <button class="btn btn-danger btn-sm" id="clear-local-data-btn" style="display:inline-flex;align-items:center;gap:6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Clear local app data (localStorage)
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Clear local app data (storage + cache)
               </button>
             </div>
           </div>
@@ -294,10 +295,10 @@
 <script src="js/config.js?v=20261016a"></script>
 <script src="js/storage.js?v=20261016a"></script>
 <script src="js/ui.js?v=20261020e"></script>
-<script src="js/auth.js?v=20261016a"></script>
-<script src="js/instant-security.js?v=20261016a"></script>
-<script src="js/ntfy-sync.js?v=20261019d"></script>
-<script src="js/rooms.js?v=20261019d"></script>
+<script src="js/auth.js?v=20261020f"></script>
+<script src="js/instant-security.js?v=20261020f"></script>
+<script src="js/ntfy-sync.js?v=20261020f"></script>
+<script src="js/rooms.js?v=20261020f"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Tab navigation
@@ -414,12 +415,21 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clear-local-data-btn').addEventListener('click', async () => {
     const ok = await UI.confirmDialog({
       title: 'Clear local data?',
-      message: 'This will sign you out and remove room cache.',
+      message: 'This will sign you out and remove all local room data, including the offline message cache.',
       confirmText: 'Clear all',
       cancelText: 'Keep',
       danger: true,
     });
     if (ok) {
+      // localStorage alone is not all the data: chat history is cached in
+      // IndexedDB. Clear it before wiping the keys that point at it.
+      try {
+        if (typeof IDBStorage !== 'undefined' && IDBStorage.clearAll) {
+          await IDBStorage.clearAll();
+        }
+      } catch (e) {
+        console.warn('Could not clear IndexedDB cache:', e && e.message);
+      }
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = 'index.html';
@@ -429,19 +439,56 @@ document.addEventListener('DOMContentLoaded', () => {
   // Notifications
   const notifBtn = document.getElementById('request-notif-btn');
   const notifStatus = document.getElementById('notif-status-text');
+  const notifEnabledHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;vertical-align:-2px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Enabled';
+
+  function registerNotifySW() {
+    try {
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    } catch {}
+  }
+
+  function paintNotifStatus(perm) {
+    if (perm === 'granted') {
+      notifStatus.textContent = 'Status: granted — background alerts are enabled in rooms.';
+      notifBtn.innerHTML = notifEnabledHtml;
+      registerNotifySW();
+    } else if (perm === 'denied') {
+      notifStatus.textContent = 'Status: blocked — allow notifications for this site in your browser settings.';
+      notifBtn.textContent = 'Blocked';
+    } else if (perm === 'default') {
+      notifStatus.textContent = 'Status: not requested yet';
+      notifBtn.textContent = 'Enable';
+    } else {
+      notifStatus.textContent = 'Not supported in this browser';
+      notifBtn.disabled = true;
+    }
+  }
 
   if ('Notification' in window) {
-    notifStatus.textContent = 'Status: ' + Notification.permission;
-    if (Notification.permission === 'granted') notifBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;vertical-align:-2px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Enabled';
+    paintNotifStatus(Notification.permission);
   } else {
     notifStatus.textContent = 'Not supported in this browser';
     notifBtn.disabled = true;
   }
 
   notifBtn.addEventListener('click', async () => {
-    const perm = await Notification.requestPermission();
-    notifStatus.textContent = 'Status: ' + perm;
-    if (perm === 'granted') notifBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;vertical-align:-2px;"><polyline points="20 6 9 17 4 12"></polyline></svg> Enabled';
+    if (!('Notification' in window)) return;
+    try {
+      if (Notification.permission === 'denied') {
+        paintNotifStatus('denied');
+        UI.toast('warning', 'Notifications blocked', 'Allow notifications for this site in your browser settings, then reload.');
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      paintNotifStatus(perm);
+      if (perm === 'granted') {
+        UI.toast('success', 'Notifications enabled', 'Background chat alerts are now allowed.');
+      } else if (perm === 'denied') {
+        UI.toast('warning', 'Notifications blocked', 'You can allow them later in your browser site settings.');
+      }
+    } catch (err) {
+      notifStatus.textContent = 'Could not request permission: ' + (err.message || err);
+    }
   });
 
   // Debug toggle
@@ -557,9 +604,10 @@ document.addEventListener('DOMContentLoaded', () => {
       UI.toast('info', 'Reset', 'Google OAuth Client ID reset to default.');
     });
 
-    document.getElementById('copy-settings-origin-btn').addEventListener('click', () => {
-      navigator.clipboard.writeText(window.location.origin);
-      UI.toast('success', 'Copied', 'Authorized origin copied.');
+    document.getElementById('copy-settings-origin-btn').addEventListener('click', async () => {
+      const ok = await UI.copyText(window.location.origin);
+      if (ok) UI.toast('success', 'Copied', 'Authorized origin copied.');
+      else UI.toast('error', 'Copy failed', 'Clipboard access was blocked. Copy the origin manually.');
     });
   }
 
