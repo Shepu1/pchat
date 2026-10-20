@@ -818,6 +818,8 @@
   align-items: center;
   gap: 0.15rem;
   flex-shrink: 0;
+  /* A touch of breathing room before the send arrow. */
+  margin-right: 0.3rem;
 }
 
 .chat-input-btn {
@@ -944,92 +946,55 @@
   margin-top: 1px;
 }
 
-/* ── Send Button ────────────────────────────────────────────────── */
+/* ── Send Button (Shepu AI 4.1) ─────────────────────────────────
+   Icon only, no frame, living at the right end of the input field:
+   dimmed while the field is empty, accent coloured as soon as there is
+   something to send, small scale on hover. */
 .send-btn {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  flex-shrink: 0;
-  margin-bottom: 1px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  border: none;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Idle state (empty input) — subtle muted send button */
-.send-btn[data-empty="true"] {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  color: var(--muted);
+  background: transparent !important;
+  color: var(--text-2) !important;
+  border: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+  /* Same footprint as the mic / emoji buttons beside it, so the input
+     field keeps the exact size it had before the send button moved in. */
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: color 0.2s ease, transform 0.2s ease !important;
   cursor: default;
-  opacity: 0.65;
+  opacity: 0.5;
+  flex-shrink: 0;
+  align-self: center;
 }
 
-/* Active state (has text or emoji) — vibrant blue gradient with glow */
 .send-btn[data-empty="false"] {
-  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 60%, #1d4ed8 100%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.55), 0 1px 4px rgba(0,0,0,0.25),
-              inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  color: #fff;
+  background: transparent !important;
+  color: #4a90e2 !important; /* Shepu AI 4.1 accent */
+  box-shadow: none !important;
+  animation: none !important;
+  opacity: 1 !important;
   cursor: pointer;
-  opacity: 1;
-  animation: sendPop 0.32s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Light sweep across the send button */
-.send-btn[data-empty="false"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
-  transform: translateX(-130%);
-  animation: sendShine 3s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes sendShine {
-  0% { transform: translateX(-130%); }
-  55%, 100% { transform: translateX(130%); }
-}
-
-@keyframes sendPop {
-  0% { transform: scale(0.7); }
-  60% { transform: scale(1.14); }
-  100% { transform: scale(1); }
 }
 
 .send-btn[data-empty="false"]:hover {
-  transform: scale(1.08) translateY(-1px);
-  box-shadow: 0 6px 24px rgba(37, 99, 235, 0.65);
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  transform: scale(1.15);
 }
 
-.send-btn[data-empty="true"]:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--text-2);
-}
-
-.send-btn:active {
-  transform: scale(0.93);
-}
-
-/* Send icon: always centered and crisp */
+/* Send icon: Font Awesome solid paper-plane, as used by the 4.1 app */
 .send-btn .send-icon {
   display: block;
-  transform: rotate(0deg);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
-}
-
-.send-btn[data-empty="false"] .send-icon {
-  transform: scale(1.05) translate(1px, -1px);
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  stroke: none;
 }
 
 
@@ -1941,6 +1906,10 @@ img.custom-emoji-picker {
   background: rgba(255, 255, 255, 0.06);
   isolation: isolate;
 }
+.msg-media-wrap.msg-media-ai {
+  min-width: min(260px, 76vw);
+  min-height: 260px;
+}
 .msg-media-wrap .msg-attachment-img {
   position: relative;
   z-index: 1;
@@ -1962,18 +1931,123 @@ img.custom-emoji-picker {
   transform: none;
   opacity: 1;
 }
-/* Loading shimmer while the photo decodes */
+/* Loading shimmer while Shepu-AI generates/decodes the photo */
 .msg-media-shimmer {
   position: absolute;
   inset: 0;
   z-index: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
   background: linear-gradient(100deg, rgba(255,255,255,0.04) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 70%);
   background-size: 200% 100%;
   animation: mediaShimmer 1.3s linear infinite;
 }
+.msg-media-ai .msg-media-shimmer::before {
+  content: '';
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: mediaSpin 0.9s linear infinite;
+}
+.msg-media-ai .msg-media-shimmer::after {
+  content: '🎨 ছবি তৈরি হচ্ছে…';
+  color: var(--text-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: center;
+  padding: 0 1rem;
+  animation: mediaPulse 1.8s ease-in-out infinite;
+}
+/* 4.1 canvas loader (canvas + percentage replaces the CSS spinner when JS runs) */
+.msg-media-ai .msg-media-shimmer.msg-media-gen-wrap::before,
+.msg-media-ai .msg-media-shimmer.msg-media-gen-wrap::after { display: none; }
+.msg-media-gen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.msg-media-gen-canvas {
+  display: block;
+  width: 78%;
+  max-width: 220px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  opacity: 0.95;
+}
+.msg-media-gen-title {
+  position: absolute;
+  top: 0.7rem;
+  left: 0;
+  right: 0;
+  padding: 0 3.2rem;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+.msg-media-gen-percent {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.6rem;
+  min-width: 2.7rem;
+  padding: 0.18rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
 @keyframes mediaShimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+@keyframes mediaSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes mediaPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.msg-media-watermark {
+  position: absolute;
+  z-index: 2;
+  left: 0.55rem;
+  bottom: 0.55rem;
+  padding: 0.18rem 0.48rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.3s ease 0.1s;
+}
+.msg-media-wrap.loaded .msg-media-watermark { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .msg-media-shimmer,
+  .msg-media-ai .msg-media-shimmer::before,
+  .msg-media-ai .msg-media-shimmer::after { animation: none; }
 }
 /* Broken image state */
 .msg-media-wrap.media-error { min-height: 0; }

@@ -158,6 +158,35 @@ const Chat = (() => {
   // Sounds arm a few seconds after init so history backfill stays silent
   let _soundsArmedAt = 0;
 
+  // ── Music voice command ("gan bajau" / "play music") ──────────
+  // Any member can put the room radio on air by asking for it in chat.
+  function _maybeMusicCommand(text) {
+    if (!text) return false;
+    try {
+      if (typeof RoomMusic === 'undefined' || typeof RoomMusic.maybePlayFromMessage !== 'function') return false;
+      return !!RoomMusic.maybePlayFromMessage(text);
+    } catch (e) { return false; }
+  }
+
+  function _maybeMusicCommandFromMsg(msg) {
+    if (!msg || msg.deleted) return false;
+    if (msg.messageType && msg.messageType !== 'text') return false;
+    const raw = typeof msg.message === 'string' ? msg.message : '';
+    if (!raw) return false;
+    if (raw.startsWith('enc:')) {
+      // Passphrase rooms encrypt the body — decrypt, then look for the intent.
+      try {
+        if (typeof Encryption !== 'undefined' && typeof Encryption.decrypt === 'function') {
+          Encryption.decrypt(raw)
+            .then(pt => { try { _maybeMusicCommand(pt); } catch (e) { /* non-fatal */ } })
+            .catch(() => {});
+        }
+      } catch (e) { /* non-fatal */ }
+      return false;
+    }
+    return _maybeMusicCommand(raw);
+  }
+
   // ── Render messages from sync ─────────────────────────────────
   function appendMessages(msgs) {
     if (!msgs || !msgs.length) return;
@@ -215,9 +244,18 @@ const Chat = (() => {
         _memberMap.set(msg.senderId, msg.senderName);
       }
 
-      // 1. If already confirmed in DOM — silently update
+      // 1. If already confirmed in DOM — silently update only when the
+      // renderable content actually changed. Re-rendering an identical media
+      // message (sync/polling repeats) used to restart its 4.1 loader and
+      // could leave the official portrait stuck behind the animation.
       if (document.getElementById(`msg-${msg.id}`)) {
-        _updateMessageEl(msg);
+        const prev = _messages.find(x => x.id === msg.id);
+        const unchanged = prev &&
+          prev.message === msg.message &&
+          (prev.messageType || 'text') === (msg.messageType || 'text') &&
+          !!prev.deleted === !!msg.deleted &&
+          !!prev.edited === !!msg.edited;
+        if (!unchanged) _updateMessageEl(msg);
         return;
       }
 
@@ -315,6 +353,19 @@ const Chat = (() => {
       } else if (scrollBtn) {
         scrollBtn.classList.remove('hidden');
       }
+    }
+
+    // ── Music voice command ──────────────────────────────────────
+    // "gan bajau" / "play some music" puts the room radio on air. Only
+    // genuinely new messages count — replayed history must never start
+    // music by itself when a room opens.
+    if (addedCount > 0) {
+      sortedMsgs.forEach(m => {
+        if (!m || m.deleted || m._optimistic) return;
+        const ts = new Date(m.createdAt || m.timestamp || 0).getTime();
+        if (!Number.isFinite(ts) || Date.now() - ts > 120000) return;
+        _maybeMusicCommandFromMsg(m);
+      });
     }
   }
 
@@ -1304,6 +1355,9 @@ const Chat = (() => {
 
     _pendingIds.add(msgId);
     _appendOptimistic(optimisticMsg);
+    // "gan bajau" / "play music" → put the room radio on air (own message).
+    // Fires on the send gesture so it works even if the transport is slow.
+    if (msgType === 'text' && !retry) _maybeMusicCommand(text);
     input.value = '';
     UI.autoResize(input);
     // Stop typing indicator now that the message is sent
@@ -1361,7 +1415,12 @@ const Chat = (() => {
       if (typeof ShepuBot !== 'undefined' && ShepuBot.isMention(text)) {
         const question = ShepuBot.extractQuestion(text);
         if (question) {
-          setTimeout(() => ShepuBot.respond(question), 400);
+          setTimeout(() => {
+            try {
+              const pending = ShepuBot.respond(question);
+              if (pending && typeof pending.catch === 'function') pending.catch(() => {});
+            } catch (e) { /* never break the send path for a bot reply */ }
+          }, 400);
         }
       }
 
@@ -3071,17 +3130,185 @@ const Chat = (() => {
     } catch {}
   }
 
-  // Fade-in on load, error state, overlay buttons (view/download).
+  // ── Shepu-AI 4.1-style image generation animation ─────────────
+  // A 19×19 wave of dots + a slowly rising percentage, adapted from the
+  // reference build's canvas loader. It runs behind the image until load.
+  function _mediaGenMarkup() {
+    return '<span class="msg-media-gen" aria-hidden="true">'
+      + '<span class="msg-media-gen-title">Creating image</span>'
+      + '<canvas class="msg-media-gen-canvas" width="300" height="300"></canvas>'
+      + '<span class="msg-media-gen-percent">12%</span>'
+      + '</span>';
+  }
+
+  function _startMediaGenAnimation(wrap) {
+    try {
+      if (!wrap || wrap._mediaGenStop) return;
+      const canvas = wrap.querySelector('.msg-media-gen-canvas');
+      const percentElem = wrap.querySelector('.msg-media-gen-percent');
+      if (!canvas || !percentElem || typeof requestAnimationFrame !== 'function') return;
+      const ctx = canvas.getContext && canvas.getContext('2d');
+      if (!ctx) return;
+
+      const size = 300;
+      const dpr = Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1, 2);
+      canvas.width = Math.round(size * dpr);
+      canvas.height = Math.round(size * dpr);
+      if (ctx.setTransform) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      else ctx.scale(dpr, dpr);
+
+      const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+      const isLight = document.body && document.body.classList.contains('light-mode');
+      const cols = 19;
+      const rows = 19;
+      const step = size / (cols + 1);
+      const cx = size / 2;
+      const cy = size / 2;
+      const maxDist = Math.hypot(cx, cy);
+      let progress = 12 + Math.floor(Math.random() * 3);
+      let phase = 0;
+      let raf = 0;
+      let timer = null;
+      let stopped = false;
+
+      const paintPercent = () => { percentElem.textContent = progress + '%'; };
+      paintPercent();
+
+      if (!reduceMotion) {
+        timer = setInterval(() => {
+          if (stopped || progress >= 95) return;
+          const inc = progress < 40
+            ? (Math.floor(Math.random() * 2) + 1)
+            : (progress < 75 ? (Math.random() < 0.65 ? 1 : 2) : 1);
+          progress = Math.min(95, progress + inc);
+          paintPercent();
+        }, 450);
+      }
+
+      const stop = (complete) => {
+        if (stopped) return;
+        stopped = true;
+        if (timer) clearInterval(timer);
+        if (raf) cancelAnimationFrame(raf);
+        if (complete) { progress = 100; paintPercent(); }
+        wrap._mediaGenStop = null;
+      };
+      wrap._mediaGenStop = stop;
+
+      const draw = () => {
+        if (stopped) return;
+        if (!canvas.isConnected) { stop(false); return; }
+        ctx.clearRect(0, 0, size, size);
+        phase += 0.62;
+        const cycle = maxDist * 1.5;
+        const wave1 = phase % cycle;
+        const wave2 = (phase + cycle * 0.5) % cycle;
+        for (let r = 1; r <= rows; r++) {
+          for (let c = 1; c <= cols; c++) {
+            const x = c * step;
+            const y = r * step;
+            const d = Math.hypot(x - cx, y - cy);
+            const int1 = Math.max(0, 1 - Math.abs(d - wave1) / 56);
+            const int2 = Math.max(0, 1 - Math.abs(d - wave2) / 56);
+            const intensity = Math.pow(Math.min(1, int1 + int2), 1.2);
+            const radius = 1.35 + intensity * 1.1;
+            let color;
+            if (intensity > 0.04) {
+              const alpha = 0.18 + intensity * 0.82;
+              color = isLight
+                ? `rgba(37, 99, 235, ${alpha})`
+                : `rgba(${Math.round(96 + intensity * 130)}, ${Math.round(165 + intensity * 75)}, 255, ${alpha})`;
+            } else {
+              color = isLight ? 'rgba(0, 0, 0, 0.11)' : 'rgba(255, 255, 255, 0.12)';
+            }
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+          }
+        }
+        if (!reduceMotion) raf = requestAnimationFrame(draw);
+        else stopped = true;
+      };
+      raf = requestAnimationFrame(draw);
+    } catch (e) { /* keep the CSS shimmer as a fallback */ }
+  }
+
+  function _stopMediaGenAnimation(wrap, complete) {
+    try {
+      if (wrap && typeof wrap._mediaGenStop === 'function') wrap._mediaGenStop(!!complete);
+    } catch (e) { /* non-fatal */ }
+  }
+
+  function _revealMediaWrap(wrap, delay) {
+    if (!wrap || wrap.dataset.revealPending === '1') return;
+    wrap.dataset.revealPending = '1';
+    setTimeout(() => wrap.classList.add('loaded'), Math.max(0, delay || 0));
+  }
+
+  // Fade-in on load, turbo-model fallback, error state, overlay buttons.
   function _bindMediaWraps(container) {
     try {
       container.querySelectorAll('.msg-media-wrap').forEach(wrap => {
+        const hasGen = !!wrap.querySelector('.msg-media-gen');
+        if (hasGen) _startMediaGenAnimation(wrap);
         const img = wrap.querySelector('img.msg-attachment-img');
         if (img) {
-          if (img.complete && img.naturalWidth) {
-            wrap.classList.add('loaded');
+          const revealDelay = Math.max(0, parseInt(img.getAttribute('data-reveal-delay') || '0', 10) || 0);
+          const finishLoad = () => {
+            if (img.dataset.mediaRevealScheduled === '1') return;
+            img.dataset.mediaRevealScheduled = '1';
+            if (hasGen) _stopMediaGenAnimation(wrap, true);
+            _revealMediaWrap(wrap, hasGen ? 180 : 0);
+          };
+          const onLoad = () => {
+            // 4.1 keeps the dots loader on screen for the official portrait
+            // even though the bundled image is already available locally.
+            if (hasGen && revealDelay > 0) {
+              setTimeout(finishLoad, revealDelay);
+            } else {
+              finishLoad();
+            }
+          };
+          const onError = () => {
+            // 4.1 image logic: retry the same prompt with the faster
+            // Shepu-AI turbo image model before showing a broken-image state.
+            const fallback = img.getAttribute('data-fallback-src') || '';
+            if (fallback && img.dataset.fallbackTried !== '1') {
+              img.dataset.fallbackTried = '1';
+              wrap.classList.remove('media-error');
+              wrap.classList.remove('loaded');
+              if (img.dataset.fallbackLoadBound !== '1') {
+                img.dataset.fallbackLoadBound = '1';
+                img.addEventListener('load', onLoad, { once: true });
+                // Also cover the case where `complete` was already true at
+                // bind time; otherwise a failed turbo retry could leave the
+                // shimmer spinning forever.
+                img.addEventListener('error', onError, { once: true });
+              }
+              img.src = fallback;
+              return;
+            }
+            // Official local photo or remote Shepu-AI image failed twice:
+            // keep the image reachable through a normal link.
+            const href = img.getAttribute('data-remote-href') || '';
+            if (href) {
+              if (img.dataset.finalErrorHandled === '1') return;
+              img.dataset.finalErrorHandled = '1';
+              _stopMediaGenAnimation(wrap, false);
+              wrap.innerHTML = `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="msg-link">ছবিটি নতুন ট্যাবে খুলুন</a>`;
+              return;
+            }
+            _stopMediaGenAnimation(wrap, false);
+            wrap.classList.add('media-error');
+          };
+          if (img.complete) {
+            if (img.naturalWidth) onLoad();
+            else onError();
           } else {
-            img.addEventListener('load', () => wrap.classList.add('loaded'), { once: true });
-            img.addEventListener('error', () => wrap.classList.add('media-error'), { once: true });
+            img.addEventListener('load', onLoad, { once: true });
+            img.addEventListener('error', onError);
           }
           img.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -3184,21 +3411,65 @@ const Chat = (() => {
           return;
         }
         const dataUrl = (typeof parsed.dataUrl === 'string' && /^(data:(image|audio|video|application\/pdf|text\/plain)[^,]*(;base64)?,)/i.test(parsed.dataUrl)) ? parsed.dataUrl : '';
+        // The Shepu-AI bot can attach a remote Shepu-AI image or the exact
+        // bundled official portrait instead of a data: upload. Legacy rooms
+        // may still contain the old provider tag, so both are accepted; only
+        // these two sources are allowed. User/peer messages cannot turn
+        // arbitrary remote URLs into inline media.
+        const isAiProvider = parsed.provider === 'shepu-ai-image' || parsed.provider === 'pollinations';
+        const remoteImage = (typeof parsed.dataUrl === 'string'
+          && isAiProvider
+          && /^https:\/\/image\.pollinations\.ai\/prompt\/[^\s"'<>]+$/i.test(parsed.dataUrl))
+          ? parsed.dataUrl : '';
+        const localOfficial = (typeof parsed.dataUrl === 'string'
+          && parsed.provider === 'shepu-official'
+          && parsed.dataUrl === 'ai/shepu-official.png')
+          ? parsed.dataUrl : '';
+        const remoteFallback = (typeof parsed.fallbackUrl === 'string'
+          && isAiProvider
+          && /^https:\/\/image\.pollinations\.ai\/prompt\/[^\s"'<>]+$/i.test(parsed.fallbackUrl))
+          ? parsed.fallbackUrl : '';
+        const mediaSrc = dataUrl || remoteImage || localOfficial;
+        const fallbackAttr = remoteFallback ? ` data-fallback-src="${escapeHtml(remoteFallback)}"` : '';
+        const remoteHrefAttr = (remoteImage || localOfficial) ? ` data-remote-href="${escapeHtml(mediaSrc)}"` : '';
+        const isAiImage = isAiProvider || parsed.provider === 'shepu-official';
+        // Local-only placeholder shown while ShepuBot is enhancing the prompt
+        // and building the image URL (before the final message exists).
+        if (parsed.provider === 'shepu-generating') {
+          const genHtml = `<figure class="msg-media-wrap msg-media-ai msg-media-generating" data-filename="Shepu-AI image">`
+            + `<span class="msg-media-shimmer msg-media-gen-wrap" aria-hidden="true">${_mediaGenMarkup()}</span>`
+            + `</figure>`;
+          container.innerHTML = genHtml + (parsed.text ? `<div class="msg-attach-caption">${_renderText(parsed.text)}</div>` : '');
+          _bindMediaWraps(container);
+          _paintMediaBubble(container);
+          return;
+        }
+        const watermark = isAiImage
+          ? `<span class="msg-media-watermark" aria-hidden="true">Shepu-AI</span>` : '';
+        // The 4.1 loader: a 19×19 wave of dots plus a percentage badge.
+        // It is visible while the prompt/image is being prepared, and also
+        // while the final Shepu-AI image is decoding.
+        const genMarkup = isAiImage ? _mediaGenMarkup() : '';
+        const shimmerClass = isAiImage ? 'msg-media-shimmer msg-media-gen-wrap' : 'msg-media-shimmer';
+        const officialDelayAttr = localOfficial ? ' data-reveal-delay="2200"' : '';
         let html = '';
-        if (dataUrl && parsed.fileType && parsed.fileType.startsWith('image/')) {
+        let renderedImage = false;
+        if (mediaSrc && parsed.fileType && parsed.fileType.startsWith('image/')) {
+          renderedImage = true;
           const fname = parsed.fileName || 'Image';
           const cap = parsed.text ? `<div class="msg-img-caption">${_renderText(parsed.text)}</div>` : '';
-          html += `<figure class="msg-media-wrap${parsed.text ? ' has-caption' : ''}" data-filename="${escapeHtml(fname)}">`
-            + `<span class="msg-media-shimmer" aria-hidden="true"></span>`
-            + `<img src="${escapeHtml(dataUrl)}" class="msg-attachment-img" alt="${escapeHtml(fname)}" loading="lazy" />`
+          html += `<figure class="msg-media-wrap${isAiImage ? ' msg-media-ai' : ''}${parsed.text ? ' has-caption' : ''}" data-filename="${escapeHtml(fname)}">`
+            + `<span class="${shimmerClass}" aria-hidden="true">${genMarkup}</span>`
+            + `<img src="${escapeHtml(mediaSrc)}" class="msg-attachment-img" alt="${escapeHtml(fname)}" loading="lazy" referrerpolicy="no-referrer"${fallbackAttr}${remoteHrefAttr}${officialDelayAttr} />`
+            + watermark
             + `<figcaption class="msg-media-overlay">`
             + `<button type="button" class="msg-media-btn" data-act="view" aria-label="View full size" title="View full size"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg></button>`
-            + `<a class="msg-media-btn" data-act="download" href="${escapeHtml(dataUrl)}" download="${escapeHtml(fname)}" aria-label="Download image" title="Download"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></a>`
+            + `<a class="msg-media-btn" data-act="download" href="${escapeHtml(mediaSrc)}" download="${escapeHtml(fname)}" aria-label="Download image" title="Download"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></a>`
             + `</figcaption></figure>${cap}`;
         } else if (dataUrl) {
           html += `<a href="${escapeHtml(dataUrl)}" download="${escapeHtml(parsed.fileName || 'file')}" class="msg-file-card"><span class="msg-file-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg></span><div class="msg-file-details"><div class="msg-file-name">${escapeHtml(parsed.fileName)}</div><div class="msg-file-meta">${Math.round((parsed.fileSize||0)/1024)} KB · Click to download</div></div></a>`;
         }
-        if (parsed.text) {
+        if (parsed.text && !renderedImage) {
           html += `<div class="msg-attach-caption">${_renderText(parsed.text)}</div>`;
         }
         container.innerHTML = html;
@@ -3230,16 +3501,87 @@ const Chat = (() => {
     await new Promise(r => setTimeout(r, 50));
   }
 
+  // ── Ephemeral 4.1 image-generation placeholder ────────────────
+  // Shown only on the client that asked ShepuBot, while the prompt is being
+  // refined and the image URL is built. It is never persisted; the final
+  // image message replaces it through the normal room transport.
+  let _genPlaceholderSeq = 0;
+  function beginImageGeneration(opts) {
+    opts = opts || {};
+    if (!feed || !_session) return null;
+    try {
+      const id = 'g_' + (++_genPlaceholderSeq) + '_' + Date.now();
+      const msg = {
+        id,
+        createdAt: new Date().toISOString(),
+        senderId: 'shepu_ai_bot',
+        senderName: 'Shepu-AI 4.1 Ultra',
+        senderPicture: 'ai/pai.png',
+        messageType: 'image',
+        message: JSON.stringify({
+          provider: 'shepu-generating',
+          fileType: 'image/jpeg',
+          fileName: 'shepu-ai.jpg',
+          text: String(opts.text || ''),
+        }),
+        replyTo: null,
+        edited: false,
+        deleted: false,
+      };
+      const el = _makeMessageEl(msg);
+      el.id = 'gen-' + id;
+      el.classList.add('msg-generating');
+      feed.appendChild(el);
+      _checkEmpty();
+      try {
+        if (UI && typeof UI.scrollToBottom === 'function') UI.scrollToBottom(feed, true);
+        else feed.scrollTop = feed.scrollHeight;
+      } catch { feed.scrollTop = feed.scrollHeight; }
+      return id;
+    } catch (e) { return null; }
+  }
+
+  function endImageGeneration(id) {
+    if (!id) return;
+    try {
+      const el = document.getElementById('gen-' + id);
+      if (el) el.remove();
+      _checkEmpty();
+    } catch { /* non-fatal */ }
+  }
+
+  // Read-only directory for the Shepu-AI room-command layer. Online state is
+  // derived from the same presence window used by the member sidebar.
+  function getMembers() {
+    return Array.from(_memberDir.values()).map(e => ({
+      ...e,
+      online: _isOnlineEntry(e),
+    }));
+  }
+
+  // Remove a member from the local directory immediately after the owner
+  // removes them through the bot. The next sync will reconcile anyway.
+  function dropMember(memberId) {
+    if (!memberId) return;
+    _memberDir.delete(memberId);
+    _memberMap.delete(memberId);
+    _renderMemberDir();
+  }
+
   return {
     init,
     appendMessages,
     renderMembers,
     refreshDecryption,
+    getMembers,
+    dropMember,
     setStatus,
     showUnavailable,
     loadSheetMessages,
     setEncryptionStatus,
     handleTypingEvent,
+    beginImageGeneration,
+    endImageGeneration,
     getMessages: () => _messages,
     mergeMembers,
     setTheme,

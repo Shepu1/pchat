@@ -346,7 +346,11 @@ function showJoinForm(roomInfo) {
   try {
     const icon = (typeof Rooms !== 'undefined' && Rooms.roomIcon)
       ? Rooms.roomIcon(roomInfo, roomInfo.kind)
-      : (roomInfo.kind === 'saved' ? 'assets/icons/saved.webp' : 'assets/icons/quick.webp');
+      : (roomInfo.kind === 'saved'
+        ? 'assets/icons/saved.webp'
+        : ((typeof Rooms !== 'undefined' && Rooms.quickIconFor)
+          ? Rooms.quickIconFor(roomInfo)
+          : 'assets/icons/quick.webp'));
     const img = document.createElement('img');
     img.src = icon;
     img.alt = '';

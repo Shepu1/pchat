@@ -508,9 +508,165 @@ const RoomMusic = (() => {
     }
   }
 
+  // ── Chat voice commands ("gan bajau" / "play some music") ─────
+  // Any member can start the room radio just by asking for it in chat:
+  // Bengali, Banglish or English, small spelling mistakes included.
+  const MUSIC_NOUN_WORDS = [
+    'gan', 'gaan', 'song', 'songs', 'music', 'musics', 'radio', 'tune',
+    'গান', 'সঙ্গীত', 'সংগীত', 'সঙ্গিত', 'রেডিও', 'সুর', 'গীত',
+  ];
+  const MUSIC_PLAY_WORDS = [
+    'bajau', 'bajao', 'baja', 'bajavu', 'bajay', 'sonau', 'sunao', 'sunau', 'suna',
+    'chalau', 'chalao', 'chalu', 'chalo', 'lagao', 'laga', 'lagay', 'play', 'plays',
+    'koro', 'kore', 'koreko', 'kro', 'start', 'put', 'suru',
+    'বাজাও', 'বাজাউ', 'সোনাও', 'সুনাও', 'চালাও', 'চালু', 'লাগাও', 'শোনাও', 'খোলো',
+  ];
+  const MUSIC_STOP_WORDS = [
+    'bondho', 'bondhu', 'band', 'off', 'stop', 'thako', 'thak', 'pause',
+    'বন্ধ', 'থামাও', 'বন্ধকরো', 'বন্ধকর',
+  ];
+  const MUSIC_NEXT_WORDS = [
+    'chenge', 'change', 'chang', 'next', 'porer', 'pore', 'badal', 'badali', 'notun',
+    'পরের', 'পরেরটা', 'বদলাও', 'বদলে', 'চেঞ্জ',
+  ];
+
+  // Small edit distance so "baju", "bajav", "gn", "baaju" still count.
+  function _editDistance(a, b) {
+    a = String(a || '');
+    b = String(b || '');
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    let prev = new Array(b.length + 1);
+    for (let j = 0; j <= b.length; j++) prev[j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  // One transposed pair ("baaju" / "bajau") counts as a single mistake.
+  function _isSwappedPair(a, b) {
+    if (a.length !== b.length || a.length < 3) return false;
+    let i = 0;
+    while (i < a.length && a[i] === b[i]) i++;
+    return i < a.length - 1 &&
+      a[i] === b[i + 1] &&
+      a[i + 1] === b[i] &&
+      a.slice(i + 2) === b.slice(i + 2);
+  }
+
+  function _isMusicWord(tok, list) {
+    if (!tok) return false;
+    if (list.indexOf(tok) !== -1) return true;
+    if (tok.length < 2) return false;
+    for (const w of list) {
+      if (w.length < 3) continue;
+      if (Math.abs(w.length - tok.length) > 1) continue;
+      if (_editDistance(tok, w) <= 1) return true;
+      if (_isSwappedPair(tok, w)) return true;
+    }
+    return false;
+  }
+
+  function _musicTokens(text) {
+    return String(text || '')
+      .toLowerCase()
+      // \p{M} keeps Bengali vowel signs attached ("গান" must stay one token)
+      .replace(/[^\p{L}\p{M}\p{N}\s]+/gu, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  // "gan bajau" / "গান বাজাও" / "play some music" / "music chalu"
+  function _looksLikeMusicRequest(text) {
+    const tokens = _musicTokens(text);
+    if (!tokens.length || tokens.length > 14) return false;
+    const hasNoun = tokens.some(t => _isMusicWord(t, MUSIC_NOUN_WORDS));
+    if (!hasNoun) return false;
+    return tokens.some(t => _isMusicWord(t, MUSIC_PLAY_WORDS));
+  }
+
+  // "gan bondho koro" / "stop the music"
+  function _looksLikeMusicStop(text) {
+    const tokens = _musicTokens(text);
+    if (!tokens.length || tokens.length > 14) return false;
+    const hasNoun = tokens.some(t => _isMusicWord(t, MUSIC_NOUN_WORDS));
+    if (!hasNoun) return false;
+    return tokens.some(t => _isMusicWord(t, MUSIC_STOP_WORDS));
+  }
+
+  // "gan chenge koro" / "next song" → skip to the next track
+  function _looksLikeMusicNext(text) {
+    const tokens = _musicTokens(text);
+    if (!tokens.length || tokens.length > 14) return false;
+    const hasNoun = tokens.some(t => _isMusicWord(t, MUSIC_NOUN_WORDS));
+    if (!hasNoun) return false;
+    return tokens.some(t => _isMusicWord(t, MUSIC_NEXT_WORDS));
+  }
+
+  // Public: what does this message ask for?  'play' | 'stop' | 'next' | null
+  function detectCommand(text) {
+    try {
+      if (_looksLikeMusicStop(text)) return 'stop';
+      if (_looksLikeMusicNext(text)) return 'next';
+      if (_looksLikeMusicRequest(text)) return 'play';
+      return null;
+    } catch (e) { return null; }
+  }
+
+  let _lastIntentAt = 0;
+
+  // Called for every chat message (own + incoming). Starts the synced room
+  // radio when someone asks for music, stops it when they ask to stop.
+  function maybePlayFromMessage(text) {
+    try {
+      const cmd = detectCommand(text);
+      if (!cmd) return false;
+
+      if (cmd === 'stop') {
+        if (_isPlaying) {
+          _togglePlayPause();
+          _showSyncToast('Music stopped ⏹');
+        }
+        return true;
+      }
+
+      if (cmd === 'next') {
+        if (!_playlist.length) {
+          _startSyncedPlayback();
+        } else {
+          _advanceNext();
+        }
+        return true;
+      }
+
+      const now = Date.now();
+      if (now - _lastIntentAt < 1500) return true;  // debounce rapid repeats
+      _lastIntentAt = now;
+      if (_isPlaying) return true;                   // already on air
+      _startSyncedPlayback();
+      return true;
+    } catch (e) {
+      console.warn('[RoomMusic] voice command failed:', e && e.message);
+      return false;
+    }
+  }
+
   return {
     init,
     handleSyncEvent,
+    maybePlayFromMessage,
+    detectCommand,
+    play: () => { if (!_isPlaying) _startSyncedPlayback(); },
+    stop: () => { if (_isPlaying) _togglePlayPause(); },
+    next: () => { if (_playlist.length) _advanceNext(); else _startSyncedPlayback(); },
+    isPlaying: () => _isPlaying,
   };
 })();
 

@@ -347,6 +347,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       secret:        session.roomSecret || urlRoomSecret || '',
       theme:         session.theme || urlTheme || 1,
       kind:          session.roomKind || urlRoomKind || 'quick',
+      quickIcon:     session.quickIcon || undefined,
     };
     // Save back to registry so future loads don't have to rebuild
     if (session.role === 'owner') {
@@ -451,17 +452,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch { /* non-critical */ }
 
   // ── Populate header ───────────────────────────────────────────
-  document.title = `${room.name} — Pchat shepu`;
+  // Room names are stored clean now; legacy rooms may still carry a leading
+  // emoji marker — strip it so the header stays colourless.
+  const displayRoomName = String(room.name || '')
+    .replace(/^[\p{Extended_Pictographic}\p{Emoji_Presentation}\s]+/gu, '')
+    .trim() || room.name || 'Chat';
+  document.title = `${displayRoomName} — Pchat shepu`;
   const titleEl = document.getElementById('room-title');
   const paintTitle = (n) => { if (titleEl) titleEl.innerHTML = emoName(n); };
-  paintTitle(room.name);
-  // Room profile icon: saved.webp for sheet rooms, quick.webp otherwise.
+  paintTitle(displayRoomName);
+  // Room profile icon: saved.webp for sheet rooms, one of the four quick
+  // avatars (random per room) for instant/P2P rooms.
   try {
     const avImg = document.getElementById('room-avatar');
     if (avImg) {
       const icon = (typeof Rooms !== 'undefined' && Rooms.roomIcon)
         ? Rooms.roomIcon(room, room.kind || urlRoomKind)
-        : ((room.spreadsheetId || room.kind === 'saved' || urlRoomKind === 'saved') ? 'assets/icons/saved.webp' : 'assets/icons/quick.webp');
+        : ((room.spreadsheetId || room.kind === 'saved' || urlRoomKind === 'saved')
+          ? 'assets/icons/saved.webp'
+          : ((typeof Rooms !== 'undefined' && Rooms.quickIconFor)
+            ? Rooms.quickIconFor(room)
+            : 'assets/icons/quick.webp'));
       avImg.src = icon;
       avImg.alt = room.name || 'Room';
       avImg.onerror = () => { try { avImg.style.display = 'none'; } catch {} };
@@ -470,7 +481,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Repaint once custom emoji arrive (room names may lead with emoji)
   try {
     if (typeof CustomEmoji !== 'undefined') {
-      CustomEmoji.load().then(() => paintTitle(room.name)).catch(() => {});
+      CustomEmoji.load().then(() => paintTitle(displayRoomName)).catch(() => {});
     }
   } catch {}
   Chat.setStatus('Connecting…', false);

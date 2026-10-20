@@ -109,6 +109,157 @@
   .music-track-meta { font-size: 0.62rem; }
   .music-vol-wrap { display: none; }
 
+  /* ── Phone chat: modern · minimal · professional ────────────────
+     Quieter header, flatter bubbles, one calm composer. Touch targets
+     stay ≥ 34px so nothing gets harder to tap. */
+  .chat-header {
+    height: 56px;
+    padding: 0 0.6rem;
+    gap: 0.45rem;
+    background: rgba(9, 13, 22, 0.88) !important;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+  }
+
+  .chat-header .back-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: var(--text-2);
+  }
+
+  .chat-header .room-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .chat-header .room-subtitle {
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .chat-header .header-actions { gap: 0.1rem; }
+  .chat-header .header-actions .btn-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    color: var(--text-2);
+    background: transparent;
+    border: 1px solid transparent;
+  }
+
+  .chat-header .header-actions .btn-icon:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Messages */
+  .chat-feed { padding: 0.75rem 0.7rem 1rem; }
+
+  .msg-row {
+    max-width: 86%;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .msg-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.68rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  .msg-sender-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-left: 2px;
+    margin-bottom: 1px;
+  }
+
+  .msg-bubble {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    border-radius: 15px 15px 15px 5px;
+    box-shadow: none;
+  }
+
+  .msg-row.other .msg-bubble,
+  .msg-row:not(.msg-mine) .msg-bubble {
+    background: rgba(16, 22, 38, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+    border-radius: 15px 15px 15px 5px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .msg-row.own .msg-bubble,
+  .msg-row.msg-mine .msg-bubble {
+    background: linear-gradient(135deg, rgba(59, 90, 246, 0.28) 0%, rgba(37, 64, 235, 0.2) 100%);
+    border: 1px solid rgba(129, 161, 255, 0.26);
+    box-shadow: none;
+    border-radius: 15px 15px 5px 15px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .msg-meta {
+    font-size: 0.62rem;
+    opacity: 0.6;
+    margin-top: 2px;
+  }
+
+  /* Composer: one calm surface, quiet tools, solid send button */
+  .chat-input-bar {
+    padding: 0.4rem 0.6rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(9, 13, 22, 0.94);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: none;
+  }
+
+  .chat-input-row { gap: 0.4rem; }
+
+  .chat-input-side-btn {
+    width: 38px;
+    height: 38px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-2);
+    box-shadow: none;
+  }
+
+  .chat-input-wrap {
+    min-height: 42px;
+    padding: 0.35rem 0.35rem 0.35rem 0.9rem;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+  }
+
+  /* No accent ring on phones — the field keeps its quiet hairline. */
+  .chat-input-bar .chat-input-wrap:focus-within {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: none;
+  }
+
+  .chat-input-btn {
+    width: 32px;
+    height: 32px;
+    color: var(--text-2);
+  }
+
+  .send-btn {
+    width: 34px;
+    height: 34px;
+  }
+
   /* Modal mobile */
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal {

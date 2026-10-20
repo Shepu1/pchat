@@ -106,17 +106,40 @@ const Rooms = {
   generateRoomSecret() { return Crypto.generateSecret(); },
 
   // ── Room kind + profile icon ────────────────────────────────
-  // Saved (Google Sheet backup) rooms → saved.webp, everything else
-  // (instant/P2P quick rooms) → quick.webp. kindHint ('saved'|'quick')
-  // covers invite-link contexts where the registry row has no spreadsheetId.
+  // Saved (Google Sheet backup) rooms → saved.webp. Quick (instant/P2P)
+  // rooms get one of the four quick avatars; the pick is random per new
+  // room and stored on the room record so the same room never flickers
+  // between renders. kindHint ('saved'|'quick') covers invite-link
+  // contexts where the registry row has no spreadsheetId.
+  QUICK_ROOM_ICONS: [
+    'assets/icons/quick.webp',
+    'assets/icons/quick1.jpeg',
+    'assets/icons/quick2.jpeg',
+    'assets/icons/quick3.jpeg',
+  ],
   roomKind(room, kindHint) {
     if (kindHint === 'saved' || kindHint === 'quick') return kindHint;
     return (room && room.spreadsheetId) ? 'saved' : 'quick';
   },
+  // Random pick for a brand-new quick room.
+  rollQuickIcon() {
+    const list = this.QUICK_ROOM_ICONS;
+    return list[Math.floor(Math.random() * list.length)];
+  },
+  // Stored pick when available, otherwise a stable hash of the room id
+  // (older rooms have no stored icon yet).
+  quickIconFor(room) {
+    const stored = room && room.quickIcon;
+    if (stored && this.QUICK_ROOM_ICONS.indexOf(stored) !== -1) return stored;
+    const id = String((room && (room.id || room.roomId)) || '');
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+    return this.QUICK_ROOM_ICONS[hash % this.QUICK_ROOM_ICONS.length];
+  },
   roomIcon(room, kindHint) {
     return this.roomKind(room, kindHint) === 'saved'
       ? 'assets/icons/saved.webp'
-      : 'assets/icons/quick.webp';
+      : this.quickIconFor(room);
   },
 
   createInstantRoom(roomName, roomDesc, ownerName) {
@@ -138,6 +161,9 @@ const Rooms = {
       isOwner: true,
       deploymentUrl: mockEndpoint,
       theme,
+      // Random quick avatar (one of four) — kept on the room so the icon
+      // stays the same on every render.
+      quickIcon: this.rollQuickIcon(),
     };
     this.addMyRoom(room);
 
@@ -159,6 +185,7 @@ const Rooms = {
       roomDesc: description,
       roomSecret: roomSecret,
       theme,
+      quickIcon: room.quickIcon,
       picture: ((typeof UI !== 'undefined' && UI.effectivePicture) ? UI.effectivePicture() : ''),
     };
     Storage.setSession(sessionData);

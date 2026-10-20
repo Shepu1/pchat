@@ -37,8 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
       modeBtns.forEach(b => {
         const isActive = b === btn;
         b.classList.toggle('active', isActive);
-        b.style.background  = isActive ? 'var(--surface-3)' : 'var(--surface-2)';
-        b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+        // Thin, soft accent edge for the selected mode (no heavy ring).
+        b.style.background  = isActive ? 'rgba(99,102,241,0.10)' : 'var(--surface-2)';
+        b.style.borderColor = isActive ? 'rgba(99,102,241,0.45)' : 'var(--border)';
       });
       if (modeHint) modeHint.textContent = MODE_HINTS[roomMode] || '';
     });
@@ -80,10 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const activeEmoji = document.querySelector('.btn-emoji-tag.active')?.dataset?.emoji;
-    if (activeEmoji && !roomName.includes(activeEmoji)) {
-      roomName = `${activeEmoji} ${roomName}`;
-    }
+    // The room icon is a monochrome SVG choice — it is stored as room
+    // metadata instead of being mixed into the room name, so every room
+    // name stays clean and professional.
+    const roomIcon = (window.__pchatRoomIcon) || 'chat';
 
     // Show progress
     document.getElementById('step-form').style.display     = 'none';
@@ -99,6 +100,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('step-form').style.display     = '';
         return;
       }
+      try {
+        if (typeof Rooms !== 'undefined' && typeof Rooms.updateRoom === 'function') {
+          Rooms.updateRoom(createdRoom.id, { icon: roomIcon });
+        }
+      } catch (e) { /* non-fatal */ }
       showSuccess(createdRoom);
     } catch (err) {
       console.error('Room creation failed:', err);
