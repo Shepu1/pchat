@@ -132,7 +132,12 @@ const UI = {
     if (!input || input.dataset.pwHardened === '1') return input;
     input.dataset.pwHardened = '1';
     try {
-      input.setAttribute('autocomplete', 'new-password');
+      // "new-password" would ASK Chrome for its password generator
+      // ("Suggest strong password" pops up over the box). "off" is
+      // ignored by Chrome on password fields, so the only hint Chrome
+      // actually respects is "one-time-code" — it then treats the field
+      // as a plain code field and leaves it alone.
+      input.setAttribute('autocomplete', 'one-time-code');
       input.setAttribute('autocapitalize', 'none');
       input.setAttribute('autocorrect', 'off');
       input.setAttribute('spellcheck', 'false');
@@ -142,6 +147,11 @@ const UI = {
       input.setAttribute('data-bwignore', 'true');
       // Chrome matches saved logins by name/id — a random name keeps it away.
       input.setAttribute('name', 'pw_' + Math.random().toString(36).slice(2, 10));
+      // A "form" attribute pointing at a form that does not exist leaves the
+      // field without a form owner. Chrome then cannot see a sign-up form
+      // (room name + password) and never offers its password generator.
+      // Every value is read from the element itself, so nothing breaks.
+      input.setAttribute('form', 'pchat-no-form');
       // readonly until the first real touch: Chrome never offers a saved
       // password for a readonly field, and dropping the attribute on
       // touch keeps the soft keyboard open.
