@@ -496,6 +496,17 @@ const CallManager = (() => {
       UI.toast('warning', 'Microphone blocked', _mediaErrorText(err) + ' Camera is on, but others cannot hear you yet — tap the mic button to retry.', 9000);
     }
   }
+  async function _getUserMediaVideoOnly() {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS });
+    } catch (err) {
+      if (err && (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError')) {
+        return await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS_RELAXED });
+      }
+      throw err;
+    }
+  }
+
   async function _acquireLocalMedia(type) {
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
       _notifyMediaProblem(type === 'video', new Error('Media devices need HTTPS (or localhost).'));
@@ -527,7 +538,7 @@ const CallManager = (() => {
       // Mic denied but camera allowed → keep the camera instead of dropping
       // both. The user can grant/retry the mic from the mic button later.
       try {
-        const videoOnly = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS });
+        const videoOnly = await _getUserMediaVideoOnly();
         _notifyMediaPartial('audio', audioErr);
         return videoOnly;
       } catch (videoErr) {
@@ -695,6 +706,7 @@ const CallManager = (() => {
     } else if (statusEl && _callState === 'calling') {
       statusEl.textContent = 'Ringing (no mic/camera)';
     }
+    _syncMediaButtons();
 
     // 4. The CALLEE is the only side that starts the media connection (see
     //    acceptCall). The caller never calls first, so both sides cannot
@@ -916,6 +928,7 @@ const CallManager = (() => {
     } else if (statusEl) {
       statusEl.textContent = 'Connected (no mic/camera)';
     }
+    _syncMediaButtons();
 
     // The callee starts the media connection: answer a pending offer, or call
     // the caller with our stream. If we have no mic/camera, tell the caller so
@@ -1102,6 +1115,27 @@ const CallManager = (() => {
     if (micOff) micOff.classList.toggle('hidden', !muted);
   }
 
+  function _paintCamUI(off) {
+    const btn = document.getElementById('call-dock-cam');
+    const camOn = document.getElementById('icon-cam-on');
+    const camOff = document.getElementById('icon-cam-off');
+    if (btn) btn.classList.toggle('is-off', off);
+    if (camOn) camOn.classList.toggle('hidden', off);
+    if (camOff) camOff.classList.toggle('hidden', !off);
+  }
+
+  // Reflect what we ACTUALLY have: if the mic was denied, show the mic as
+  // off (not falsely "on"); same for a blocked camera. Tapping the button
+  // still re-requests permission.
+  function _syncMediaButtons() {
+    const hasAudio = !!(_localStream && _localStream.getAudioTracks().some(t => t.readyState === 'live'));
+    const hasVideo = !!(_localStream && _localStream.getVideoTracks().some(t => t.readyState === 'live'));
+    if (!hasAudio) _isMuted = true;
+    if (!hasVideo) _isVideoOff = true;
+    _paintMicUI(_isMuted);
+    _paintCamUI(_isVideoOff);
+  }
+
   async function toggleMic() {
     const liveAudio = _localStream
       ? _localStream.getAudioTracks().find(t => t.readyState === 'live')
@@ -1129,7 +1163,7 @@ const CallManager = (() => {
       _attachLocalPreview();
       if (!_restartMediaConnection()) _addLocalTracksToActiveCall();
       _isMuted = false;
-      _paintMicUI(false);
+      _syncMediaButtons();
       const retryStatus = document.getElementById('call-status-subtitle');
       if (retryStatus && _callState === 'connected') retryStatus.textContent = 'Connected';
       return;
@@ -1152,19 +1186,14 @@ const CallManager = (() => {
       _localStream = retryStream;
       _attachLocalPreview();
       if (!_restartMediaConnection()) _addLocalTracksToActiveCall();
-      if (_localStream.getVideoTracks().length) {
+      if (_localStream.getVideoTracks().some(t => t.readyState === 'live')) {
         _callType = 'video';
         _isVideoOff = false;
         _updateStageDisplay();
-        const retryBtn = document.getElementById('call-dock-cam');
-        const retryOn = document.getElementById('icon-cam-on');
-        const retryOff = document.getElementById('icon-cam-off');
-        const retryStatus = document.getElementById('call-status-subtitle');
-        if (retryStatus && _callState === 'connected') retryStatus.textContent = 'Connected';
-        if (retryBtn) retryBtn.classList.remove('is-off');
-        if (retryOn) retryOn.classList.remove('hidden');
-        if (retryOff) retryOff.classList.add('hidden');
       }
+      _syncMediaButtons();
+      const retryStatus = document.getElementById('call-status-subtitle');
+      if (retryStatus && _callState === 'connected') retryStatus.textContent = 'Connected';
       return;
     }
     const videoTrack = _localStream.getVideoTracks().find(t => t.readyState === 'live');
@@ -1186,8 +1215,13 @@ const CallManager = (() => {
         _notifyMediaProblem(true, new Error('Media devices need HTTPS (or localhost).'));
         return;
       }
-      navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS })
+      _getUserMediaVideoOnly()
         .then(newStream => {
+          // The user may have ended the call while the camera prompt was open.
+          if (_callState !== 'connected' || !_localStream) {
+            try { newStream.getTracks().forEach(t => t.stop()); } catch {}
+            return;
+          }
           const newVideoTrack = newStream.getVideoTracks()[0];
           if (!newVideoTrack) {
             try { newStream.getTracks().forEach(t => t.stop()); } catch {}
@@ -1201,6 +1235,7 @@ const CallManager = (() => {
           _localStream.addTrack(newVideoTrack);
           _callType = 'video';
           _isVideoOff = false;
+          _syncMediaButtons();
           _updateStageDisplay();
 
           const localVideo = document.getElementById('call-local-video');
@@ -1246,13 +1281,15 @@ const CallManager = (() => {
       _isScreenSharing = false;
       document.getElementById('call-dock-screen')?.classList.remove('is-active');
 
+      const camTrack = _localStream
+        ? _localStream.getVideoTracks().find(t => t.readyState === 'live')
+        : null;
+      if (_activeCall && _activeCall.peerConnection) {
+        const sender = _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        // replaceTrack(null) stops sending video if there is no camera.
+        if (sender) sender.replaceTrack(camTrack || null);
+      }
       if (_localStream) {
-        const camTrack = _localStream.getVideoTracks().find(t => t.readyState === 'live');
-        if (_activeCall && _activeCall.peerConnection) {
-          const sender = _activeCall.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-          // replaceTrack(null) stops sending video if there is no camera.
-          if (sender) sender.replaceTrack(camTrack || null);
-        }
         const localVideo = document.getElementById('call-local-video');
         if (localVideo) localVideo.srcObject = _localStream;
       }
@@ -1260,7 +1297,7 @@ const CallManager = (() => {
     }
 
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
-      UI.toast('warning', 'Screen share unavailable', 'This browser or device does not support screen sharing.');
+      UI.toast('warning', 'Screen share unavailable', 'Screen sharing needs HTTPS (or localhost) and a browser/device that supports it.');
       return;
     }
 
@@ -1348,6 +1385,9 @@ const CallManager = (() => {
       overlay.classList.toggle('minimized', _isMinimized);
       overlay.style.display = 'flex';
     }
+    // Fresh call: no mute/camera state yet. Acquisition paints the truth.
+    _paintMicUI(_isMuted);
+    _paintCamUI(_isVideoOff);
   }
 
   function _hideCallOverlay() {
