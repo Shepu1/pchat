@@ -92,6 +92,30 @@ const Notify = (() => {
     } catch { return null; }
   }
 
+  // The preview text for an encrypted message. Decrypts on demand when this
+  // device holds the key; otherwise it says the message is locked.
+  async function _previewOfEncrypted(msg) {
+    const LOCKED = 'Encrypted message (locked)';
+    try {
+      if (typeof Encryption === 'undefined' || typeof Encryption.decrypt !== 'function') return LOCKED;
+      if (typeof Encryption.isActive === 'function' && !Encryption.isActive()) return LOCKED;
+      const pt = await Encryption.decrypt(msg.message);
+      if (!pt || String(pt).startsWith("[Couldn't decrypt")) return LOCKED;
+      // The decrypted body may be an attachment envelope.
+      if (typeof pt === 'string' && pt.startsWith('{')) {
+        try {
+          const p = JSON.parse(pt);
+          const label = p.text || p.fileName || '📎 Attachment';
+          return String(label).length > 120 ? String(label).slice(0, 120) + '…' : String(label);
+        } catch { /* not an envelope — use the raw text */ }
+      }
+      const text = String(pt);
+      return text.length > 120 ? text.slice(0, 120) + '…' : text;
+    } catch {
+      return LOCKED;
+    }
+  }
+
   function _supported() {
     return typeof window !== 'undefined' && 'Notification' in window;
   }
@@ -165,7 +189,12 @@ const Notify = (() => {
     let body = '';
     if (typeof msg.message === 'string') {
       // Strip encryption prefix / JSON attachment wrapper for a clean preview
-      if (msg.message.startsWith('enc:')) body = 'Encrypted message (locked)';
+      if (msg.message.startsWith('enc:')) {
+        // This device may well hold the key — then show the real text
+        // instead of a "locked" notice about a message the user can already
+        // read in the room.
+        body = await _previewOfEncrypted(msg);
+      }
       else if (msg.message.startsWith('{')) {
         try { const p = JSON.parse(msg.message); body = p.text || p.fileName || '📎 Attachment'; }
         catch { body = 'New message'; }

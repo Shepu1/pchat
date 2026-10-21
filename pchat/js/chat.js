@@ -726,8 +726,16 @@ const Chat = (() => {
       if (replyRef) {
         const quote = document.createElement('div');
         quote.className = 'msg-reply-quote';
-        quote.innerHTML = `<span class="reply-quote-name">${_escEmo(replyRef.senderName || '')}</span>
-          <span class="reply-quote-text">${_escEmo(_displayText(replyRef))}</span>`;
+        const nameEl = document.createElement('span');
+        nameEl.className = 'reply-quote-name';
+        nameEl.innerHTML = _escEmo(replyRef.senderName || '');
+        const textEl = document.createElement('span');
+        textEl.className = 'reply-quote-text';
+        // The quoted message may be encrypted — decrypt it on demand so the
+        // quote shows the real text instead of "Encrypted message (locked)".
+        _fillSnippet(textEl, replyRef);
+        quote.appendChild(nameEl);
+        quote.appendChild(textEl);
         col.appendChild(quote);
       }
     }
@@ -1662,7 +1670,10 @@ const Chat = (() => {
   function startReply(msg) {
     _replyTo = msg;
     document.getElementById('reply-to-name').textContent    = msg.senderName || 'Unknown';
-    document.getElementById('reply-to-preview').textContent = _displayText(msg);
+    // Same rule as the reply quote: an encrypted message is decrypted on
+    // demand, so the preview shows the real text rather than a locked
+    // placeholder.
+    _fillSnippet(document.getElementById('reply-to-preview'), msg);
     replyBar.classList.remove('hidden');
     input.focus();
   }
@@ -3098,6 +3109,44 @@ const Chat = (() => {
     }
     if (typeof c === 'string' && c.startsWith('enc:')) return 'Encrypted message (locked)';
     return (typeof c === 'string' ? c : '').substring(0, 80);
+  }
+
+  // Fill a snippet element (a reply quote, the reply bar preview) with the
+  // text of a message.
+  //
+  // An ENCRYPTED message cannot be rendered synchronously — the key has to
+  // be used first. The old code just called _displayText(), which returned
+  // "Encrypted message (locked)", so replying to an encrypted message showed
+  // the sender's name next to a locked placeholder instead of the actual
+  // text. This decrypts on demand and fills the element in as soon as the
+  // key is available.
+  function _fillSnippet(el, msg) {
+    if (!el || !msg) return;
+    const raw = typeof msg.message === 'string' ? msg.message : '';
+
+    if (!raw.startsWith('enc:')) {
+      el.innerHTML = _escEmo(_displayText(msg));
+      return;
+    }
+
+    const LOCKED = 'Encrypted message (locked)';
+    const keyActive = (typeof Encryption !== 'undefined' && Encryption.isActive)
+      ? Encryption.isActive() : false;
+    if (!keyActive || typeof Encryption === 'undefined' || typeof Encryption.decrypt !== 'function') {
+      el.textContent = LOCKED;
+      return;
+    }
+
+    el.innerHTML = '<span style="color:var(--text-3);font-size:0.8rem;">Decrypting…</span>';
+    Encryption.decrypt(raw).then(pt => {
+      if (!pt || String(pt).startsWith("[Couldn't decrypt")) {
+        el.textContent = LOCKED;
+        return;
+      }
+      // The decrypted body may itself be an attachment envelope — run it
+      // back through _displayText so a voice note or file reads correctly.
+      el.innerHTML = _escEmo(_displayText({ message: pt, messageType: msg.messageType }));
+    }).catch(() => { el.textContent = LOCKED; });
   }
 
   // ── Premium voice player (waveform + speed, custom UI) ────────
