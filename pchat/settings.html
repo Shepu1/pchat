@@ -7,11 +7,11 @@
   <title>Settings — Pchat shepu</title>
   <meta name="description" content="Pchat shepu account and application preferences." />
   <meta name="theme-color" content="#090d16" />
-  <link rel="icon" href="assets/icons/icon.png?v=20261016a" type="image/png" />
-  <link rel="stylesheet" href="css/base.css?v=20261016a" />
-  <link rel="stylesheet" href="css/layout.css?v=20261016a" />
-  <link rel="stylesheet" href="css/components.css?v=20261016a" />
-  <link rel="stylesheet" href="css/responsive.css?v=20261021k" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261021z" type="image/png" />
+  <link rel="stylesheet" href="css/base.css?v=20261021z" />
+  <link rel="stylesheet" href="css/layout.css?v=20261021z" />
+  <link rel="stylesheet" href="css/components.css?v=20261021z" />
+  <link rel="stylesheet" href="css/responsive.css?v=20261021z" />
 </head>
 <body>
 <div class="bg-mesh" aria-hidden="true"></div>
@@ -19,7 +19,7 @@
 <nav class="navbar">
   <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
     <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-weight:800;font-size:1.25rem;">
-      <img src="assets/icons/icon.png?v=20261016a" alt="Pchat shepu" class="app-logo-img" />
+      <img src="assets/icons/icon.png?v=20261021z" alt="Pchat shepu" class="app-logo-img" />
       Pchat shepu
     </a>
     <div class="navbar-actions">
@@ -48,13 +48,17 @@
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
           <span class="item-label">Notifications</span>
         </button>
+        <button class="sidebar-item" data-section="relay">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"></path><circle cx="8" cy="7" r="2" fill="var(--surface)"></circle><circle cx="15" cy="12" r="2" fill="var(--surface)"></circle><circle cx="10" cy="17" r="2" fill="var(--surface)"></circle></svg></span>
+          <span class="item-label">Relay</span>
+        </button>
+        <button class="sidebar-item" data-section="help">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
+          <span class="item-label">Help</span>
+        </button>
         <button class="sidebar-item" data-section="about">
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
           <span class="item-label">About</span>
-        </button>
-        <button class="sidebar-item" data-section="debug">
-          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
-          <span class="item-label">Developer</span>
         </button>
       </nav>
 
@@ -185,9 +189,12 @@
               </div>
             </div>
 
-            <div style="margin-top:1.5rem;">
+            <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
               <button class="btn btn-danger btn-sm" id="clear-local-data-btn" style="display:inline-flex;align-items:center;gap:6px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Clear local app data (storage + cache)
+              </button>
+              <button class="btn btn-secondary btn-sm" id="clear-idb-btn" style="display:inline-flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path></svg> Clear message cache only
               </button>
             </div>
           </div>
@@ -206,6 +213,68 @@
                 <div style="font-size:0.8125rem;color:var(--muted);" id="notif-status-text">Status: Not requested</div>
               </div>
               <button class="btn btn-secondary btn-sm" id="request-notif-btn">Enable</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Relay -->
+        <section class="settings-section" id="section-relay">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Message Relay</h3>
+            <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
+              Cross-device messages ride these public ntfy servers, with automatic failover between them.
+              If chat only works on your own device, a relay is probably blocked on your network — keep at
+              least one reachable server below, or use a VPN.
+            </p>
+
+            <div style="display:flex;flex-direction:column;gap:0.875rem;">
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                  Servers
+                  <span id="relay-status-badge" class="badge">checking…</span>
+                </div>
+                <textarea id="relay-servers-input" rows="4" spellcheck="false"
+                  style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem;color:var(--text);"></textarea>
+                <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" id="relay-test-btn">Test connection</button>
+                  <button class="btn btn-primary btn-sm" id="relay-save-btn">Save servers</button>
+                  <button class="btn btn-ghost btn-sm" id="relay-reset-btn">Reset to defaults</button>
+                </div>
+                <pre id="relay-report" style="font-size:0.75rem;max-height:160px;overflow:auto;margin-top:0.6rem;white-space:pre-wrap;"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- About -->
+        <!-- Help -->
+        <section class="settings-section" id="section-help">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Help</h3>
+            <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
+              Every feature of the app, in detail — generated from the app itself, so it is never out of date.
+            </p>
+
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+              <a href="help.html" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Open the help centre
+              </a>
+              <a href="about.html" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                About this app
+              </a>
+            </div>
+
+            <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.6rem;font-size:0.85rem;color:var(--text-2);">
+              <p><strong style="color:var(--text);">In the help centre you will find:</strong></p>
+              <ul style="margin:0;padding-left:1.1rem;line-height:1.8;">
+                <li>Every screen of the app and every button on it</li>
+                <li>All the assistant commands, with examples you can copy</li>
+                <li>Where your messages and local data are stored</li>
+                <li>How the relay and the encryption work, in plain language</li>
+                <li>Answers to the problems people hit most often</li>
+              </ul>
             </div>
           </div>
         </section>
@@ -230,61 +299,14 @@
               <p><strong style="color:var(--text);">Storage:</strong> Google Drive (owner-controlled), localStorage (session), IndexedDB (cache)</p>
               <p><strong style="color:var(--text);">Note:</strong> Google Sheets API quotas apply. Optimized for small private rooms, not unlimited public chat.</p>
             </div>
-          </div>
-        </section>
 
-        <!-- Developer -->
-        <section class="settings-section" id="section-debug">
-          <div class="panel">
-            <h3 style="margin-bottom:1.25rem;">Developer Tools</h3>
-
-            <div style="display:flex;flex-direction:column;gap:0.875rem;">
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
-                <div>
-                  <div style="font-weight:500;">Debug logging</div>
-                  <div style="font-size:0.8125rem;color:var(--muted);">Log API calls to console (never logs message content)</div>
-                </div>
-                <label style="position:relative;width:44px;height:24px;cursor:pointer;" aria-label="Toggle debug logging">
-                  <input type="checkbox" id="debug-toggle" style="opacity:0;width:0;height:0;position:absolute;" />
-                  <span id="debug-track" style="position:absolute;inset:0;background:var(--surface-3);border-radius:var(--r-full);transition:background 0.2s;border:1px solid var(--border);"></span>
-                  <span id="debug-thumb" style="position:absolute;left:3px;top:3px;width:18px;height:18px;background:var(--muted);border-radius:50%;transition:transform 0.2s;"></span>
-                </label>
-              </div>
-
-              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
-                <div style="font-weight:500;margin-bottom:0.5rem;">Stored Auth State</div>
-                <pre id="debug-auth" style="font-size:0.75rem;max-height:120px;overflow:auto;"></pre>
-              </div>
-
-              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
-                <div style="font-weight:500;margin-bottom:0.5rem;">Stored Rooms</div>
-                <pre id="debug-rooms" style="font-size:0.75rem;max-height:120px;overflow:auto;"></pre>
-              </div>
-
-              <button class="btn btn-secondary btn-sm" id="clear-idb-btn">Clear IndexedDB Cache</button>
-
-              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
-                <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                  Message Relay
-                  <span id="relay-status-badge" class="badge">checking…</span>
-                </div>
-                <div style="font-size:0.8125rem;color:var(--muted);margin-bottom:0.5rem;">
-                  Cross-device messages ride these public ntfy servers (with automatic failover).
-                  If chat only works on your own device, a relay is likely blocked on your network —
-                  keep at least one reachable server below, or use a VPN.
-                </div>
-                <textarea id="relay-servers-input" rows="4" spellcheck="false"
-                  style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem;color:var(--text);"></textarea>
-                <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
-                  <button class="btn btn-secondary btn-sm" id="relay-test-btn">Test connection</button>
-                  <button class="btn btn-primary btn-sm" id="relay-save-btn">Save servers</button>
-                  <button class="btn btn-ghost btn-sm" id="relay-reset-btn">Reset to defaults</button>
-                </div>
-                <pre id="relay-report" style="font-size:0.75rem;max-height:160px;overflow:auto;margin-top:0.6rem;white-space:pre-wrap;"></pre>
-              </div>
+            <div style="display:flex;gap:0.5rem;margin-top:1.25rem;flex-wrap:wrap;">
+              <a href="about.html" class="btn btn-primary btn-sm">Open the about page</a>
+              <a href="help.html" class="btn btn-ghost btn-sm">Help &amp; all features</a>
             </div>
           </div>
         </section>
+
       </div>
     </div>
   </div>
@@ -292,13 +314,13 @@
 
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-<script src="js/config.js?v=20261016a"></script>
-<script src="js/storage.js?v=20261021k"></script>
-<script src="js/ui.js?v=20261021k"></script>
-<script src="js/auth.js?v=20261021k"></script>
-<script src="js/instant-security.js?v=20261021k"></script>
-<script src="js/ntfy-sync.js?v=20261021k"></script>
-<script src="js/rooms.js?v=20261021k"></script>
+<script src="js/config.js?v=20261021z"></script>
+<script src="js/storage.js?v=20261021z"></script>
+<script src="js/ui.js?v=20261021z"></script>
+<script src="js/auth.js?v=20261021z"></script>
+<script src="js/instant-security.js?v=20261021z"></script>
+<script src="js/ntfy-sync.js?v=20261021z"></script>
+<script src="js/rooms.js?v=20261021z"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Tab navigation
@@ -491,40 +513,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Debug toggle
-  const debugToggle = document.getElementById('debug-toggle');
-  debugToggle.checked = Storage.get('debug_mode') === 'true';
-  updateToggle();
-
-  debugToggle.addEventListener('change', () => {
-    Storage.set('debug_mode', String(debugToggle.checked));
-    updateToggle();
-  });
-
-  function updateToggle() {
-    const on = debugToggle.checked;
-    document.getElementById('debug-track').style.background = on ? 'var(--accent)' : 'var(--surface-3)';
-    document.getElementById('debug-thumb').style.transform = on ? 'translateX(20px)' : 'translateX(0)';
-    document.getElementById('debug-thumb').style.background = on ? '#fff' : 'var(--muted)';
+  // Clear the offline message cache (IndexedDB). The full "clear local app
+  // data" button lives in the Privacy section.
+  const clearIdbBtn = document.getElementById('clear-idb-btn');
+  if (clearIdbBtn) {
+    clearIdbBtn.addEventListener('click', async () => {
+      const IDBStorage = window.IDBStorage;
+      if (IDBStorage) {
+        await IDBStorage.clearAll();
+        UI.toast('success', 'Cleared', 'IndexedDB cache cleared.');
+      } else {
+        UI.toast('info', 'Note', 'IndexedDB storage not initialized.');
+      }
+    });
   }
-
-  // Debug info
-  const authRaw = Storage.getAuth();
-  const safeAuth = authRaw ? { user: authRaw.user, hasToken: !!authRaw.accessToken, expiresAt: authRaw.expiresAt } : null;
-  document.getElementById('debug-auth').textContent = JSON.stringify(safeAuth, null, 2);
-  const roomsForDebug = (typeof Rooms !== 'undefined' && Rooms.getMyRooms) ? Rooms.getMyRooms().map(r => ({ id: r.id, name: r.name, status: r.status })) : [];
-  document.getElementById('debug-rooms').textContent = JSON.stringify(roomsForDebug, null, 2);
-
-  // Clear IDB
-  document.getElementById('clear-idb-btn').addEventListener('click', async () => {
-    const IDBStorage = window.IDBStorage;
-    if (IDBStorage) {
-      await IDBStorage.clearAll();
-      UI.toast('success', 'Cleared', 'IndexedDB cache cleared.');
-    } else {
-      UI.toast('info', 'Note', 'IndexedDB storage not initialized.');
-    }
-  });
 
   // ── Message relay servers (multi-server failover) ──────────────
   const relayInput  = document.getElementById('relay-servers-input');

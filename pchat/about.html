@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — Pchat shepu</title>
+  <meta name="description" content="Pchat shepu — create a room, own the data. What the app is, why it works this way, and what it is built on." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261021z" type="image/png" />
+  <link rel="stylesheet" href="css/base.css?v=20261021z" />
+  <link rel="stylesheet" href="css/layout.css?v=20261021z" />
+  <link rel="stylesheet" href="css/components.css?v=20261021z" />
+  <link rel="stylesheet" href="css/responsive.css?v=20261021z" />
+  <link rel="stylesheet" href="css/help.css?v=20261021z" />
+</head>
+<body>
+<div class="bg-mesh" aria-hidden="true"></div>
+
+<nav class="navbar">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-weight:800;font-size:1.25rem;">
+      <img src="assets/icons/icon.png?v=20261021z" alt="Pchat shepu" class="app-logo-img" />
+      Pchat shepu
+    </a>
+    <div class="navbar-actions">
+      <a href="help.html" class="btn btn-ghost btn-sm">Help</a>
+      <a href="index.html" class="btn btn-ghost btn-sm">← Back to Chats</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="container" style="position:relative;z-index:1;">
+
+    <!-- ── Hero ──────────────────────────────────────────────── -->
+    <div class="about-hero">
+      <div class="about-logo">P</div>
+      <h1>Pchat shepu</h1>
+      <p><strong>Create a room. Own the data.</strong><br />
+        A private chat app where your conversations live in your own Google Drive — not in someone's database, not on our servers.</p>
+    </div>
+
+    <div class="about-stats" id="about-stats"></div>
+
+    <!-- ── What it is ────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2rem;">
+      <h2>💬 What it is</h2>
+      <div class="about-prose">
+        <p>Pchat turns a single link into a full chat room. You make a room, get a link, and send it to whoever you want. They open it, pick a nickname, and you're talking — no signup, no email, no password, no user list, no advertising network.</p>
+        <p>Here's the part that matters: <strong>the room belongs to you.</strong> If you create it, the messages are written to a Google Sheet inside <strong>your</strong> Google Drive. We never see them. We don't even run a server for your chat — we host the web page and nothing else. If the app disappeared tomorrow, your conversations would still be sitting in your own Drive, readable in a spreadsheet.</p>
+        <p>Quick rooms are even lighter: there is no server at all. Your messages travel directly between the people in the room, and the room is gone the moment everyone leaves.</p>
+      </div>
+    </section>
+
+    <!-- ── Pillars ───────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2rem;">
+      <h2>🌟 Why it's built this way</h2>
+      <p class="doc-lede">Six decisions that shape everything else.</p>
+      <div class="about-pillars" id="about-pillars"></div>
+    </section>
+
+    <!-- ── How it works ──────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2rem;">
+      <h2>🔧 How it works</h2>
+      <div class="about-prose">
+        <p><strong>You create a room.</strong> Pchat sets up a Google Sheet in your Drive and gives you a private link. The link carries a secret that never travels to any server — it lives in the part of the URL browsers don't send. That secret is what makes the relay channel unguessable and what lets the app read back any previously encrypted history.</p>
+        <p><strong>You share the link.</strong> Anyone who opens it and picks a name is in. Nothing else is needed.</p>
+        <p><strong>You talk.</strong> Messages appear instantly on everyone's screen. They travel over <strong>two independent routes at once</strong> — a direct peer-to-peer connection and a cloud relay. If a network blocks one, the other still delivers. Nothing is lost because a router said no.</p>
+        <p>For a room with a passphrase, each message is encrypted on the sending device before it goes anywhere. The key never leaves the phone or laptop, so the relay only ever sees ciphertext. Without a passphrase, a room is <em>private</em> but not <em>secret</em> — that choice stays with the owner.</p>
+      </div>
+    </section>
+
+    <!-- ── Facts ─────────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2rem;">
+      <h2>📊 What it is made of</h2>
+      <p class="doc-lede">These numbers are read out of the app itself, so they are always true.</p>
+      <div class="panel" style="padding:0.5rem 0.75rem;">
+        <table class="doc-table" id="about-facts"></table>
+      </div>
+    </section>
+
+    <!-- ── Honesty ───────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2rem;">
+      <h2>🤝 Straight answers</h2>
+      <div class="about-prose">
+        <ul>
+          <li><strong>Anyone with the link is in the room.</strong> That is the design. Rotate the link if that stops being true — the old one stops working immediately.</li>
+          <li><strong>A room without a passphrase is not encrypted.</strong> It is private, not secret. The passphrase is what makes it secret, and a passphrase cannot be recovered later — keep it safe.</li>
+          <li><strong>In a saved room the owner can read the messages.</strong> It is their Drive. If you need a room where even the owner cannot read you, set a passphrase — the key is derived on your device and never sent.</li>
+          <li><strong>Email sign-in is a nickname, not an account.</strong> It tells the room who you are; it does not verify it. Use Google sign-in for a real identity.</li>
+          <li><strong>Google Sheets has usage limits.</strong> Pchat is made for small private rooms — a family, a team, a few friends. It is not built to run a public channel with thousands of people.</li>
+          <li><strong>Calls need a direct path.</strong> Where a network blocks peer-to-peer traffic, messages still arrive over the relay, but the call may not connect.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── Built on ──────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2rem;">
+      <h2>🧱 Built on</h2>
+      <div class="about-prose">
+        <p>Plain HTML, CSS and JavaScript — no build step, no framework, no bundler. Open the file and it runs. The whole app is static files that any host can serve.</p>
+        <p>Web Crypto for encryption, WebRTC for calls, Google Sheets and Apps Script for the backend, and a public relay for instant cross-device delivery. The service worker exists only for notifications — it deliberately never caches, so you always get the current version of the app.</p>
+      </div>
+    </section>
+
+    <!-- ── CTA ───────────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:3rem;">
+      <div class="panel" style="text-align:center;padding:2rem 1.5rem;">
+        <h2 style="font-size:1.35rem;margin:0 0 0.4rem;">Ready to try it?</h2>
+        <p style="color:var(--text-2);margin:0 0 1.25rem;">Make a room, send the link. That is the entire setup.</p>
+        <div style="display:flex;gap:0.6rem;justify-content:center;flex-wrap:wrap;">
+          <a href="index.html" class="btn btn-primary">Go to your chats</a>
+          <a href="help.html" class="btn btn-ghost">Read the help</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer style="border-top:1px solid var(--border);padding:1.5rem 0;margin-top:1rem;">
+  <div class="container" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+    <span style="color:var(--muted);font-size:0.8rem;">Pchat shepu · <a href="help.html" style="color:var(--accent-2);text-decoration:none;">Help</a> · <a href="index.html" style="color:var(--accent-2);text-decoration:none;">Chats</a></span>
+    <span style="color:var(--muted);font-size:0.75rem;" id="about-generated"></span>
+  </div>
+</footer>
+
+<script src="js/help-data.js?v=20261021z"></script>
+<script src="js/about-page.js?v=20261021z"></script>
+</body>
+</html>

@@ -130,6 +130,16 @@ Chromium against a local static server.
 
 Also fixed: **#21** (digits-only messages rendered as giant emoji bubbles — `js/chat.js`).
 
+### Second audit round — HTML / CSS (agent 6)
+
+| # | Bug | Fix | Verified |
+|---|---|---|---|
+| H1 | **Stale `?v=` cache-busters** — `js/sounds.js`, `css/base.css`, `css/components.css`, `js/drive.js`, `js/sheets.js`, `manifest.json` were pinned to a version older than their last content change, so returning visitors kept the old code (including the Oct-19 sound fix) | All 112 local asset references now use one token `20261021z`; verified that no file has two tokens | [C] |
+| H2 | **CSS variables `--text-1` / `--text-3` were used but never defined** — the `color` declaration was invalid at computed-value time, so the text silently inherited the parent's colour | `css/base.css` `:root` — added `--text-1: #f8fafc` and `--text-3: #64748b` (aliases of `--text` / `--muted`) | [RT] |
+| H3 | **`<img src="">` on 5 elements** — an empty `src` makes the browser re-fetch the page URL as an image and flash a broken image | The `src` attribute was removed from all 5; `js/chat.js` `closeLightbox()` now uses `removeAttribute('src')` instead of `src = ''` | [RT] |
+| H4 | **Dead CSS selectors** — `.msg-retry` (the JS renders `.msg-retry-btn`) and `.incoming-avatar-img` (the JS renders `.incoming-avatar-initial`) never matched anything | Removed the dead rules; the live rules are untouched and still present | [RT] |
+| H5 | *(found by my own regression suite)* The relay chunking overran the 4096-byte limit because the per-chunk `_part`/`_parts`/`_origId` markers were not counted in the overhead | `js/ntfy-sync.js` — the overhead is now measured from a worst-case chunk (3-digit index) | [RT] — max body 4 081 bytes |
+
 Not fixed (deliberately): **#26** — the date-divider feature was never wired up; it is a
 missing cosmetic feature rather than a broken one.
 

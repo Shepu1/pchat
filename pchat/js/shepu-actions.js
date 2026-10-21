@@ -92,6 +92,78 @@ const ShepuActions = (() => {
   const LINK_OFFTOPIC_RE = /(video|youtube|website|webpage|article|post|photo|image|download|song|music|file|document|profile|comment|external|browser)/i;
   const LINK_DELETE_RE = /(remove|delete|deleted|bondho|off|বন্ধ|রিমুভ|ডিলিট)/i;
 
+  // ── Theme (wallpaper) change ─────────────────────────────────────
+  // Exact word matching on purpose: the typo-tolerant layer would let
+  // "there" match "theme" (one edit apart).
+  const THEME_WORD_RE = /(?:\bthemes?\b|\bwall\s*paper\b|\bwallpapers?\b|\bbackground\b|\bbg\b|\bskins?\b|থিম|ওয়াল\s*পেপার|ওয়ালপেপার|ব্যাকগ্রাউন্ড|পটভূমি|স্কিন)/i;
+  const THEME_VERB_RE = /(?:\b(?:change|changed|changing|swap|set|update|apply|make|give|show|use|random|new|another|next)\b|\b(?:badal|badlo|badle|badali|baddal)\b|\b(?:koro|kor|kore|kora|kar|korte)\b|\b(?:deu|dao|den|din|dibo|dite|de)\b|বদলে|বদলাও|বদলানো|বদলাতে|পরিবর্তন|করো|কর|করে|করা|করতে|দাও|দিন|দিয়ে|সেট|একটা|একটি|অন্য)/i;
+  // "theme 3", "theme number 3", "3rd theme", "theme no 3"
+  const THEME_NUM_RE = /(?:\bthemes?\b|\bwall\s*paper\b|\bbackground\b|\bbg\b|\bskins?\b|থিম)[^0-9০-৯]{0,12}([0-9]{1,2})/i;
+  const THEME_NUM_REV_RE = /\b([0-9]{1,2})(?:st|nd|rd|th)?\s*(?:number|no|num)?\s*(?:\bthemes?\b|\bwall\s*paper\b|\bbackground\b|\bskins?\b|থিম)/i;
+  const THEME_WORD_NUMBERS = {
+    '1': 1, 'one': 1, 'ek': 1, 'ekta': 1, 'ekti': 1, 'এক': 1, 'একটা': 1, 'একটি': 1, 'prothom': 1, 'প্রথম': 1,
+    '2': 2, 'two': 2, 'dui': 2, 'duo': 2, 'দুই': 2, 'duito': 2, 'দ্বিতীয়': 2, 'dutiyo': 2,
+    '3': 3, 'three': 3, 'tin': 3, 'tini': 3, 'তিন': 3, 'tinno': 3, 'তৃতীয়': 3, 'titiyo': 3,
+    '4': 4, 'four': 4, 'char': 4, 'choy': 4, 'চার': 4, 'carto': 4, 'চতুর্থ': 4,
+    '5': 5, 'five': 5, 'pach': 5, 'pachho': 5, 'পাঁচ': 5, 'pacho': 5, 'পঞ্চম': 5,
+  };
+  const BN_DIGITS = { '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4', '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9' };
+
+  function _themeCount() {
+    try {
+      if (typeof RoomTheme !== 'undefined' && RoomTheme.count) return RoomTheme.count;
+    } catch { /* fall through */ }
+    return 5;
+  }
+
+  // Which theme did they ask for?
+  // null  = no number mentioned ("pick one for me")
+  // 1..N = the theme they want
+  // out-of-range numbers are returned as-is so the bot can say "there are
+  // only 5 themes" instead of silently picking a different one.
+  function _extractThemeNumber(text) {
+    let t = String(text == null ? '' : text).replace(/[০-৯]/g, d => (BN_DIGITS[d] || d));
+
+    let m = t.match(THEME_NUM_RE) || t.match(THEME_NUM_REV_RE);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n)) return n;
+    }
+
+    // Written-out numbers: "theme three", "থিম তিন"
+    const words = t.split(/\s+/);
+    for (let i = 0; i < words.length; i++) {
+      const w = String(words[i] || '').replace(/[^0-9a-zঀ-৿]/gi, '').toLowerCase();
+      if (!w) continue;
+      if (Object.prototype.hasOwnProperty.call(THEME_WORD_NUMBERS, w)) {
+        // Only accept it when it is next to a theme word.
+        const near = words.slice(Math.max(0, i - 3), i + 4).join(' ');
+        if (THEME_WORD_RE.test(near)) return THEME_WORD_NUMBERS[w];
+      }
+    }
+    return null;
+  }
+
+  // "which theme is this?", "কোন থিম?", "theme koto"
+  // Deliberately tight: "what is a theme?" (a definition) must NOT be
+  // treated as a question about the room's wallpaper.
+  const THEME_QUERY_RE = /(?:\b(?:which|what|whats)\s+(?:current|now|active|room'?s?|room|chat)?\s*\bthemes?\b(?!\s+is\s+a\b)|\bcurrent\s+themes?\b|\bactive\s+themes?\b|\bthemes?\s+(?:koto|টা|টি|number|no)\b|কোন(?:টা|টি)?\s*থিম|থিম\s*(?:কত|কোনটা|কোনটি|নাম্বার)|(?:\broom\b|\bchat\b|রুম|চ্যাট)[^\n]{0,16}?\bthemes?\b|\bthemes?\b[^\n]{0,16}?(?:\broom\b|\bchat\b|রুম|চ্যাট))/i;
+
+  // Does this message ask for a wallpaper change?
+  function _themeIntent(text) {
+    const t = String(text == null ? '' : text);
+    if (!THEME_WORD_RE.test(t)) return false;
+    // A real member whose name happens to be "theme" / "bg" wins — removing
+    // that person must not be read as a wallpaper request.
+    try { if (_mentionsExistingMember(t)) return false; } catch { /* ignore */ }
+    // A theme word alone is not enough ("what is the theme of this app?"),
+    // but a theme word with a number is.
+    if (_extractThemeNumber(t) !== null) return true;
+    if (THEME_VERB_RE.test(t)) return true;
+    // "which theme is this?" → tell them, don't change anything.
+    return THEME_QUERY_RE.test(t) ? 'query' : false;
+  }
+
   function _norm(value) {
     return String(value == null ? '' : value)
       .toLowerCase()
@@ -292,7 +364,7 @@ const ShepuActions = (() => {
     const raw = String(text == null ? '' : text).trim();
     if (!raw) return null;
     const t = _norm(raw);
-    if (!t || _looksLikeQuestion(t)) return null;
+    if (!t) return null;
 
     // Image requests must never be parsed as room commands. For example,
     // "draw a room delete button" contains both "room" and "delete".
@@ -305,10 +377,26 @@ const ShepuActions = (() => {
         /(বানাও|আঁক|তৈরি|দাও|দেখাও|banao|banau|toiri|draw|paint|create|generate|make|show|chobi|image|picture|photo)/i.test(t)) {
       return null;
     }
-    if (NEGATED_ACTION_RE.test(t)) return null;
 
     const lang = _langOf(raw);
     const action = (type, extra) => Object.assign({ type, lang, raw, text: t }, extra || {});
+
+    // 0. Theme / wallpaper.
+    //
+    // Checked BEFORE the question guard: "which theme is this?" is a
+    // question, but it is a question about THIS room — and the AI engine
+    // has no idea which wallpaper the room is using. It is also checked
+    // before the room actions so a theme request is never read as a
+    // member removal, and after the image guard so "draw a background"
+    // stays a picture request.
+    const themeIntent = _themeIntent(raw);
+    if (themeIntent) {
+      if (themeIntent === 'query') return action('theme_info');
+      return action('theme_change', { themeNumber: _extractThemeNumber(raw) });
+    }
+
+    if (_looksLikeQuestion(t)) return null;
+    if (NEGATED_ACTION_RE.test(t)) return null;
 
     // 1. Password OFF / remove. This must run before the generic remove
     // parser so "password remove koro" never tries to kick a member.
@@ -836,6 +924,75 @@ const ShepuActions = (() => {
     }
   }
 
+  // ── Theme (wallpaper) change ────────────────────────────────────
+  // Anyone can change the wallpaper through the header picker, so the bot
+  // may do it too. Chat.setTheme() applies it locally, persists it and
+  // relays it to the rest of the room.
+  async function _runTheme(action) {
+    const lang = action.lang;
+    const count = _themeCount();
+
+    const asked = parseInt(action.themeNumber, 10);
+    if (Number.isFinite(asked) && asked !== null && (asked < 1 || asked > count)) {
+      // They asked for a theme that does not exist — say so instead of
+      // silently applying a different one.
+      return { text: _pick(lang,
+        `এই room-এ মাত্র ${count}টা থিম আছে (১-${count})।`,
+        `Ei room-e matro ${count}ta theme ache (1-${count}).`,
+        `This room has ${count} themes (1-${count}).`) };
+    }
+
+    let n = asked;
+    if (!Number.isFinite(n) || n < 1 || n > count) {
+      // No number given → pick one for them.
+      try {
+        n = (typeof RoomTheme !== 'undefined' && typeof RoomTheme.pick === 'function')
+          ? RoomTheme.pick()
+          : 1;
+      } catch { n = 1; }
+    }
+    n = Math.max(1, Math.min(count, n || 1));
+
+    if (typeof Chat === 'undefined' || typeof Chat.setTheme !== 'function') {
+      return { text: _pick(lang,
+        'এখন থিম বদলাতে পারছি না।',
+        'Ekhon theme bodlate parchi na.',
+        'I cannot change the theme right now.') };
+    }
+    try {
+      await Chat.setTheme(n);
+    } catch (e) {
+      try { console.warn('[ShepuActions] theme change failed:', e); } catch {}
+      return { text: _pick(lang,
+        'থিম বদলানো গেল না।',
+        'Theme bodlano gel na.',
+        'The theme could not be changed.') };
+    }
+    return { text: _pick(lang,
+      `🎨 থিম ${n} করে দিয়েছি।`,
+      `🎨 Theme ${n} kore diyechi.`,
+      `🎨 Theme ${n} applied.`) };
+  }
+
+  // ── Which theme are we using right now? ────────────────────────
+  async function _runThemeInfo(action) {
+    const lang = action.lang;
+    const room = action._room || {};
+    const count = _themeCount();
+    let cur = parseInt(room.theme, 10);
+    if (!Number.isFinite(cur) || cur < 1 || cur > count) {
+      try {
+        const s = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
+        cur = parseInt(s && s.theme, 10);
+      } catch { /* ignore */ }
+    }
+    if (!Number.isFinite(cur) || cur < 1 || cur > count) cur = 1;
+    return { text: _pick(lang,
+      `🎨 এখন থিম ${cur} চালু আছে। মোট ${count}টা থিম আছে।`,
+      `🎨 Ekhon theme ${cur} chalu ache. Moto ${count}ta theme ache.`,
+      `🎨 Theme ${cur} is active. There are ${count} themes in total.`) };
+  }
+
   async function run(action, ctx) {
     if (!action || typeof action !== 'object') return null;
     const context = Object.assign({}, action, ctx || {});
@@ -847,6 +1004,8 @@ const ShepuActions = (() => {
       case 'remove_member':   return _runRemove(context);
       case 'room_delete':     return _runDelete(context);
       case 'invite_link':     return _runInvite(context);
+      case 'theme_change':    return _runTheme(context);
+      case 'theme_info':      return _runThemeInfo(context);
       case 'password_off':    return _runPasswordOff(context);
       case 'password_help':   return { text: _pick(action.lang,
         'Password চালু বা বদলাতে Settings → Room Password ব্যবহার করুন। নিরাপত্তার জন্য chat-এ password লিখবেন না।',

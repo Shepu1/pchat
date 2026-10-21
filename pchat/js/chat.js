@@ -3490,7 +3490,9 @@ const Chat = (() => {
     try {
       document.getElementById('lightbox-modal')?.classList.add('hidden');
       const img = document.getElementById('lightbox-img');
-      if (img) img.src = '';
+      // removeAttribute, not src = '' — an empty src makes the browser
+      // re-fetch the page URL as an image.
+      if (img) img.removeAttribute('src');
       try { document.body.style.overflow = ''; } catch {}
     } catch {}
   }

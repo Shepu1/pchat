@@ -1065,17 +1065,8 @@
 }
 
 /* ── Retry button ───────────────────────────────────────────────── */
-.msg-retry {
-  font-size: 0.8125rem;
-  color: var(--danger);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 2px;
-}
-
-.msg-retry:hover { text-decoration: underline; }
+/* The button the JS renders uses .msg-retry-btn (styled further down).
+   The old .msg-retry rule matched nothing at all. */
 
 /* ── Edit input overlay ─────────────────────────────────────────── */
 .edit-input-area {

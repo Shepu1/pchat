@@ -157,14 +157,27 @@ const ShepuRelay = (() => {
     const text = typeof msg.message === 'string' ? msg.message : '';
     if (!text) return [payload];
 
-    const overhead = _byteLen(JSON.stringify({ ...payload, msg: { ...msg, message: '' } }));
-    const budget = RELAY_MAX_BYTES - overhead - 16;   // 16 bytes of slack
+    // The unchunked payload is measured exactly.
+    if (_byteLen(JSON.stringify(payload)) <= RELAY_MAX_BYTES) return [payload];
+
+    // The overhead of a CHUNK is bigger than the plain envelope: every part
+    // carries its own id plus the _part/_parts/_origId markers. Measure a
+    // worst-case part (3-digit index, 3-digit count) so the real body can
+    // never exceed the relay limit.
+    const samplePart = {
+      ...msg,
+      id: msg.id + '_p999',
+      message: '',
+      _part: 999,
+      _parts: 999,
+      _origId: msg.id,
+    };
+    const overhead = _byteLen(JSON.stringify({ ...payload, msg: samplePart }));
+    const budget = RELAY_MAX_BYTES - overhead - 8;   // small safety margin
     if (budget < 32) return [payload];                // cannot split safely
-    if (overhead + _byteLen(text) <= RELAY_MAX_BYTES) return [payload];
 
     const parts = [];
     let rest = text;
-    let i = 0;
     // First pass: cut the text into relay-safe chunks.
     while (rest.length) {
       // Largest prefix that still fits into the byte budget.
@@ -177,7 +190,6 @@ const ShepuRelay = (() => {
       const part = rest.slice(0, take);
       rest = rest.slice(take);
       parts.push(part);
-      i++;
     }
 
     // Second pass: tag every chunk with its index, the total count and the

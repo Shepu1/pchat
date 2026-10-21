@@ -124,7 +124,8 @@
   flex-shrink: 0;
 }
 
-.incoming-avatar-img,
+/* The incoming toast renders .incoming-avatar-initial (see calls.js) —
+   there is no .incoming-avatar-img element anywhere. */
 .incoming-avatar-initial {
   width: 52px;
   height: 52px;

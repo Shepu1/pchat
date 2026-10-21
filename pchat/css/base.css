@@ -27,7 +27,13 @@
 
   /* Text */
   --text:        #f8fafc;
+  /* --text-1 / --text-3 are used by chat.css and by chat.js (the
+     "Decrypting…" placeholder). They were never defined, so the colour
+     declaration was invalid at computed-value time and the text simply
+     inherited the parent's colour. These are aliases of --text / --muted. */
+  --text-1:      #f8fafc;
   --text-2:      #94a3b8;
+  --text-3:      #64748b;
   --muted:       #64748b;
 
   /* Brand / Accent */

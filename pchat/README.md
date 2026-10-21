@@ -4,6 +4,10 @@
 
 SHEPU ROOMS is a privacy-first chat platform where every room's data lives in the **room owner's Google Drive**, not in a central platform database.
 
+> 📖 **Product page → [`PRODUCT.md`](PRODUCT.md)**
+> A public-facing overview: what the app does, why it's different, how to
+> get started, the bot commands, privacy, and the FAQ.
+
 ---
 
 ## Architecture Overview
@@ -174,6 +178,32 @@ If the Apps Script API is blocked (requires Google Workspace or specific Cloud p
 
 ---
 
+## Bot Commands (@shepu-ai)
+
+Mention `@shepu-ai` in the chat to talk to the bot. Besides answering
+questions, it understands a set of **local room commands** — these are
+parsed on-device (never sent to the AI provider) and work in English,
+Banglish and Bangla.
+
+| Say | What happens |
+|---|---|
+| `theme 3` · `theme number 4` · `থিম ৩ করো` | Sets that wallpaper for the whole room |
+| `theme change koro` · `random theme dao` · `background badal dao` | Picks a theme for you |
+| `which theme is this` · `কোন থিম চালু আছে` | Tells you the current theme |
+| `call Rahim` · `audio call koro` | Starts a call (1:1 or room-wide) |
+| `remove Rahim` · `Rahim ke ber kore dao` | Removes a member (asks first) |
+| `invite link dao` · `room link share koro` | Shares the invite link (copies it) |
+| `room lock koro` · `room unlock koro` | Locks / unlocks the room (owner only) |
+| `delete room` | Deletes the room (asks first) |
+| `koto jon ache` · `member list dao` | Lists the members |
+| `gan chalu` · `gan bondho` · `gan chenge` | Room radio: play / stop / next track |
+| `password off` | Points you to Settings → Room Password |
+
+Theme and music changes apply to everyone in the room and are relayed to
+the other devices, so the whole room sees them.
+
+---
+
 ## Message Synchronization
 
 Google Sheets has [API quotas](https://developers.google.com/sheets/api/limits) (read/write requests per minute per project). SHEPU ROOMS is optimized for **small private rooms**, not large-scale public chat.
@@ -198,13 +228,21 @@ PCHAT/
 ├── room.html           — Chat interface
 ├── settings.html       — Account settings
 ├── owner.html          — Owner management panel
+├── about.html          — About the app (public product page)
+├── help.html           — Help: every feature, generated from the app
 │
 ├── css/
 │   ├── base.css        — CSS variables, reset, typography
 │   ├── layout.css      — Navbar, page, grid layout
 │   ├── components.css  — Buttons, forms, modals, cards, badges
 │   ├── chat.css        — Chat feed, bubbles, input bar
+│   ├── calls.css       — Call overlay
+│   ├── help.css        — About & Help pages
 │   └── responsive.css  — Breakpoints (360px → 1280px+)
+│
+├── tools/
+│   ├── generate-help.js  — Scans the project → js/help-data.js
+│   └── verify-help.js    — Smoke test for the About & Help pages
 │
 ├── js/
 │   ├── config.js       — Central configuration (set CLIENT_ID here)
@@ -262,6 +300,30 @@ PCHAT/
 | `Rate limit exceeded` | Wait 10 seconds; reduce message frequency |
 | `Room is disabled` | Contact the room owner |
 | Sync stops working | Check browser console for quota errors; try refreshing |
+
+---
+
+## Keeping the Help page honest
+
+`help.html` is **generated from the project itself**, so it can never drift
+away from the app. `tools/generate-help.js` scans the source and writes
+`js/help-data.js`:
+
+```bash
+node tools/generate-help.js           # regenerate js/help-data.js
+node tools/generate-help.js --check   # fail if the committed file is stale
+node tools/verify-help.js             # smoke test the About & Help pages
+```
+
+What it extracts automatically: every screen and every button on it, the
+bot commands, the backend API actions, the room operations, the config
+values, the browser storage keys, the sheet tabs and their columns, the
+relay servers, the encryption parameters and the asset counts.
+
+The generator **refuses to write** if the code contains a feature the
+documentation does not mention — add a bot command without documenting it
+and the script fails with the name of the missing entry. The narrative
+itself lives in the `DOC` map at the top of `tools/generate-help.js`.
 
 ---
 

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Help — Pchat shepu</title>
+  <meta name="description" content="Every feature of Pchat shepu, generated from the app itself." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261021z" type="image/png" />
+  <link rel="stylesheet" href="css/base.css?v=20261021z" />
+  <link rel="stylesheet" href="css/layout.css?v=20261021z" />
+  <link rel="stylesheet" href="css/components.css?v=20261021z" />
+  <link rel="stylesheet" href="css/responsive.css?v=20261021z" />
+  <link rel="stylesheet" href="css/help.css?v=20261021z" />
+</head>
+<body>
+<div class="bg-mesh" aria-hidden="true"></div>
+
+<nav class="navbar">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-weight:800;font-size:1.25rem;">
+      <img src="assets/icons/icon.png?v=20261021z" alt="Pchat shepu" class="app-logo-img" />
+      Pchat shepu
+    </a>
+    <div class="navbar-actions">
+      <a href="about.html" class="btn btn-ghost btn-sm">About</a>
+      <a href="index.html" class="btn btn-ghost btn-sm">← Back to Chats</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="container" style="position:relative;z-index:1;">
+
+    <div style="padding:2rem 0 0.25rem;">
+      <h1 style="font-size:1.75rem;">Help</h1>
+      <p style="color:var(--text-2);margin-bottom:0.25rem;">Everything the app can do — generated from the app itself, so it is never out of date.</p>
+      <p style="color:var(--muted);font-size:0.8rem;margin-bottom:0;">
+        Search below, or pick a section.
+      </p>
+    </div>
+
+    <div class="doc-layout">
+
+      <!-- Section nav -->
+      <nav class="doc-nav" id="doc-nav" aria-label="Help sections">
+      </nav>
+
+      <!-- Content -->
+      <div id="doc-main">
+
+        <div class="doc-search">
+          <input id="doc-search" type="search" placeholder="Search the help — try &quot;theme&quot;, &quot;call&quot;, &quot;password&quot;…" aria-label="Search help" autocomplete="off" />
+          <button type="button" class="doc-search-clear" id="doc-search-clear" aria-label="Clear search">×</button>
+        </div>
+
+        <div class="doc-empty" id="doc-empty">
+          <h3>Nothing matched</h3>
+          <p>Try a different word, or clear the search to see everything.</p>
+        </div>
+
+        <!-- ── Getting started ─────────────────────────────────── -->
+        <section class="doc-section" data-doc="getting-started" data-title="Getting started" hidden>
+          <h2>🚀 Getting started</h2>
+          <p class="doc-lede">A room is a link. That is the whole idea — here is how to make one and how to use it.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Screens ─────────────────────────────────────────── -->
+        <section class="doc-section" data-doc="screens" data-title="Every screen" hidden>
+          <h2>🗺 Every screen</h2>
+          <p class="doc-lede">The app has these pages. Each one lists every control on it, taken straight from the markup.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── The room ────────────────────────────────────────── -->
+        <section class="doc-section" data-doc="room" data-title="In the room" hidden>
+          <h2>💬 In the room</h2>
+          <p class="doc-lede">What you can do once you are inside a room.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <section class="doc-section" data-doc="room-controls" data-title="Room controls" hidden>
+          <h2>🎛 Room controls</h2>
+          <p class="doc-lede">Every button in the room, with its name.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Dashboard ───────────────────────────────────────── -->
+        <section class="doc-section" data-doc="dashboard" data-title="Your chats" hidden>
+          <h2>🏠 Your chats</h2>
+          <p class="doc-lede">The dashboard, where your rooms live.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Owner ───────────────────────────────────────────── -->
+        <section class="doc-section" data-doc="owner" data-title="Owner tools" hidden>
+          <h2>🛡 Owner tools</h2>
+          <p class="doc-lede">Only the room owner can reach these.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <section class="doc-section" data-doc="owner-controls" data-title="Owner panel buttons" hidden>
+          <h2>🛠 Owner panel buttons</h2>
+          <p class="doc-lede">Every control in the owner panel.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Settings ────────────────────────────────────────── -->
+        <section class="doc-section" data-doc="settings" data-title="Settings" hidden>
+          <h2>⚙️ Settings</h2>
+          <p class="doc-lede">Your account, notifications, the relay and the privacy tools.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <section class="doc-section" data-doc="settings-controls" data-title="Settings buttons" hidden>
+          <h2>🔧 Settings buttons</h2>
+          <p class="doc-lede">Every control in Settings.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Assistant ───────────────────────────────────────── -->
+        <section class="doc-section" data-doc="assistant" data-title="The assistant" hidden>
+          <h2>🤖 The assistant</h2>
+          <p class="doc-lede">Mention it in chat and it will answer questions — or do what you tell it to. Click any command to copy it.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Shortcuts ───────────────────────────────────────── -->
+        <section class="doc-section" data-doc="shortcuts" data-title="Shortcuts" hidden>
+          <h2>⌨️ Shortcuts</h2>
+          <p class="doc-lede">Keyboard and touch shortcuts.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Data ────────────────────────────────────────────── -->
+        <section class="doc-section" data-doc="data" data-title="Your data" hidden>
+          <h2>📦 Your data</h2>
+          <p class="doc-lede">Where a room keeps its messages, and what stays on your device.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── How it works ────────────────────────────────────── -->
+        <section class="doc-section" data-doc="how-it-works" data-title="How it works" hidden>
+          <h2>🔧 How it works</h2>
+          <p class="doc-lede">The machinery behind the chat — in plain language.</p>
+          <div class="doc-body"></div>
+        </section>
+
+        <!-- ── Troubleshooting ─────────────────────────────────── -->
+        <section class="doc-section" data-doc="troubleshooting" data-title="Troubleshooting" hidden>
+          <h2>🛠 Troubleshooting</h2>
+          <p class="doc-lede">The things people ask about most.</p>
+          <div class="doc-body"></div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer style="border-top:1px solid var(--border);padding:1.5rem 0;margin-top:1rem;">
+  <div class="container" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+    <span style="color:var(--muted);font-size:0.8rem;">Pchat shepu — <a href="about.html" style="color:var(--accent-2);text-decoration:none;">About</a> · <a href="index.html" style="color:var(--accent-2);text-decoration:none;">Chats</a></span>
+    <span style="color:var(--muted);font-size:0.75rem;" id="doc-generated"></span>
+  </div>
+</footer>
+
+<script src="js/help-data.js?v=20261021z"></script>
+<script src="js/help-page.js?v=20261021z"></script>
+<script>
+  (function () {
+    try {
+      var el = document.getElementById('doc-generated');
+      if (el && window.HelpData && window.HelpData.generatedAt) {
+        el.textContent = 'This page was generated from the app on ' +
+          String(window.HelpData.generatedAt).slice(0, 10) + '.';
+      }
+    } catch (e) { /* non-critical */ }
+  })();
+</script>
+</body>
+</html>
