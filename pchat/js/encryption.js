@@ -40,7 +40,10 @@ const Encryption = (() => {
 
   // ── Encrypt plaintext → base64 ciphertext with prefix ─────────
   async function encrypt(plaintext) {
-    if (!_key) return plaintext; // If not encrypted, return as is
+    // No key → refuse. Returning the plaintext here would silently downgrade
+    // an "encrypted" room to plaintext; the caller must never be able to
+    // ship an unencrypted message by accident.
+    if (!_key) throw new Error('No encryption key — refusing to send plaintext.');
     try {
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const enc = new TextEncoder();
@@ -55,7 +58,9 @@ const Encryption = (() => {
       return "enc:" + _arrayBufferToBase64(combined.buffer);
     } catch (e) {
       console.warn("Encryption failed:", e);
-      return plaintext;
+      // Never fall back to the plaintext here: a caller that cannot tell the
+      // difference would ship an unencrypted message into an "encrypted" room.
+      throw new Error('Encryption failed — the message was not encrypted.');
     }
   }
 

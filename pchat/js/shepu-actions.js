@@ -409,17 +409,28 @@ const ShepuActions = (() => {
   function _resolveMember(text, session) {
     const q = _nameNorm(text);
     if (!q) return { member: null, ambiguous: [] };
+    const qTokens = q.split(/\s+/).filter(Boolean);
     const scored = [];
     for (const m of _members()) {
       if (!m || !m.memberId) continue;
       const name = _nameNorm(m.displayName);
-      if (!name || name.length < 2) continue;
+      // 2-character names match far too much ("ali" inside "finally").
+      if (!name || name.length < 3) continue;
       if (m.memberId === BOT_ID) continue;
       const tokens = name.split(/\s+/).filter(Boolean);
+      // Word-boundary match — a plain substring test matched "Ali" inside
+      // "finalize the plan" and removed the WRONG member.
+      const hasToken = (t) => qTokens.includes(t);
       let score = 0;
-      if (q.includes(name)) score = 4;
-      else if (tokens.length > 1 && tokens.every(tok => tok.length >= 3 && q.includes(tok))) score = 3;
-      else if (tokens[0] && tokens[0].length >= 3 && q.includes(tokens[0])) score = 2;
+      if (hasToken(name)) score = 4;
+      else if (tokens.length > 1 && tokens.every(tok => tok.length >= 3 && hasToken(tok))) score = 3;
+      else if (tokens[0] && tokens[0].length >= 3 && hasToken(tokens[0])) score = 2;
+      else if (name.length >= 4 && tokens.length === 1) {
+        // A single-word name may still be written inside a longer phrase
+        // ("remove Rahim please") — accept it only as a whole word.
+        const re = new RegExp('(?:^|\\s)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:\\s|$)');
+        if (re.test(q)) score = 2;
+      }
       if (score > 0) scored.push({ member: m, score });
     }
     scored.sort((a, b) => b.score - a.score);
@@ -680,10 +691,12 @@ const ShepuActions = (() => {
     let copied = false;
     try {
       if (typeof UI !== 'undefined' && typeof UI.copyText === 'function') {
-        await UI.copyText(url);
-        copied = true;
+        // UI.copyText() RETURNS false when both the async clipboard and the
+        // execCommand fallback fail — it does not throw. Ignoring the return
+        // value made the bot claim "(copied)" while the clipboard was empty.
+        copied = !!(await UI.copyText(url));
       }
-    } catch { /* still send the link */ }
+    } catch { copied = false; }
     const note = room.passwordLocked
       ? _pick(lang, '\n\nRoom-টি password-protected; link খুলে password দিতে হবে।', '\n\nRoom ti password-protected; link khule password dite hobe.', '\n\nThis room is password-protected; the password is still required.')
       : '';

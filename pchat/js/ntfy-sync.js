@@ -120,20 +120,92 @@ const ShepuRelay = (() => {
       signal: ctrl.signal,
     }).then(res => {
       clearTimeout(timer);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) {
+        // A 4xx is OUR fault (payload too large, bad request, rate limited) —
+        // the server is fine. Marking it as failed made every relay look
+        // dead and inflated the reconnect backoff.
+        const err = new Error('HTTP ' + res.status);
+        err.clientError = res.status >= 400 && res.status < 500;
+        throw err;
+      }
       markOk(base);
       return true;
-    }).catch(err => { clearTimeout(timer); markFail(base, err); return false; });
+    }).catch(err => {
+      clearTimeout(timer);
+      if (!err || !err.clientError) markFail(base, err);
+      return false;
+    });
+  }
+
+  // ntfy's default message-size-limit is 4096 bytes. A larger body is not
+  // delivered as a message (the server treats it as an attachment), so long
+  // messages never reached the other devices.
+  const RELAY_MAX_BYTES = 4096;
+
+  function _byteLen(str) {
+    try { return new TextEncoder().encode(String(str)).length; }
+    catch { return String(str).length; }
+  }
+
+  // Split an oversized chat message into relay-safe parts. Each part gets its
+  // own id so receivers do not dedupe them away; the full message is still
+  // stored in the Sheet / local history.
+  function _splitForRelay(payload) {
+    if (!payload || typeof payload !== 'object') return [payload];
+    if (payload.type !== 'message' || !payload.msg) return [payload];
+    const msg = payload.msg;
+    const text = typeof msg.message === 'string' ? msg.message : '';
+    if (!text) return [payload];
+
+    const overhead = _byteLen(JSON.stringify({ ...payload, msg: { ...msg, message: '' } }));
+    const budget = RELAY_MAX_BYTES - overhead - 16;   // 16 bytes of slack
+    if (budget < 32) return [payload];                // cannot split safely
+    if (overhead + _byteLen(text) <= RELAY_MAX_BYTES) return [payload];
+
+    const parts = [];
+    let rest = text;
+    let i = 0;
+    // First pass: cut the text into relay-safe chunks.
+    while (rest.length) {
+      // Largest prefix that still fits into the byte budget.
+      let lo = 1, hi = rest.length, take = 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (_byteLen(rest.slice(0, mid)) <= budget) { take = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      const part = rest.slice(0, take);
+      rest = rest.slice(take);
+      parts.push(part);
+      i++;
+    }
+
+    // Second pass: tag every chunk with its index, the total count and the
+    // ORIGINAL message id. Without _parts/_origId the receiver has no way to
+    // know that a message was cut up — it used to arrive as several
+    // separate chat bubbles.
+    return parts.map((part, idx) => ({
+      ...payload,
+      msg: {
+        ...msg,
+        id: msg.id + '_p' + idx,
+        message: part,
+        _part: idx,
+        _parts: parts.length,
+        _origId: msg.id,
+      },
+    }));
   }
 
   async function publish(payload, topics) {
     const list = Array.isArray(topics) ? topics.filter(Boolean) : [];
     if (!list.length) return;
-    const body = (typeof payload === 'string') ? payload : JSON.stringify(payload);
+    const payloads = _splitForRelay(payload);
+    const bodies = payloads.map(p => (typeof p === 'string' ? p : JSON.stringify(p)));
     const bases = servers();
     const jobs = [];
     for (const base of bases) {
-      for (const t of list) jobs.push(_post(base, t, body));
+      for (const t of list) for (const body of bodies) jobs.push(_post(base, t, body));
     }
     const results = await Promise.allSettled(jobs);
     return results.some(r => r.status === 'fulfilled' && r.value === true);
@@ -184,16 +256,71 @@ window.ShepuRelay = ShepuRelay;
 const NtfySync = (() => {
   let _topics = [];
   let _running = false;
+  let _stopping = false;     // true while stop() is aborting the streams
   let _onEvent = null;      // (event) => void
   let _abortCtrls = [];
   let _restartTimers = new Set();
   let _streams = [];        // { base, topic }
   let _roomId = null;
   let _privateOnly = false;
+  // Bumped whenever the topics change (link rotation). Streams opened
+  // before the bump are stale and must not keep running or reconnect.
+  let _generation = 0;
   const _seenIds = new Set();      // message ids (logical dedupe)
+  const SEEN_IDS_MAX = 3000;       // keep the set bounded — it never shrank
+  const _lastStreamIds = new Map(); // topic -> last ntfy message id (resume point)
   const _payloadSeen = new Map();  // raw payload -> first-seen ts (short-window)
   const PAYLOAD_SEEN_MAX = 800;
   const PAYLOAD_DEDUPE_MS = 5000;  // same text from another server/topic copy
+
+  // ── Fragment reassembly ─────────────────────────────────────────
+  // A message longer than the relay's 4096-byte limit is published as
+  // several chunks. Each chunk carries _part/_parts/_origId, so the
+  // receiver can stitch them back together — otherwise a 4000-character
+  // message (a 4000-character Bengali message is 12000 bytes!) arrived as
+  // 3-4 separate chat bubbles, cut mid-word.
+  const _fragments = new Map();   // origId -> { parts: Map, total, base, timer }
+  const FRAGMENT_TIMEOUT_MS = 30000;
+
+  function _clearFragment(origId) {
+    const entry = _fragments.get(origId);
+    if (!entry) return null;
+    try { if (entry.timer) clearTimeout(entry.timer); } catch {}
+    _fragments.delete(origId);
+    return entry;
+  }
+
+  // Returns the complete message, or null while parts are still missing.
+  function _collectFragment(msg) {
+    const origId = msg._origId || msg.id;
+    const total  = Number(msg._parts) || 0;
+    const idx    = Number(msg._part) || 0;
+    if (!total || total < 2) return null;
+
+    let entry = _fragments.get(origId);
+    if (!entry) {
+      entry = { parts: new Map(), total, base: msg, timer: null };
+      _fragments.set(origId, entry);
+      // Give up on an incomplete message instead of leaking the buffer.
+      entry.timer = setTimeout(() => { _fragments.delete(origId); }, FRAGMENT_TIMEOUT_MS);
+    }
+    entry.total = Math.max(entry.total, total);
+    entry.parts.set(idx, msg);
+    if (entry.parts.size < entry.total) return null;
+
+    _clearFragment(origId);
+
+    // Rebuild the original message from the collected chunks.
+    const ordered = [];
+    for (let i = 0; i < entry.total; i++) ordered.push(entry.parts.get(i));
+    const rebuilt = { ...entry.base };
+    rebuilt.id = origId;
+    rebuilt.message = ordered.map(p => (p && typeof p.message === 'string') ? p.message : '').join('');
+    delete rebuilt._part;
+    delete rebuilt._parts;
+    delete rebuilt._origId;
+    return rebuilt;
+  }
 
   function topicFor(roomId) {
     return `shepu_pchat_${roomId}`;
@@ -202,6 +329,8 @@ const NtfySync = (() => {
   function init({ roomId, roomSecret, onEvent, privateOnly }) {
     _roomId = roomId || _roomId;
     _privateOnly = privateOnly === true;
+    // Any stream still running belongs to the previous topic set.
+    _generation++;
     try {
       if (typeof InstantSecurity !== 'undefined') {
         const all = InstantSecurity.topicsFor(roomId, roomSecret || null);
@@ -217,6 +346,11 @@ const NtfySync = (() => {
     _onEvent = onEvent;
     _seenIds.clear();
     _payloadSeen.clear();
+    // Drop half-collected chunks from a previous room/session.
+    for (const [, entry] of _fragments) {
+      try { if (entry.timer) clearTimeout(entry.timer); } catch {}
+    }
+    _fragments.clear();
   }
 
   function start() {
@@ -260,11 +394,16 @@ const NtfySync = (() => {
 
   function stop() {
     _running = false;
+    // An intentional abort must not look like a server outage: the aborted
+    // fetch rejects, and markFail() would report every relay as dead (and
+    // inflate the reconnect backoff) right after a secret rotation.
+    _stopping = true;
     _restartTimers.forEach(t => clearTimeout(t));
     _restartTimers.clear();
     _abortCtrls.forEach(c => { try { c.abort(); } catch {} });
     _abortCtrls = [];
     _streams = [];
+    setTimeout(() => { _stopping = false; }, 0);
   }
 
   // Link rotation: drop the old topics and subscribe to the new secret's
@@ -283,9 +422,18 @@ const NtfySync = (() => {
   // ── One long-lived stream per (server, topic) ───────────────────
   async function _startStream(base, topic) {
     if (!_running) return;
+    // Never open a stream for a topic we no longer use (link rotation).
+    if (Array.isArray(_topics) && _topics.length && !_topics.includes(topic)) return;
+    // A generation counter invalidates every stream that was already in
+    // flight when the topics changed.
+    const gen = _generation;
     const ctrl = new AbortController();
     _abortCtrls.push(ctrl);
-    const url = `${base}/${encodeURIComponent(topic)}/json?since=all`;
+    // The FIRST connect needs the backlog (a late joiner must see the room
+    // history). Every reconnect used "?since=all" too, so the whole topic
+    // was re-downloaded and re-parsed on every sleep/wake or network blip.
+    const since = _lastStreamIds.get(topic) || 'all';
+    const url = `${base}/${encodeURIComponent(topic)}/json?since=${encodeURIComponent(since)}`;
 
     let res;
     try {
@@ -298,8 +446,9 @@ const NtfySync = (() => {
       ShepuRelay._markOk(base);
     } catch (err) {
       _dropCtrl(ctrl);
-      ShepuRelay._markFail(base, err);
-      if (_running) _scheduleRestart(base, topic, false);
+      // An intentional stop() abort is not a server failure.
+      if (!_stopping) ShepuRelay._markFail(base, err);
+      if (_running && gen === _generation) _scheduleRestart(base, topic, false);
       return;
     }
 
@@ -307,7 +456,7 @@ const NtfySync = (() => {
     const decoder = new TextDecoder();
     let buf = '';
     try {
-      while (_running) {
+      while (_running && gen === _generation) {
         const { value, done } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
@@ -321,7 +470,7 @@ const NtfySync = (() => {
     } catch { /* aborted or network drop */ }
 
     _dropCtrl(ctrl);
-    if (_running) _scheduleRestart(base, topic, true);
+    if (_running && gen === _generation) _scheduleRestart(base, topic, true);
   }
 
   function _dropCtrl(ctrl) {
@@ -330,6 +479,12 @@ const NtfySync = (() => {
 
   function _scheduleRestart(base, topic, wasLive) {
     if (!_running) return;
+    // The topic may have been replaced while this stream was in flight
+    // (link rotation calls setSecret → stop + init + start). Resubscribing
+    // to a topic we no longer use kept the OLD, revoked topic alive: the
+    // owner kept receiving from it and the revoked participants kept
+    // reaching the owner.
+    if (Array.isArray(_topics) && _topics.length && !_topics.includes(topic)) return;
     // A stream that was working and then dropped → reconnect fast.
     // A server that never connected → exponential-ish backoff, max 60s.
     const delay = wasLive ? 1500 : Math.min(60000, 2000 * Math.pow(2, Math.min(5, _failCount(base))));
@@ -374,6 +529,12 @@ const NtfySync = (() => {
     if (evt.event && evt.event !== 'message') return;
     if (evt.message == null) return;
 
+    // Remember the ntfy message id so a reconnect can resume from here
+    // instead of replaying the whole topic history.
+    if (evt.id && forTopic) {
+      try { _lastStreamIds.set(forTopic, evt.id); } catch {}
+    }
+
     // Cross-server / cross-topic duplicate suppression, but only for a short
     // window. The previous forever-dedupe dropped legitimate repeats (the
     // same presence heartbeat, the same theme re-applied, an identical
@@ -386,8 +547,34 @@ const NtfySync = (() => {
 
     if (payload.type === 'message' && payload.msg) {
       const msg = payload.msg;
-      if (msg.id && _seenIds.has(msg.id)) return;
-      if (msg.id) _seenIds.add(msg.id);
+      // An edit or a delete is broadcast under the ORIGINAL message id, so
+      // the id dedupe below would swallow it and members would keep seeing
+      // the old text (or a message that should be gone). Updates bypass the
+      // dedupe; they are idempotent on the receiving side.
+      const isUpdate = (msg.edited === true) || (msg.deleted === true);
+      if (!isUpdate && msg.id && _seenIds.has(msg.id)) return;
+      if (msg.id) {
+        _seenIds.add(msg.id);
+        // Keep the dedupe set bounded — a long-lived tab received one id per
+        // message (plus relay replays) and the set never shrank.
+        if (_seenIds.size > SEEN_IDS_MAX) {
+          const drop = _seenIds.size - SEEN_IDS_MAX;
+          let i = 0;
+          for (const id of _seenIds) {
+            _seenIds.delete(id);
+            if (++i >= drop) break;
+          }
+        }
+      }
+      // A chunk of a longer message: collect it and stay quiet until every
+      // chunk has arrived, then deliver the reconstructed message once.
+      if (msg._parts && Number(msg._parts) > 1) {
+        const rebuilt = _collectFragment(msg);
+        if (!rebuilt) return;
+        if (rebuilt.id && !_seenIds.has(rebuilt.id)) _seenIds.add(rebuilt.id);
+        if (_onEvent) _onEvent({ kind: 'message', msg: rebuilt });
+        return;
+      }
       if (_onEvent) _onEvent({ kind: 'message', msg });
     } else if (payload.type === 'seen') {
       if (_onEvent) _onEvent({ kind: 'seen', seenBy: payload.seenBy, messageIds: payload.messageIds, payload });
@@ -400,7 +587,11 @@ const NtfySync = (() => {
     } else if (payload.type === 'join' && payload.memberId) {
       if (_onEvent) _onEvent({ kind: 'join', member: payload });
     } else if (payload.type === 'call_signal' && payload.payload) {
-      if (_onEvent) _onEvent({ kind: 'call_signal', payload: payload.payload, payload });
+      // The inner signal must be the value of `payload` — app.js forwards it
+      // straight to CallManager.handleIncomingSignal(), which needs `.action`.
+      // (A second `payload` key here silently overwrote it with the whole
+      // envelope, so every relayed call invite was dropped.)
+      if (_onEvent) _onEvent({ kind: 'call_signal', payload: payload.payload });
     } else if (payload.type === 'room_status' && payload.status) {
       if (_onEvent) _onEvent({ kind: 'room_status', status: payload.status, payload });
     }

@@ -242,14 +242,25 @@ window.CustomEmoji = CustomEmoji;
 function emoName(name) {
   const raw = name == null ? '' : String(name);
   try {
-    const esc = (typeof escapeHtml === 'function') ? escapeHtml(raw) : raw;
+    const esc = (typeof escapeHtml === 'function') ? escapeHtml(raw) : escapeHtmlLocalFallback(raw);
     if (typeof CustomEmoji !== 'undefined' && CustomEmoji.isLoaded && CustomEmoji.isLoaded()) {
       return CustomEmoji.twemojifyEscaped(CustomEmoji.emojifyEscaped(esc));
     }
     return esc;
   } catch {
-    return raw;
+    // Never fall back to the RAW string: every caller assigns the result to
+    // innerHTML, so an unescaped fallback would turn any emoji-renderer
+    // hiccup into HTML injection.
+    return escapeHtmlLocalFallback(raw);
   }
+}
+
+// Minimal escaper used when the global escapeHtml() is unavailable (ui.js
+// not loaded yet) or when the emoji pipeline throws.
+function escapeHtmlLocalFallback(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
 }
 
 window.emoName = emoName;

@@ -20,11 +20,20 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil((async () => {
     try {
+      // Focus the tab the notification came from. Focusing "the first
+      // window" opened the dashboard (or another room) instead of the room
+      // the user was notified about.
+      const data = (event.notification && event.notification.data) || {};
+      const target = data.url || './';
+      let wanted = null;
+      try { wanted = new URL(target, self.location.origin).href; } catch { wanted = target; }
+
       const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of all) {
-        if ('focus' in client) return client.focus();
-      }
-      if (self.clients.openWindow) return self.clients.openWindow('./');
+      const hit = all.find(c => c.url === wanted)
+        || all.find(c => c.url && wanted && c.url.split('#')[0] === wanted.split('#')[0]);
+      if (hit) return hit.focus();
+
+      if (self.clients.openWindow) return self.clients.openWindow(target);
     } catch { /* best effort */ }
   })());
 });

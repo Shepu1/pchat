@@ -503,9 +503,26 @@ function handleRoomOp(body) {
 
   if (op === 'clear_chat') {
     var msgSheet = getSheet('messages');
-    var headers  = msgSheet.getRange(1, 1, 1, 9).getValues();
-    msgSheet.clearContents();
-    msgSheet.getRange(1, 1, 1, 9).setValues(headers);
+    var lastRow = msgSheet.getLastRow();
+    if (lastRow > 1) {
+      // Wipe the CONTENT but keep the rows.
+      //
+      // The client's incremental cursor is a ROW NUMBER. clearContents()
+      // would shrink the sheet back to its header row, so every client
+      // would keep asking for (old cursor + 1) of a 1-row sheet and the
+      // room would never receive another message. Soft-deleting the rows
+      // (exactly what a normal delete does) removes the text from the
+      // owner's Drive while leaving the row counter intact.
+      var msgData = msgSheet.getRange(2, 1, lastRow - 1, 9).getValues();
+      for (var i = 0; i < msgData.length; i++) {
+        msgData[i][4] = 'text';   // messageType
+        msgData[i][5] = '';       // message content
+        msgData[i][6] = '';       // replyTo
+        msgData[i][7] = 'FALSE';  // edited
+        msgData[i][8] = 'TRUE';   // deleted
+      }
+      msgSheet.getRange(2, 1, lastRow - 1, 9).setValues(msgData);
+    }
     return corsResponse({ success: true });
   }
 

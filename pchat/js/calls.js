@@ -14,6 +14,7 @@ const CallManager = (() => {
   let _activeCall = null;         // Current MediaConnection
   let _localStream = null;        // Local MediaStream
   let _screenStream = null;       // Screen share stream if active
+  let _screenPending = false;     // a screen-picker prompt is open
   let _remoteStream = null;       // Remote MediaStream
   let _callType = 'audio';        // 'audio' | 'video'
   let _callState = 'idle';        // 'idle' | 'calling' | 'incoming' | 'connected' | 'ended'
@@ -24,8 +25,12 @@ const CallManager = (() => {
   let _callTimerInterval = null;
   let _callStartTime = 0;
   let _currentCallId = null;
+  let _currentCallTargetId = null;  // set when the call goes to one member
+  let _iceGraceTimer = null;      // grace period after a transient ICE drop
+  const ICE_GRACE_MS = 12000;      // 'disconnected' must persist this long
   let _incomingCallData = null;
   let _pendingMediaConnection = null;
+  let _incomingRingTimer = null;  // auto-decline an unanswered incoming call
   let _accepterPeerId = null;     // peer that accepted our outgoing call
   let _remotePeerId = null;       // peer on the active media connection
   let _placeholderTrack = null;   // black video track to keep a video m-line
@@ -95,9 +100,50 @@ const CallManager = (() => {
     _playCallSound(0.55);
   }
 
+  // Paint the audio-stage avatar (initial + optional picture).
+  function _paintAudioAvatar(name, picture) {
+    const av = document.getElementById('call-audio-avatar');
+    if (!av) return;
+    const initial = (name ? String(name)[0] : '?').toUpperCase();
+    av.innerHTML = '';
+    av.textContent = initial;
+    const pic = String(picture || '').trim();
+    if (!pic) return;
+    try {
+      const img = document.createElement('img');
+      img.src = pic;
+      img.alt = '';
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      img.onerror = () => { try { av.textContent = initial; } catch {} };
+      av.appendChild(img);
+    } catch { /* keep the initial */ }
+  }
+
   // Call ringtone on incoming call
   function _playIncomingRing() {
     _playCallSound(0.85);
+  }
+
+  // Auto-decline an unanswered incoming call. Without this the ringtone kept
+  // playing forever when the caller hung up or the accept signal was lost.
+  const INCOMING_RING_TIMEOUT_MS = 45000;
+  function _armIncomingRingTimeout(callId) {
+    if (_incomingRingTimer) { clearTimeout(_incomingRingTimer); _incomingRingTimer = null; }
+    _incomingRingTimer = setTimeout(() => {
+      _incomingRingTimer = null;
+      if (_callState !== 'incoming') return;
+      if (callId && _currentCallId && callId !== _currentCallId) return;
+      _stopSounds();
+      _hideIncomingToast();
+      _incomingCallData = null;
+      _callState = 'idle';
+      if (_pendingMediaConnection) {
+        try { _pendingMediaConnection.close(); } catch {}
+        _pendingMediaConnection = null;
+      }
+      const st = document.getElementById('call-status-subtitle');
+      if (st) st.textContent = 'Missed call';
+    }, INCOMING_RING_TIMEOUT_MS);
   }
 
   // Fallback harmonic melody if MP3 playback is restricted
@@ -334,7 +380,10 @@ const CallManager = (() => {
         <div class="call-stage">
           <!-- Video Stage (shown in video calls) -->
           <div class="call-video-container" id="call-video-container" style="display:none;">
-            <video id="call-remote-video" class="call-remote-video" autoplay playsinline></video>
+            <!-- muted: the hidden <audio> below is the ONLY audio source.
+                 Attaching the same MediaStream to two un-muted elements made
+                 the peer audible twice (doubled / comb-filtered voice). -->
+            <video id="call-remote-video" class="call-remote-video" autoplay playsinline muted></video>
             <!-- Floating PiP Local Self-View -->
             <div class="call-local-pip" id="call-local-pip" title="Your camera">
               <video id="call-local-video" class="call-local-video" autoplay playsinline muted></video>
@@ -615,6 +664,13 @@ const CallManager = (() => {
       // Send the new offer first; _setupMediaConnection() then swaps the
       // active connection and closes the old one without hanging up.
       const mediaConn = peer.call(target, outgoing, { metadata: { callType: _callType, callId: _currentCallId, restart: true } });
+      // PeerJS returns undefined (instead of throwing) when the peer is
+      // disconnected from the signalling server. Reporting success there made
+      // the mic button look "unmuted" while the peer heard nothing.
+      if (!mediaConn) {
+        console.warn('[CallManager] peer.call() returned no connection');
+        return false;
+      }
       _setupMediaConnection(mediaConn);
       return true;
     } catch (e) {
@@ -645,6 +701,9 @@ const CallManager = (() => {
     _isVideoOff = false;
     _isScreenSharing = false;
     _accepterPeerId = null;
+    // Remember whether this call goes to ONE member or to the whole room.
+    // Only a targeted call may be aborted by that member's "busy".
+    _currentCallTargetId = callTargetId;
     _currentCallId = 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     const myCallId = _currentCallId;
 
@@ -656,6 +715,8 @@ const CallManager = (() => {
     if (nameEl) nameEl.textContent = callTargetName || roomName;
     const statusEl = document.getElementById('call-status-subtitle');
     if (statusEl) statusEl.textContent = callTargetName ? `Calling ${callTargetName}…` : 'Calling…';
+    // Audio-stage avatar for the outgoing call (was always "?")
+    _paintAudioAvatar(callTargetName || roomName, '');
 
     _playOutgoingRing();
 
@@ -722,7 +783,11 @@ const CallManager = (() => {
       if (_callState === 'calling' && _currentCallId === myCallId) {
         const st = document.getElementById('call-status-subtitle');
         if (st) st.textContent = 'No Answer';
-        setTimeout(() => endCall(true), 2000);
+        // Re-check the call id: a new call started inside this 2s window must
+        // NOT be torn down by the stale timer.
+        setTimeout(() => {
+          if (_callState === 'calling' && _currentCallId === myCallId) endCall(true);
+        }, 2000);
       }
     }, 45000);
   }
@@ -787,6 +852,7 @@ const CallManager = (() => {
       _ensureUIElements();
       _showIncomingToast(payload);
       _playIncomingRing();
+      _armIncomingRingTimeout(payload.callId);
     } else if (payload.action === 'accept') {
       if (_callState === 'calling' && (!_currentCallId || payload.callId === _currentCallId)) {
         _stopSounds();
@@ -814,6 +880,19 @@ const CallManager = (() => {
           }
           _pendingMediaConnection = null;
         }
+      } else if (_callState === 'incoming' && (!_currentCallId || payload.callId === _currentCallId)) {
+        // Somebody ELSE picked up the call. Stop ringing — without this the
+        // 'accept' signal was ignored while we were still in the 'incoming'
+        // state, so this device kept ringing forever.
+        _stopSounds();
+        _hideIncomingToast();
+        _incomingCallData = null;
+        _callState = 'idle';
+        if (_pendingMediaConnection) {
+          try { _pendingMediaConnection.close(); } catch {}
+          _pendingMediaConnection = null;
+        }
+        if (_incomingRingTimer) { clearTimeout(_incomingRingTimer); _incomingRingTimer = null; }
       }
     } else if (payload.action === 'media-ready') {
       // The callee accepted but could not start media itself (no mic/camera,
@@ -837,7 +916,7 @@ const CallManager = (() => {
           if (peer && !peer.destroyed && outgoing && !_activeCall && _accepterPeerId) {
             try {
               const mediaConn = peer.call(_accepterPeerId, outgoing, { metadata: { callType: _callType, callerName: session?.displayName, callId: _currentCallId, fallback: true } });
-              _setupMediaConnection(mediaConn);
+              if (mediaConn) _setupMediaConnection(mediaConn);
             } catch (e) {
               console.warn('[CallManager] Media-ready call error:', e);
             }
@@ -850,7 +929,10 @@ const CallManager = (() => {
         if (st) st.textContent = 'Call Declined';
         _stopSounds();
         _playEndChime();
-        setTimeout(() => endCall(false), 1600);
+        const declinedCallId = _currentCallId;
+        setTimeout(() => {
+          if (_currentCallId === declinedCallId) endCall(false);
+        }, 1600);
       }
     } else if (payload.action === 'end') {
       if (_callState !== 'idle' && (!_currentCallId || !payload.callId || payload.callId === _currentCallId)) {
@@ -858,11 +940,25 @@ const CallManager = (() => {
       }
     } else if (payload.action === 'busy') {
       if (_callState === 'calling' && (!_currentCallId || payload.callId === _currentCallId)) {
+        // A ROOM-WIDE call must not be torn down because ONE member is busy
+        // (or is already in another call) — the other members are ringing
+        // and may be about to answer. Only a call addressed to a single
+        // member can be aborted by that member's "busy".
+        if (!_currentCallTargetId) {
+          const st = document.getElementById('call-status-subtitle');
+          if (st) st.textContent = 'User is Busy';
+          return;
+        }
+        if (payload.fromId !== _currentCallTargetId) return;
+
         const st = document.getElementById('call-status-subtitle');
         if (st) st.textContent = 'User is Busy';
         _stopSounds();
         _playEndChime();
-        setTimeout(() => endCall(false), 2000);
+        const busyCallId = _currentCallId;
+        setTimeout(() => {
+          if (_currentCallId === busyCallId) endCall(false);
+        }, 2000);
       }
     }
   }
@@ -887,6 +983,12 @@ const CallManager = (() => {
     if (peerNameEl) peerNameEl.textContent = incoming.callerName || 'Room Member';
     const statusEl = document.getElementById('call-status-subtitle');
     if (statusEl) statusEl.textContent = 'Connecting…';
+    // The audio-stage avatar was never filled in — it always showed "?".
+    _paintAudioAvatar(incoming.callerName || 'Room Member', incoming.callerPicture || '');
+    // A fresh call must not inherit the previous call's screen-share state.
+    _isScreenSharing = false;
+    try { document.getElementById('call-dock-screen')?.classList.remove('is-active'); } catch {}
+    if (_incomingRingTimer) { clearTimeout(_incomingRingTimer); _incomingRingTimer = null; }
 
     _playConnectedChime();
     _startCallTimer();
@@ -949,9 +1051,21 @@ const CallManager = (() => {
       if (peer && !peer.destroyed) {
         try {
           const mediaConn = peer.call(incoming.callerPeerId, _localStream, { metadata: { callType: _callType, callId: incoming.callId } });
+          // peer.call() returns undefined (it does NOT throw) when the peer
+          // is disconnected. Without this check _activeCall stayed null and
+          // both sides showed "Connected" with a running timer while there
+          // was no PeerConnection at all — a permanently dead call.
+          if (!mediaConn) {
+            console.warn('[CallManager] peer.call() returned no connection');
+            UI.toast('error', 'Call failed', 'Could not reach the other device. Try again.');
+            endCall(false);
+            return;
+          }
           _setupMediaConnection(mediaConn);
         } catch (e) {
           console.warn('[CallManager] Answer call error:', e);
+          UI.toast('error', 'Call failed', 'Could not connect to the other device.');
+          endCall(false);
         }
       }
     } else if (!_activeCall && typeof P2PSync !== 'undefined' && P2PSync.broadcastCallSignal) {
@@ -996,6 +1110,7 @@ const CallManager = (() => {
     _stopMediaTracks();
     _callState = 'idle';
     _currentCallId = null;
+    _currentCallTargetId = null;
   }
 
   // ── Setup MediaConnection Listeners ─────────────────────────────
@@ -1029,6 +1144,9 @@ const CallManager = (() => {
 
       const remoteVideo = document.getElementById('call-remote-video');
       if (remoteVideo) {
+        // Only the <audio> element may play the remote voice — see the
+        // markup note. (display:none does not stop a media element playing.)
+        try { remoteVideo.muted = true; } catch {}
         remoteVideo.srcObject = remoteStream;
         remoteVideo.play().catch(() => {});
       }
@@ -1057,6 +1175,48 @@ const CallManager = (() => {
     conn.on('error', (err) => {
       console.warn('[CallManager] MediaConnection error:', err);
     });
+
+    // ICE watchdog. PeerJS only auto-closes on 'failed'/'closed' (15-30s
+    // later) and ignores 'disconnected' entirely — so a dead peer left the
+    // overlay saying "Connected" with the timer running and no audio.
+    try {
+      if (typeof conn.on === 'function') {
+        conn.on('iceStateChanged', (state) => {
+          if (state === 'connected' || state === 'completed') {
+            // The connection recovered — cancel any pending "lost" timer.
+            if (_iceGraceTimer) { clearTimeout(_iceGraceTimer); _iceGraceTimer = null; }
+            return;
+          }
+          if (state !== 'failed' && state !== 'disconnected' && state !== 'closed') return;
+          if (_activeCall !== conn) return;
+          if (_callState !== 'connected' && _callState !== 'calling') return;
+
+          if (state === 'disconnected') {
+            // 'disconnected' is explicitly TRANSIENT in WebRTC: a Wi-Fi →
+            // mobile handover, a VPN toggle or a backgrounded phone tab
+            // emits it for a few hundred milliseconds and the connection
+            // often recovers on its own. Ending the call right away killed
+            // live calls over a momentary blip, so give it a grace period.
+            if (_iceGraceTimer) clearTimeout(_iceGraceTimer);
+            _iceGraceTimer = setTimeout(() => {
+              _iceGraceTimer = null;
+              if (_activeCall !== conn) return;
+              if (_callState !== 'connected' && _callState !== 'calling') return;
+              const st = document.getElementById('call-status-subtitle');
+              if (st) st.textContent = 'Connection lost';
+              endCall(false);
+            }, ICE_GRACE_MS);
+            return;
+          }
+
+          // 'failed' / 'closed' — the connection is really gone.
+          if (_iceGraceTimer) { clearTimeout(_iceGraceTimer); _iceGraceTimer = null; }
+          const st = document.getElementById('call-status-subtitle');
+          if (st) st.textContent = 'Connection lost';
+          endCall(false);
+        });
+      }
+    } catch { /* older PeerJS builds have no iceStateChanged */ }
   }
 
   // ── End Active Call ─────────────────────────────────────────────
@@ -1065,6 +1225,8 @@ const CallManager = (() => {
     _playEndChime();
     _stopCallTimer();
     _stopVisualizer();
+    // Cancel a pending "connection lost" grace timer — the call is over.
+    if (_iceGraceTimer) { clearTimeout(_iceGraceTimer); _iceGraceTimer = null; }
 
     if (sendSignal && _currentCallId) {
       const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
@@ -1094,12 +1256,19 @@ const CallManager = (() => {
 
     _callState = 'idle';
     _currentCallId = null;
+    _currentCallTargetId = null;
     _incomingCallData = null;
     _accepterPeerId = null;
+    _remotePeerId = null;        // stale peer id must not be reused as target
     _isMinimized = false;
     _callType = 'audio';
     _isMuted = false;
     _isVideoOff = false;
+    // Screen-share state must reset too, or the next call's Share button
+    // takes the "revert" branch and never starts a share.
+    _isScreenSharing = false;
+    if (_incomingRingTimer) { clearTimeout(_incomingRingTimer); _incomingRingTimer = null; }
+    try { document.getElementById('call-dock-screen')?.classList.remove('is-active'); } catch {}
 
     _hideCallOverlay();
     _hideIncomingToast();
@@ -1301,10 +1470,27 @@ const CallManager = (() => {
       return;
     }
 
+    // A picker is already open — ignore the extra tap.
+    if (_screenPending) return;
+    _screenPending = true;
+
     try {
       _screenStream = await _acquireDisplayMedia();
       const screenTrack = _screenStream.getVideoTracks()[0];
       if (!screenTrack) throw new Error('No screen video track was provided.');
+
+      // The user may have hung up (or the call may have ended) while the
+      // browser's screen-picker dialog was open. Without this guard the
+      // capture starts anyway, the track is never stopped, and the browser
+      // keeps showing "You are sharing your screen" with no call to share
+      // into — a real privacy leak.
+      if (_callState !== 'connected' && _callState !== 'calling') {
+        try { _screenStream.getTracks().forEach(t => t.stop()); } catch {}
+        _screenStream = null;
+        try { console.warn('[CallManager] screen share aborted — the call ended'); } catch {}
+        return;
+      }
+
       _isScreenSharing = true;
       document.getElementById('call-dock-screen')?.classList.add('is-active');
 
@@ -1350,6 +1536,10 @@ const CallManager = (() => {
       } else if (typeof UI !== 'undefined' && UI.toast) {
         UI.toast('warning', 'Screen share failed', 'Screen sharing is not available on this device/browser, or permission was blocked.');
       }
+    } finally {
+      // Allow a new share request once this one settled. Without the flag
+      // two quick taps opened two pickers and one capture was orphaned.
+      _screenPending = false;
     }
   }
 
@@ -1449,6 +1639,19 @@ const CallManager = (() => {
     if (_callState === 'connected') {
       // Already accepted: answer immediately. If we have no mic/camera, answer
       // without a stream (receive-only) so the other side is still heard/seen.
+      //
+      // BUT only for the peer we are already talking to. Answering any other
+      // offer let a second accepter hijack the established call: the new
+      // connection replaced (and closed) the first one, dropping the original
+      // participant silently.
+      const meta = mediaConn.metadata || {};
+      const offerCallId = meta.callId || null;
+      const sameCall = !offerCallId || !_currentCallId || offerCallId === _currentCallId;
+      const samePeer = !_remotePeerId || !mediaConn.peer || mediaConn.peer === _remotePeerId;
+      if (!sameCall || !samePeer) {
+        try { mediaConn.close(); } catch {}
+        return;
+      }
       try {
         mediaConn.answer(_localStream || undefined);
         _setupMediaConnection(mediaConn);
@@ -1474,10 +1677,18 @@ const CallManager = (() => {
           console.warn('[CallManager] Error answering incoming media call:', e);
         }
       } else {
+        // Close the previous pending connection — dropping it on the floor
+        // leaked its RTCPeerConnection / ICE agent for the whole session.
+        if (_pendingMediaConnection) {
+          try { _pendingMediaConnection.close(); } catch {}
+        }
         _pendingMediaConnection = mediaConn;
       }
     } else if (_callState === 'incoming') {
       // Store connection until the user clicks "Accept"
+      if (_pendingMediaConnection) {
+        try { _pendingMediaConnection.close(); } catch {}
+      }
       _pendingMediaConnection = mediaConn;
     } else {
       // Stray offer while idle — don't leave it hanging.

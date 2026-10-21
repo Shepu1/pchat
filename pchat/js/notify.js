@@ -14,6 +14,8 @@ const Notify = (() => {
   let _enabled = false;
   const _lastShownAt = new Map(); // dedupe by message id
   const DEDUPE_WINDOW_MS = 10000;
+  // Messages older than this are history, not news — never notify for them.
+  const NOTIFY_MAX_AGE_MS = 120000;
 
   // User's ON/OFF choice for the header bell (default ON).
   // OFF mutes BOTH system notifications and chat sound effects.
@@ -50,7 +52,7 @@ const Notify = (() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return null;
     try {
       let reg = await navigator.serviceWorker.getRegistration();
-      if (!reg) reg = await navigator.serviceWorker.register('sw.js');
+      if (!reg) reg = await navigator.serviceWorker.register('sw.js?v=20261021a');
       // `ready` can stay pending while a new worker activates; never let a
       // chat alert wait forever on it.
       try {
@@ -60,6 +62,33 @@ const Notify = (() => {
         ])) || reg;
       } catch {}
       return reg || null;
+    } catch { return null; }
+  }
+
+  // ServiceWorkerRegistration.showNotification() only works on an ACTIVATED
+  // worker — it throws InvalidStateError while the registration is still
+  // installing/waiting. Waiting for activation avoids the notification being
+  // dropped (both the SW path and the new Notification() fallback fail on
+  // Android Chrome).
+  async function _activeSW() {
+    const reg = await _ensureSW();
+    if (!reg) return null;
+    try {
+      if (reg.active && (reg.active.state === 'activated')) return reg;
+      if (reg.waiting) {
+        try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch {}
+      }
+      if (reg.installing) {
+        try { await reg.installing.statechange; } catch {}
+      }
+    } catch { /* fall through to the state check */ }
+    try {
+      if (reg.active) return reg;
+      const ready = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+      ]);
+      return ready || null;
     } catch { return null; }
   }
 
@@ -119,6 +148,12 @@ const Notify = (() => {
     if (!isBackground()) return;          // user is looking at the chat
     if (!isEnabled()) return;
 
+    // History backfill must never notify. The sound path already filters to
+    // messages younger than 2 minutes — do the same here, so opening a room
+    // does not raise one system notification per cached message.
+    const ts = new Date(msg.createdAt || msg.timestamp || 0).getTime();
+    if (Number.isFinite(ts) && ts > 0 && (Date.now() - ts) > NOTIFY_MAX_AGE_MS) return;
+
     const id = msg.id;
     if (id) {
       const now = Date.now();
@@ -146,12 +181,17 @@ const Notify = (() => {
       tag: id || undefined,
       icon: 'assets/icons/icon.png',
       badge: 'assets/icons/icon.png',
+      // Carry the room URL so the service worker can focus THIS room's tab
+      // instead of whichever window happens to be first.
+      data: { url: (function () {
+        try { return location.href; } catch { return ''; }
+      })() },
     };
 
     // Prefer the service worker path: Android Chrome throws on
     // `new Notification(...)` and the old silent catch meant notifications
     // simply never appeared on phones.
-    const reg = await _ensureSW();
+    const reg = await _activeSW();
     if (reg && typeof reg.showNotification === 'function') {
       try { await reg.showNotification(`${sender} · ${_roomName}`, options); return; } catch {}
     }

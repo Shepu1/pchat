@@ -169,7 +169,7 @@ async function loadMembers(room, session, roomInfo) {
 
       row.innerHTML = `
         <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-dim);display:grid;place-items:center;font-weight:700;color:var(--accent);flex-shrink:0;">
-          ${(m.displayName || '?')[0].toUpperCase()}
+          ${escapeHtmlLocal((m.displayName || '?')[0].toUpperCase())}
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-weight:600;font-size:0.9rem;">${escapeHtmlLocal(m.displayName || 'Unknown')}

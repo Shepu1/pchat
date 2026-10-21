@@ -73,13 +73,23 @@ const UI = {
     if (loading) {
       btn.classList.add('loading');
       btn.disabled = true;
+      // Remember the original label so it can be restored — the button used
+      // to stay on "Joining…" forever after a failed attempt.
       if (loadingText) {
         const textEl = btn.querySelector('.btn-text');
-        if (textEl) textEl.textContent = loadingText;
+        if (textEl) {
+          if (textEl.dataset.origText == null) textEl.dataset.origText = textEl.textContent || '';
+          textEl.textContent = loadingText;
+        }
       }
     } else {
       btn.classList.remove('loading');
       btn.disabled = false;
+      const textEl = btn.querySelector('.btn-text');
+      if (textEl && textEl.dataset.origText != null) {
+        textEl.textContent = textEl.dataset.origText;
+        delete textEl.dataset.origText;
+      }
     }
   },
 
@@ -314,6 +324,7 @@ const UI = {
 // ── Professional confirm dialog (replaces browser confirm()/alert()) ─
 // Builds its own overlay on demand, so it works on every page with zero markup.
 let _confirmResolver = null;
+let _confirmCleanup = null;   // tears the PREVIOUS dialog down completely
 
 function ensureConfirmModal() {
   let overlay = document.getElementById('ui-confirm-overlay');
@@ -341,7 +352,11 @@ const ICON_OUT = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" st
 UI.confirmDialog = function ({ title = 'Are you sure?', message = '', confirmText = 'Confirm', cancelText = 'Cancel', danger = false, icon = null } = {}) {
   return new Promise((resolve) => {
     try {
-      // Settle any previous pending dialog as cancelled
+      // Settle any previous pending dialog as cancelled — and FULLY tear it
+      // down. Resolving the promise alone left its keydown listener
+      // registered forever, and because every dialog shares this one
+      // overlay, the stale handler would hide the dialog that is open now.
+      if (_confirmCleanup) { try { _confirmCleanup(); } catch {} _confirmCleanup = null; }
       if (_confirmResolver) { try { _confirmResolver(false); } catch {} _confirmResolver = null; }
       const overlay = ensureConfirmModal();
       const modal = overlay.querySelector('.ui-confirm-modal');
@@ -357,18 +372,30 @@ UI.confirmDialog = function ({ title = 'Are you sure?', message = '', confirmTex
       _confirmResolver = resolve;
       const done = (val) => {
         overlay.classList.add('hidden');
-        document.removeEventListener('keydown', onKey, true);
+        overlay.removeEventListener('keydown', onKey);
+        if (_confirmCleanup === cleanup) _confirmCleanup = null;
         if (_confirmResolver === resolve) _confirmResolver = null;
         resolve(val);
       };
+      // The listener lives on the OVERLAY, not on document. A document-level
+      // capture listener resolved the dialog for ANY Enter keypress — the
+      // chat composer kept the focus, so pressing Enter to send a message
+      // confirmed the dialog instead (and the message was swallowed).
+      // Destructive dialogs (delete room, ban member) were confirmed by
+      // accident that way.
       const onKey = (e) => {
         if (e.key === 'Escape') { e.stopPropagation(); done(false); }
         else if (e.key === 'Enter') { e.stopPropagation(); done(true); }
       };
+      const cleanup = () => {
+        overlay.removeEventListener('keydown', onKey);
+        overlay.classList.add('hidden');
+      };
+      _confirmCleanup = cleanup;
       okBtn.onclick = () => done(true);
       cancelBtn.onclick = () => done(false);
       overlay.onclick = (e) => { if (e.target === overlay) done(false); };
-      document.addEventListener('keydown', onKey, true);
+      overlay.addEventListener('keydown', onKey);
       overlay.classList.remove('hidden');
       setTimeout(() => { try { (danger ? okBtn : cancelBtn).focus({ preventScroll: true }); } catch {} }, 30);
     } catch {
@@ -408,9 +435,11 @@ UI.promptName = function ({ title = 'Your name?', message = 'Pick a display name
       const cancelBtn = overlay.querySelector('#ui-name-cancel');
       const done = (val) => {
         overlay.classList.add('hidden');
-        document.removeEventListener('keydown', onKey, true);
+        overlay.removeEventListener('keydown', onKey);
         resolve(val);
       };
+      // Same rule as confirmDialog: the listener belongs to the overlay, so
+      // an Enter typed in the chat composer can never submit this prompt.
       const onKey = (e) => {
         if (e.key === 'Escape') { e.stopPropagation(); done(null); }
         else if (e.key === 'Enter') { e.stopPropagation(); okBtn.click(); }
@@ -421,7 +450,7 @@ UI.promptName = function ({ title = 'Your name?', message = 'Pick a display name
       };
       cancelBtn.onclick = () => done(null);
       overlay.onclick = (e) => { if (e.target === overlay) done(null); };
-      document.addEventListener('keydown', onKey, true);
+      overlay.addEventListener('keydown', onKey);
       overlay.classList.remove('hidden');
       setTimeout(() => { try { input.focus({ preventScroll: true }); } catch {} }, 30);
     } catch {

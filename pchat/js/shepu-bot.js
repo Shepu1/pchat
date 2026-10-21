@@ -30,6 +30,12 @@ const ShepuBot = (() => {
   const BOT_DISPLAY = 'Shepu-AI 4.1 Ultra';
   const BOT_PIC     = 'ai/pai.png';
   const BOT_ID      = 'shepu_ai_bot';
+  // The bot's own backend identity (member id + session token). It used to
+  // post with the HUMAN's credentials, so the Apps Script stored the
+  // answer under the human's member id and name — after a reload the
+  // answer showed up as the user's OWN message (right-aligned, "Sent"
+  // tick, no author). The bot keeps its own member row instead.
+  let _botSession  = null;
   const MENTION_RE  = /@shepu-ai\b/i;
   const TRIGGER_RE  = /@shepu-ai\b\s*(.*)/is;   // capture the question after the mention
   const MAX_HISTORY_MESSAGES = 8;
@@ -47,6 +53,7 @@ const ShepuBot = (() => {
   let _inflight = new Set();
   let _activeResponses = 0;
   let _typingTimer = null;
+  let _keyBound = false;   // guards against double-binding the key handler
 
   // ── Init ──────────────────────────────────────────────────────
   function init(room, session, inputEl) {
@@ -69,8 +76,19 @@ const ShepuBot = (() => {
 
     if (_input) {
       _input.addEventListener('input', _onInput);
-      _input.addEventListener('keydown', _onKeydown);
       _input.addEventListener('blur', () => setTimeout(hidePopup, 150));
+      // The keydown handler MUST run before the chat module's own Enter
+      // handler (chat.js binds its listener first, in Chat.init). Otherwise
+      // Chat sends the message — and clears the input — before the popup
+      // handler can apply the suggestion, so "@sh" was sent as plain text and
+      // the popup stayed open. Capturing on the document runs first.
+      if (!_keyBound) {
+        _keyBound = true;
+        document.addEventListener('keydown', (e) => {
+          if (e.target !== _input) return;
+          _onKeydown(e);
+        }, true);
+      }
     }
 
     // Load the knowledge base (non-blocking).
@@ -380,12 +398,19 @@ const ShepuBot = (() => {
       Chat.appendMessages([botMsg]);
     }
 
+    // Persist to the Apps Script backend — independently of the P2P mesh.
+    // These used to share one try block, so a failing server call skipped
+    // the P2P broadcast and the bot's answer never reached the other
+    // members at all.
     try {
       if (typeof RoomAPI !== 'undefined' && _room.deploymentUrl &&
           !_room.deploymentUrl.startsWith('mock://')) {
-        await RoomAPI.sendMessage(_room.deploymentUrl, {
-          memberId:     _session.memberId,
-          sessionToken: _session.sessionToken,
+        // Post with the BOT's own credentials, so the Sheet stores the
+        // answer under "Shepu-AI" and not under the human who asked.
+        const botSess = await _ensureBotSession();
+        const send = async (sess) => RoomAPI.sendMessage(_room.deploymentUrl, {
+          memberId:     sess.memberId,
+          sessionToken: sess.sessionToken,
           displayName:  BOT_DISPLAY,
           picture:      BOT_PIC,
           messageId:    msgId,
@@ -393,11 +418,65 @@ const ShepuBot = (() => {
           messageType:  messageType,
           replyTo:      '',
         });
+        let res;
+        try {
+          res = await send(botSess || { memberId: BOT_ID, sessionToken: '' });
+        } catch (e) { res = null; }
+        // The cached token can go stale (room recreated, token rotated) —
+        // join again once and retry.
+        if (!res || !res.success) {
+          const fresh = await _ensureBotSession(true);
+          if (fresh) {
+            try { res = await send(fresh); } catch (e) { res = null; }
+          }
+        }
       }
+    } catch (e) { /* server down — still broadcast over P2P */ }
+
+    try {
       if (typeof P2PSync !== 'undefined' && P2PSync.broadcastMessage) {
         P2PSync.broadcastMessage(botMsg);
       }
     } catch (e) { /* best-effort; local render already happened */ }
+  }
+
+  // ── The bot's own backend identity ─────────────────────────────
+  // Joins the room once with the bot's display name so the backend stores
+  // its answers under "Shepu-AI" instead of the human who asked. The
+  // credentials are cached per room.
+  async function _ensureBotSession(forceFresh = false) {
+    const roomId = (_room && _room.id) || '';
+    if (!roomId) return null;
+    if (_botSession && !forceFresh) return _botSession;
+
+    const cacheKey = 'shepu_bot_session_' + roomId;
+    if (!forceFresh) {
+      try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved && saved.memberId && saved.sessionToken) {
+            _botSession = saved;
+            return _botSession;
+          }
+        }
+      } catch { /* fall through and join */ }
+    }
+
+    if (typeof RoomAPI === 'undefined' || !RoomAPI.join) return null;
+    try {
+      const res = await RoomAPI.join(_room.deploymentUrl, {
+        displayName: BOT_DISPLAY,
+        memberId: BOT_ID,
+        picture: BOT_PIC,
+      });
+      if (res && res.success && res.memberId && res.sessionToken) {
+        _botSession = { memberId: res.memberId, sessionToken: res.sessionToken };
+        try { localStorage.setItem(cacheKey, JSON.stringify(_botSession)); } catch {}
+        return _botSession;
+      }
+    } catch { /* the live P2P copy still works without a backend session */ }
+    return null;
   }
 
   // ── Suggestion popup (autocomplete @shepu-ai) ──────────────────
@@ -460,6 +539,10 @@ const ShepuBot = (() => {
       row.addEventListener('click', () => _apply(i, replaceFromAt));
       _pop.appendChild(row);
     });
+    // Select the first row by default. With no row selected, Enter merely
+    // closed the popup and sent the raw text ("@sh") to the room — the
+    // autocomplete looked like it worked but never applied anything.
+    try { _setActive(0); } catch { /* no rows */ }
     _pop.classList.remove('hidden');
   }
 
@@ -548,6 +631,8 @@ const ShepuBot = (() => {
     respond,
     isMention,
     extractQuestion,
+    BOT_ID,
+    BOT_DISPLAY,
   };
 })();
 

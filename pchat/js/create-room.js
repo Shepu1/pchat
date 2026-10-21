@@ -132,7 +132,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!ownerDisplayName) return null;
 
     const customScriptUrl = document.getElementById('custom-script-url')?.value?.trim();
-    if (customScriptUrl && customScriptUrl.startsWith('https://script.google.com')) {
+    if (customScriptUrl && !isAllowedEndpoint(customScriptUrl)) {
+      // A backend URL that does not match was dropped without a message and
+      // the room was created on the mock endpoint — the invite link then
+      // pointed nowhere. Tell the owner instead.
+      showProgressError('That Apps Script URL does not look right. It must start with https://script.google.com/ (or https://script.googleusercontent.com/).');
+      throw new Error('Invalid custom Apps Script URL');
+    }
+    if (customScriptUrl && isAllowedEndpoint(customScriptUrl)) {
       const roomId = Rooms.generateRoomId();
       const roomSecret = Rooms.generateRoomSecret();
       const now = new Date().toISOString();
@@ -149,11 +156,16 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       Rooms.addMyRoom(room);
 
-      const memberId = 'u_owner_' + roomId.slice(0, 8);
+      // The owner credential is random and device-local (see
+      // Rooms.ensureOwnerToken). The memberId length must match the one
+      // used everywhere else (rooms.js / app.js use 6 chars) — a mismatch
+      // creates a duplicate owner row and a session the backend rejects.
+      const memberId = 'u_owner_' + roomId.slice(0, 6);
+      const ownerToken = Rooms.ensureOwnerToken(room);
       Storage.setSession({
         roomId,
         memberId,
-        sessionToken: 'owner_sess_' + roomSecret,
+        sessionToken: ownerToken,
         displayName:  ownerDisplayName,
         role:         'owner',
         joinedAt:     now,
@@ -199,8 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
       throw new Error('Google Client ID not configured');
     }
 
-    // Prompt Google sign-in if the user is not already authenticated
-    if (!Auth.isAuthenticated()) {
+    // Prompt Google sign-in if we have no usable Google token.
+    // isAuthenticated() is also true for email/demo logins, which have no
+    // Google token at all — the Drive call then failed with a 401 and an
+    // unsolicited OAuth popup.
+    const hasGoogleToken = () => {
+      if (typeof Auth === 'undefined') return false;
+      if (typeof Auth.hasGoogleToken === 'function') return !!Auth.hasGoogleToken();
+      return false;
+    };
+    if (!hasGoogleToken()) {
       try {
         console.log('[createRoom] secure flow: requesting Google sign-in…');
         await step(Auth.signIn(), 180000, 'Google sign-in');
@@ -211,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const hasGoogle = CONFIG.isGoogleConfigured() && Auth.isAuthenticated();
+    const hasGoogle = CONFIG.isGoogleConfigured() && hasGoogleToken();
 
     if (!hasGoogle) {
       showProgressError('Google sign-in is required for Saved rooms. Please try again or switch to Quick mode.');
@@ -326,11 +346,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     Rooms.addMyRoom(room);
 
-    const memberId = 'u_owner_' + roomId.slice(0, 8);
+    // Random, device-local owner credential — never derived from the room
+    // secret, which travels in every invite link.
+    const memberId = 'u_owner_' + roomId.slice(0, 6);
+    const ownerToken = Rooms.ensureOwnerToken(room);
     Storage.setSession({
       roomId,
       memberId,
-      sessionToken: 'owner_sess_' + roomSecret,
+      sessionToken: ownerToken,
       displayName:  ownerDisplayName,
       role:         'owner',
       joinedAt:     now,
@@ -421,8 +444,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const ps = document.getElementById('progress-subtitle');
     if (ps) ps.textContent = message;
     const pi = document.getElementById('progress-icon');
-    if (pi) pi.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-    if (pi) pi.classList.remove('animate-spin');
+    if (pi) {
+      // Swap the spinner for an error icon — otherwise it kept spinning
+      // forever next to the "Setup failed" message.
+      pi.classList.remove('spinner', 'animate-spin');
+      pi.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+    }
     UI.toast('error', 'Room creation failed', message);
   }
 });

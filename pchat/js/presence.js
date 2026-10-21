@@ -17,6 +17,10 @@ const Presence = (() => {
 
   // ── Start presence system ─────────────────────────────────────
   function start({ endpointUrl, memberId, sessionToken, onMembersUpdate, roomId, announce }) {
+    // Never leave a previous pair of timers running: start() used to be
+    // callable more than once and each call added another heartbeat.
+    stop();
+
     _endpointUrl     = endpointUrl;
     _memberId        = memberId;
     _sessionToken    = sessionToken;
@@ -40,6 +44,15 @@ const Presence = (() => {
     }, 30000);
   }
 
+  // ── Stop the presence timers ───────────────────────────────────
+  // (This was exported but never defined, so `Presence.stop` resolved to the
+  //  built-in window.stop — which stops PAGE LOADING, not the heartbeat.)
+  function stop() {
+    _running = false;
+    if (_heartbeatTimer) { clearInterval(_heartbeatTimer); _heartbeatTimer = null; }
+    if (_membersTimer) { clearInterval(_membersTimer); _membersTimer = null; }
+  }
+
 
   // ── Send heartbeat ────────────────────────────────────────────
   async function heartbeat(status = 'online') {
@@ -59,9 +72,12 @@ const Presence = (() => {
   async function refreshMembers() {
     if (!_endpointUrl) return;
     try {
-      const session = Storage.getSession();
-      if (!session) return;
-      const roomId = session.roomId;
+      // Use the room this Presence instance was started for. The session is
+      // a single global localStorage key shared by every tab, so a second
+      // tab on another room would otherwise make this one fetch — and
+      // render — the wrong room's member list.
+      const roomId = _roomId || (Storage.getSession() || {}).roomId;
+      if (!roomId) return;
 
       const members = await Members.fetchAndCache(_endpointUrl, roomId);
       if (_onMembersUpdate) _onMembersUpdate(members);
@@ -72,12 +88,3 @@ const Presence = (() => {
 })();
 
 window.Presence = Presence;
-
-// ── Helper used by app.js ─────────────────────────────────────────
-function loadMembers(room, session) {
-  Members.fetchAndCache(room.deploymentUrl, room.id)
-    .then(members => Chat.renderMembers(members))
-    .catch(() => {});
-}
-
-window.loadMembers = loadMembers;

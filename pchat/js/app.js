@@ -114,6 +114,10 @@ async function bindRoomPasswordUI(room, session) {
       setTimeout(() => window.location.reload(), 900);
     } catch (e) {
       try { RoomPassword.clearStored(room.id); } catch {}
+      // The key was already installed in the Encryption module when
+      // deriveAndStore() ran — roll it back so a failed lock does not leave
+      // the room encrypting messages it never secured.
+      try { if (typeof Encryption !== 'undefined') Encryption.clearKey(); } catch {}
       showErr((e && e.message) || 'Could not lock the room.');
       try { btn.disabled = false; btn.textContent = 'Lock Room'; } catch {}
     }
@@ -190,7 +194,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const epParam = params.get('ep');
     if (epParam) {
       const b64 = epParam.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - epParam.length % 4) % 4);
-      urlDeployment = atob(b64) || null;
+      const decoded = atob(b64) || null;
+      // Same allow-list as the join flow: ?ep= is attacker-controlled, so an
+      // unknown backend is refused instead of silently taking over the chat.
+      urlDeployment = (decoded && isAllowedEndpoint(decoded)) ? decoded : null;
+      if (decoded && !urlDeployment) console.warn('Refused an unrecognised room backend from the invite link.');
     }
   } catch { urlDeployment = null; }
   // Room theme (?th=) — public wallpaper digit shared via invite link.
@@ -240,7 +248,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       session = {
         roomId,
         memberId:     'u_owner_' + roomId.slice(0, 6),
-        sessionToken: 'owner_sess_' + (myRoom.secret || roomId),
+        // Rebuild the owner credential from the device-local registry entry.
+        // A secret-derived token would be reconstructible by anyone holding
+        // the invite link, so it must never be used here.
+        sessionToken: Rooms.ensureOwnerToken(myRoom),
         displayName:  ownerName,
         picture:      ownerPicture,
         role:         'owner',
@@ -502,6 +513,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ── Init chat module ──────────────────────────────────────────
+  // Notify.init() runs BEFORE the chat module so the "my own message" guard
+  // is active while the cached history is rendered.
+  if (typeof Notify !== 'undefined') {
+    Notify.init({
+      memberId: session.memberId,
+      displayName: session.displayName,
+      roomName: room.name || 'Chat',
+    });
+  }
   Chat.init(room, session);
   // Owner password controls (menu item + modal). No-op for guests.
   try { bindRoomPasswordUI(room, session); } catch {}
@@ -914,14 +934,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           const st = payload.status;
           room.status = st;
           try { Rooms.updateRoom(room.id, { status: st }); } catch {}
+          // Mirror it into this device's local mock store so the send path
+          // enforces a lock the owner applied on another device.
+          try { Rooms.setLocalRoomStatus(room.id, st); } catch {}
           if (st === 'deleted') { Chat.showUnavailable('This room has been deleted.'); return; }
           if (st === 'disabled') { Chat.showUnavailable('This room is currently disabled.'); return; }
-          if (st === 'locked') { Chat.setStatus('Locked (read-only)', true); return; }
+          if (st === 'locked') {
+            Chat.setStatus('Locked (read-only)', true);
+            Chat.setComposerEnabled(false);
+            return;
+          }
           if (st === 'active') {
             try {
               document.getElementById('room-unavailable-overlay')?.classList.add('hidden');
-              const ci = document.getElementById('chat-input'); if (ci) ci.disabled = false;
-              const sb = document.getElementById('send-btn'); if (sb) sb.disabled = false;
+              Chat.setComposerEnabled(true);
               Chat.setStatus(session.displayName || 'Online', true);
             } catch {}
           }
@@ -944,13 +970,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ── Web push / desktop notifications ───────────────────────────
-  if (typeof Notify !== 'undefined') {
-    Notify.init({
-      memberId: session.memberId,
-      displayName: session.displayName,
-      roomName: room.name || 'Chat',
-    });
-  }
+  // (initialised above, before the history was rendered — see the note there)
 
   // ── Handle visibility changes ─────────────────────────────────
   document.addEventListener('visibilitychange', () => {

@@ -72,12 +72,19 @@ const RoomPassword = (() => {
     const pw = String(password);
     await Encryption.deriveKeyFromPassword(pw, `shepu_pw_${roomId}`);
     const jwk = await Encryption.exportKey();
-    if (!jwk) throw new Error('Could not prepare the key.');
+    if (!jwk) {
+      // The live key is already installed in the Encryption module — roll it
+      // back, otherwise the room starts encrypting messages even though it
+      // was never locked.
+      try { Encryption.clearKey(); } catch {}
+      throw new Error('Could not prepare the key.');
+    }
     const topicSecret = await Encryption.sha256Hex(`pw-topic|${roomId}|${pw}`);
     try {
       sessionStorage.setItem(K_KEY(roomId), JSON.stringify(jwk));
       sessionStorage.setItem(K_TPC(roomId), topicSecret);
     } catch {
+      try { Encryption.clearKey(); } catch {}
       throw new Error('Browser storage is blocked — password cannot be kept for this session.');
     }
     markRejected(roomId, false);

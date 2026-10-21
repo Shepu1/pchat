@@ -81,8 +81,20 @@ const Storage = {
   },
 
   // ── Sync cursors ─────────────────────────────────────────────
-  getSyncCursor(roomId) { return this.get(`sync_${roomId}`); },
-  setSyncCursor(roomId, cursor) { this.set(`sync_${roomId}`, cursor); },
+  // The cursor is a ROW NUMBER. Older builds stored an object
+  // ({ lastRow: N }); reading it back as a number produced
+  // "afterRow=[object Object]", so the backend always started from row 0 and
+  // a reload only ever returned the newest 50 rows.
+  getSyncCursor(roomId) {
+    const raw = this.get(`sync_${roomId}`);
+    if (raw == null) return 0;
+    if (typeof raw === 'object') return Number(raw.lastRow) || 0;
+    return Number(raw) || 0;
+  },
+  setSyncCursor(roomId, cursor) {
+    const n = (cursor && typeof cursor === 'object') ? (Number(cursor.lastRow) || 0) : (Number(cursor) || 0);
+    this.set(`sync_${roomId}`, n);
+  },
 
   // ── Room Messages Persistence ─────────────────────────────────
   getRoomStoredMessages(roomId) {

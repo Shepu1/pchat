@@ -51,6 +51,10 @@ const Auth = (() => {
               expiresAt,
               tokenType: response.token_type || 'Bearer',
               isDemo: false,
+              // A real Google sign-in must clear the "email login" flag —
+              // otherwise hasGoogleToken() kept returning false and the room
+              // history was never loaded from the Sheet.
+              isEmailAuth: false,
             };
 
             Storage.setAuth({ ...Storage.getAuth(), ...authData });

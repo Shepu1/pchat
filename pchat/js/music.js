@@ -18,6 +18,7 @@ const RoomMusic = (() => {
 
   let _availableTracks = [...DEFAULT_TRACKS];
   let _playlist = [];
+  let _barHiddenByUser = false;   // the user closed the player bar
   let _currentIndex = 0;
   let _isPlaying = false;
   let _audio = new Audio();
@@ -146,6 +147,8 @@ const RoomMusic = (() => {
       } else {
         // If already playing, toggle player bar or play/pause
         if (_playerBar && _playerBar.classList.contains('hidden')) {
+          // The user closed it earlier — show it again now that they asked.
+          _barHiddenByUser = false;
           _playerBar.classList.remove('hidden');
         } else {
           _togglePlayPause();
@@ -203,6 +206,9 @@ const RoomMusic = (() => {
     // Close button (Hides bar, music continues playing)
     _closeBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
+      // Remember that the user hid it — _updateUI() runs on every
+      // play/pause/track change and used to bring the bar straight back.
+      _barHiddenByUser = true;
       if (_playerBar) _playerBar.classList.add('hidden');
     });
   }
@@ -335,12 +341,23 @@ const RoomMusic = (() => {
   function _playLocalTrack(track, seekSeconds = 0) {
     if (!track || !track.src) return;
 
-    if (_audio.src !== location.origin + '/' + track.src && !_audio.src.endsWith(track.src)) {
+    const changedSrc = _audio.src !== location.origin + '/' + track.src && !_audio.src.endsWith(track.src);
+    if (changedSrc) {
       _audio.src = track.src;
     }
 
     if (seekSeconds > 0) {
-      try { _audio.currentTime = seekSeconds; } catch {}
+      // Setting currentTime throws InvalidStateError while the element has
+      // no metadata yet (readyState HAVE_NOTHING) — which is exactly the
+      // state right after assigning a new src. The seek was silently lost,
+      // so a late joiner played the track from 0:00 while the room was
+      // minutes into it.
+      const applySeek = () => { try { _audio.currentTime = seekSeconds; } catch {} };
+      if (_audio.readyState >= 1) {
+        applySeek();
+      } else {
+        _audio.addEventListener('loadedmetadata', applySeek, { once: true });
+      }
     }
 
     _isPlaying = true;
@@ -469,7 +486,7 @@ const RoomMusic = (() => {
 
     // Floating Player Bar state
     if (_playerBar) {
-      if (_playlist.length) {
+      if (_playlist.length && !_barHiddenByUser) {
         _playerBar.classList.remove('hidden');
       }
 

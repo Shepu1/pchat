@@ -15,9 +15,14 @@ const Chat = (() => {
   let _atBottom      = true;   // Whether the feed is scrolled to bottom
   let _pendingIds    = new Set(); // Optimistic message IDs
   let _pendingAttachment = null; // { name, size, type, dataUrl }
+  let _voiceSendResolver = null;  // send() waiting for the voice attachment
   // reactions: Map<msgId, Map<emoji, Set<memberId>>>
   const _reactions   = new Map();
   const _memberMap   = new Map();
+
+  // A data: URL that may be rendered/downloaded. Everything is allowed
+  // except the media types that can execute script when opened.
+  const SAFE_DATA_URL_RE = /^data:(?!(?:text\/html|application\/xhtml\+xml|image\/svg\+xml)\b)[a-z0-9][a-z0-9!#$&^_+.-]*\/[a-z0-9][a-z0-9!#$&^_+.-]*[^,]*,/i;
 
   // ── DOM refs ──────────────────────────────────────────────────
   let feed, input, sendBtn, contextMenu, replyBar, typingEl, scrollBtn;
@@ -171,6 +176,18 @@ const Chat = (() => {
   function _maybeMusicCommandFromMsg(msg) {
     if (!msg || msg.deleted) return false;
     if (msg.messageType && msg.messageType !== 'text') return false;
+    // The bot's own replies must NEVER be read as music commands. Its answer
+    // to "next song" is literally "gan chenge koreci 🎶", and the detector
+    // read that as a "next" command: the asking client skipped TWO tracks,
+    // and every other client advanced once and re-broadcast its own play,
+    // so the room radio lost sync. The same applied to any AI answer that
+    // happened to contain a music word ("you can play music by typing…").
+    if (msg._bot === true) return false;
+    if (msg.senderId && String(msg.senderId).indexOf('shepu_ai') === 0) return false;
+    try {
+      if (typeof ShepuBot !== 'undefined' && ShepuBot.BOT_DISPLAY &&
+          msg.senderName && String(msg.senderName) === String(ShepuBot.BOT_DISPLAY)) return false;
+    } catch { /* the bot module may not be loaded on this page */ }
     const raw = typeof msg.message === 'string' ? msg.message : '';
     if (!raw) return false;
     if (raw.startsWith('enc:')) {
@@ -238,6 +255,24 @@ const Chat = (() => {
 
     let scrolledToBottom = _atBottom;
     let addedCount = 0;
+    // The messages that were ACTUALLY rendered in this batch. Only these may
+    // trigger a notification — the old code iterated the whole batch, so
+    // opening a room fired one notification per cached history message.
+    const newlyAdded = [];
+
+    // Snapshot the state we had BEFORE this batch, for the "did the
+    // renderable content actually change?" comparison below.
+    const prevById = new Map(_messages.map(m => [m.id, m]));
+
+    // Merge the batch into the local state FIRST.
+    //
+    // _makeMessageEl() resolves a reply's quoted parent through the
+    // module-level _messages array. With the old order (merge AFTER the
+    // render loop) the parents were not in there yet, so every reply that
+    // was loaded together with the history rendered WITHOUT its quoted
+    // snippet — and the element is never re-rendered afterwards.
+    _messages = [..._messages, ...sortedMsgs.filter(m => !_messages.find(x => x.id === m.id))];
+    _messages.sort((a, b) => new Date(a.createdAt || a.timestamp || 0) - new Date(b.createdAt || b.timestamp || 0));
 
     sortedMsgs.forEach(msg => {
       if (msg.senderId && msg.senderName) {
@@ -249,7 +284,7 @@ const Chat = (() => {
       // message (sync/polling repeats) used to restart its 4.1 loader and
       // could leave the official portrait stuck behind the animation.
       if (document.getElementById(`msg-${msg.id}`)) {
-        const prev = _messages.find(x => x.id === msg.id);
+        const prev = prevById.get(msg.id);
         const unchanged = prev &&
           prev.message === msg.message &&
           (prev.messageType || 'text') === (msg.messageType || 'text') &&
@@ -275,11 +310,11 @@ const Chat = (() => {
       _insertMessageInOrder(msgEl, msg.createdAt || msg.timestamp);
       _renderReactions(msg.id);
       addedCount++;
+      newlyAdded.push(msg);
     });
 
-    // Merge into local state in chronological order
-    _messages = [..._messages, ...sortedMsgs.filter(m => !_messages.find(x => x.id === m.id))];
-    _messages.sort((a, b) => new Date(a.createdAt || a.timestamp || 0) - new Date(b.createdAt || b.timestamp || 0));
+    // (The batch was merged into _messages BEFORE the render loop above so
+    // that reply quotes could resolve their parent.)
 
     // Guarantee local persistence for all incoming messages across reloads
     if (sortedMsgs.length && _room?.id) {
@@ -307,8 +342,9 @@ const Chat = (() => {
 
     // Fire background notifications for genuinely new incoming messages
     // (never for my own messages — Notify also guards this internally).
+    // Only the messages that were rendered in THIS batch may notify.
     if (addedCount > 0 && typeof Notify !== 'undefined') {
-      sortedMsgs.forEach(m => {
+      newlyAdded.forEach(m => {
         if (!m.deleted && (!m._optimistic) && m.senderId && _session && m.senderId !== _session.memberId) {
           try { Notify.notifyMessage(m); } catch {}
         }
@@ -814,7 +850,13 @@ const Chat = (() => {
       menuBtn.title = 'More options';
       menuBtn.setAttribute('aria-label', 'More options');
       menuBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle><circle cx="5" cy="12" r="1.5"></circle></svg>';
-      menuBtn.addEventListener('click', (e) => openContextMenu(e, msg));
+      // stopPropagation: the document-level "click outside closes the menu"
+      // listener (_bindContextMenu) must not see this click, otherwise it
+      // closes the menu in the same tick it was opened.
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openContextMenu(e, msg);
+      });
       actions.appendChild(menuBtn);
 
       col.appendChild(actions);
@@ -1012,13 +1054,17 @@ const Chat = (() => {
     if (!text || !text.trim()) return false;
     // Strip ALL emoji-related code points, then check if any real text remains
     const stripped = _stripSpecialCodes(text).trim()
+      // Keycap sequences (1️⃣ = U+0031 U+FE0F U+20E3) must go FIRST — the base
+      // character only means something together with the combining keycap.
+      // Stripping plain digits separately turned "2024" into an empty string
+      // and rendered the message as a giant emoji bubble.
+      .replace(/[0-9#*][\uFE00-\uFE0F]?\u20E3/g, '')
       .replace(/\p{Emoji_Presentation}/gu, '')      // standard emoji (colored)
       .replace(/\p{Extended_Pictographic}/gu, '')    // extended pictographic
       .replace(/[\uFE00-\uFE0F]/g, '')               // variation selectors
       .replace(/\u200D/g, '')                         // zero-width joiner (ZWJ)
-      .replace(/\u20E3/g, '')                         // combining keycap
+      .replace(/\u20E3/g, '')                         // stray combining keycap
       .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')        // regional indicators (flags)
-      .replace(/[0-9#*]/g, '')                        // keycap base chars (1️⃣ etc)
       .replace(/\s/g, '');                            // whitespace
     return stripped.length === 0;
   }
@@ -1268,7 +1314,6 @@ const Chat = (() => {
   async function sendMessage() {
     if (_recorder) { await _stopVoiceRecording(true); return; }
     const retry = _retryPayload;
-    _retryPayload = null;
     if (_insecureHttp() && !_insecureAcked()) {
       let go = false;
       try {
@@ -1279,9 +1324,14 @@ const Chat = (() => {
           danger: true,
         });
       } catch { go = false; }
-      if (!go) return;
+      if (!go) {
+        // Keep the payload: clearing it here threw the queued message away.
+        _retryPayload = retry;
+        return;
+      }
       try { sessionStorage.setItem(INSECURE_ACK_KEY, '1'); } catch {}
     }
+    _retryPayload = null;
     const nowSend = Date.now();
     if (!retry && nowSend - _lastSendAt < 1000) {
       UI.toast('info', 'Too Fast', 'Wait a second before sending again.');
@@ -1321,7 +1371,20 @@ const Chat = (() => {
     // The automatic invite-link key is decrypt-only so guests never get blocked.
     // Retried payloads are already in their final wire form.
     if (!retry && typeof Encryption !== 'undefined' && Encryption.shouldEncrypt && Encryption.shouldEncrypt()) {
-      finalMessage = await Encryption.encrypt(finalMessage);
+      let encrypted = null;
+      try {
+        encrypted = await Encryption.encrypt(finalMessage);
+      } catch (err) {
+        // Abort the send: the alternative is shipping plaintext into a room the
+        // user believes is end-to-end encrypted.
+        UI.toast('error', 'Encryption failed', (err && err.message) || 'Message was not sent — it would have travelled unencrypted.');
+        return;
+      }
+      if (typeof encrypted !== 'string' || !encrypted.startsWith('enc:')) {
+        UI.toast('error', 'Encryption failed', 'Message was not sent — it would have travelled unencrypted.');
+        return;
+      }
+      finalMessage = encrypted;
     }
 
     const nowTs     = retry ? (retry.timestamp || new Date().toISOString()) : new Date().toISOString();
@@ -1428,10 +1491,14 @@ const Chat = (() => {
       // Mark failed
       _markOptimisticFailed(msgId, err.message);
 
-      if (err.isNetwork) {
-        // Queue for retry with the exact wire payload so attachments
-        // (file JSON, voice notes, images) survive the retry instead of
-        // being reduced to a bare caption.
+      // Queue for retry with the exact wire payload so attachments
+      // (file JSON, voice notes, images) survive the retry instead of
+      // being reduced to a bare caption.
+      //
+      // Queue EVERY failure, not only network errors: the Retry button looks
+      // the message up in this queue and used to DELETE the bubble (and the
+      // user's text) whenever the failure was not a network error.
+      try {
         Storage.addPendingMessage(_room.id, {
           id: msgId,
           text,
@@ -1441,7 +1508,7 @@ const Chat = (() => {
           messageType: msgType,
           displayMessage: optimisticMsg.message,
         });
-      }
+      } catch { /* storage full — the bubble stays, Retry just cannot restore it */ }
     }
   }
 
@@ -1493,12 +1560,30 @@ const Chat = (() => {
     el.classList.add('msg-failed');
     const meta = el.querySelector('.msg-meta');
     if (meta) {
+      // Show WHY it failed — the reason was accepted but never displayed, so
+      // the user only saw "Failed" with no clue what went wrong.
+      const safeReason = String(reason || '').replace(/[<>&"]/g, '');
+      const reasonHtml = safeReason
+        ? `<span class="msg-failed-reason" style="color:var(--muted);font-size:0.72rem;">${safeReason}</span>`
+        : '';
       meta.innerHTML = `<span style="color:var(--danger);font-size:0.75rem;display:inline-flex;align-items:center;gap:3px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Failed</span>
+        ${reasonHtml}
         <button class="msg-retry-btn" data-msg-id="${msgId}">Retry</button>`;
       const retryBtn = meta.querySelector('.msg-retry-btn');
       retryBtn?.addEventListener('click', async () => {
         const pending = Storage.getPendingMessages(_room.id).find(m => m.id === msgId);
-        if (!pending) { el.remove(); return; }
+        if (!pending) {
+          // Nothing to resend from — do NOT delete the user's message.
+          // Put the text back into the composer so nothing is lost.
+          const original = el.querySelector('.msg-text')?.textContent || '';
+          if (original) {
+            input.value = original;
+            UI.autoResize(input);
+            input.focus();
+            UI.toast('info', 'Message not sent', 'The text was put back in the box — press send to try again.');
+          }
+          return;
+        }
         el.remove();
         _pendingIds.delete(msgId);
         Storage.removePendingMessage(_room.id, msgId);
@@ -1799,7 +1884,17 @@ const Chat = (() => {
     document.getElementById('menu-share-link')?.addEventListener('click', async () => {
       const url = Rooms.getRoomUrl(_room.id);
       if (navigator.share) {
-        await navigator.share({ title: `${_room.name} — SHEPU ROOMS`, url });
+        try {
+          await navigator.share({ title: `${_room.name} — SHEPU ROOMS`, url });
+        } catch (err) {
+          // The user dismissed the share sheet (AbortError) — that is not an
+          // error, and an unhandled rejection would spam the console.
+          const name = (err && err.name) || '';
+          if (name !== 'AbortError') {
+            try { await UI.copyText(url); UI.toast('info', 'Link copied', 'Sharing was cancelled, so the link was copied instead.'); }
+            catch { /* ignore */ }
+          }
+        }
       } else {
         await UI.copyText(url);
         UI.toast('success', 'Copied', 'Link copied (Web Share not available).');
@@ -2150,6 +2245,29 @@ const Chat = (() => {
     if (span) span.textContent = text;
   }
 
+  // Enable / disable the composer. A locked room is read-only: the owner
+  // applied the lock on ANOTHER device, so this device has to react to the
+  // relayed status instead of keeping an active composer.
+  function setComposerEnabled(enabled) {
+    try {
+      if (input) {
+        input.disabled = !enabled;
+        if (enabled) {
+          const saved = input.getAttribute('data-locked-placeholder');
+          if (saved) {
+            input.setAttribute('placeholder', saved);
+            input.removeAttribute('data-locked-placeholder');
+          }
+        } else if (!input.getAttribute('data-locked-placeholder')) {
+          input.setAttribute('data-locked-placeholder', input.getAttribute('placeholder') || '');
+          input.setAttribute('placeholder', 'This room is read-only');
+        }
+      }
+      const sb = document.getElementById('send-btn');
+      if (sb) sb.disabled = !enabled;
+    } catch { /* the composer is optional on some pages */ }
+  }
+
   // ── Room unavailable overlay ──────────────────────────────────
   function showUnavailable(reason) {
     document.getElementById('room-unavailable-overlay')?.classList.remove('hidden');
@@ -2168,7 +2286,10 @@ const Chat = (() => {
     _pendingAttachment = {
       name: name,
       size: size || 0,
-      type: type || 'image/png',
+      // File.type is EMPTY for most non-web extensions (.zip, .apk, .bin…).
+      // Claiming 'image/png' made the sender send messageType:'image' and
+      // the receiver render a broken <img> with no download link.
+      type: type || 'application/octet-stream',
       dataUrl: dataUrl,
       kind: 'image',
     };
@@ -2366,8 +2487,17 @@ const Chat = (() => {
       _recStream = null;
     }
     if (sendAfter) {
-      // Let the stop event build the attachment first, then send
-      setTimeout(() => { if (!_recorder) sendMessage(); }, 350);
+      // Wait for the FileReader to finish building the attachment. A fixed
+      // 350ms timer sent the caption as a SEPARATE message (and left the
+      // voice note attached to the NEXT message) whenever the reader was
+      // slower than the timer.
+      const send = () => { try { sendMessage(); } catch (e) { /* ignore */ } };
+      if (_pendingAttachment) { send(); return; }
+      _voiceSendResolver = send;
+      // Safety net — never wait forever if the reader never calls back.
+      setTimeout(() => {
+        if (_voiceSendResolver === send) { _voiceSendResolver = null; send(); }
+      }, 8000);
     }
   }
 
@@ -2377,7 +2507,12 @@ const Chat = (() => {
     _setMicUI(false);
     const chunks = _recChunks;
     _recChunks = [];
-    if (!chunks.length) return;
+    if (!chunks.length) {
+      // Nothing was recorded — drop the pending send instead of sending an
+      // empty message.
+      if (_voiceSendResolver) { _voiceSendResolver = null; }
+      return;
+    }
     const mime = (_recorder && _recorder.mimeType) || (chunks[0] && chunks[0].type) || 'audio/webm';
     const blob = new Blob(chunks, { type: mime });
     if (blob.size > 5 * 1024 * 1024) {
@@ -2412,6 +2547,12 @@ const Chat = (() => {
       if (input) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.focus({ preventScroll: true });
+      }
+      // The attachment is ready — release the waiting send (if any).
+      if (_voiceSendResolver) {
+        const r = _voiceSendResolver;
+        _voiceSendResolver = null;
+        try { r(); } catch (e) { /* ignore */ }
       }
     };
     reader.readAsDataURL(blob);
@@ -3410,7 +3551,15 @@ const Chat = (() => {
           _paintMediaBubble(container);
           return;
         }
-        const dataUrl = (typeof parsed.dataUrl === 'string' && /^(data:(image|audio|video|application\/pdf|text\/plain)[^,]*(;base64)?,)/i.test(parsed.dataUrl)) ? parsed.dataUrl : '';
+        // Any data: URL is accepted EXCEPT the media types that can run
+        // script when opened (text/html, xhtml, svg). The previous
+        // allow-list only took image/audio/video/pdf/text-plain, so a
+        // .docx, .zip, .csv — or the application/octet-stream this app
+        // itself sends for an unknown MIME — was rejected here and the
+        // message rendered as an EMPTY bubble: the file was transferred,
+        // but nobody could see or download it.
+        const dataUrl = (typeof parsed.dataUrl === 'string' && SAFE_DATA_URL_RE.test(parsed.dataUrl))
+          ? parsed.dataUrl : '';
         // The Shepu-AI bot can attach a remote Shepu-AI image or the exact
         // bundled official portrait instead of a data: upload. Legacy rooms
         // may still contain the old provider tag, so both are accepted; only
@@ -3576,6 +3725,7 @@ const Chat = (() => {
     getMembers,
     dropMember,
     setStatus,
+    setComposerEnabled,
     showUnavailable,
     loadSheetMessages,
     setEncryptionStatus,

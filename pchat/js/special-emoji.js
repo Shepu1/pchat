@@ -46,6 +46,50 @@ const SpecialEmoji = (() => {
   const SHORTCODE_LEGACY = ':sp_[A-Za-z0-9_-]{1,48}:';
   const SHORTCODE_RE = new RegExp('(?:' + SHORTCODE_LEGACY + '|' + SHORTCODE_NEW + ')', 'g');
 
+  // ── Known-code registry ─────────────────────────────────────────
+  // SHORTCODE_NEW matches ANY 5-letter word (:error:, :super:, :react: …).
+  // Those are real English words people type, so a generic pattern must never
+  // be treated as an emoji code. Only codes that actually exist (public Pchat
+  // set, the locked Special pack, or the currently unlocked items) count —
+  // everything else stays plain text.
+  const SPECIAL_CODES_URL = 'assets/emoji/special/codes.json';
+  let _specialCodes = new Set();   // 'abcde' -> true (special pack, still locked)
+
+  function _loadSpecialCodes() {
+    if (typeof fetch !== 'function') return;
+    try {
+      fetch(SPECIAL_CODES_URL, { cache: 'force-cache' })
+        .then(r => (r && r.ok) ? r.json() : null)
+        .then(map => {
+          if (!map || typeof map !== 'object') return;
+          const s = new Set();
+          for (const code of Object.keys(map)) {
+            if (typeof code !== 'string') continue;
+            const inner = code.toLowerCase().replace(/^:/, '').replace(/:$/, '');
+            if (inner) s.add(inner);
+          }
+          if (s.size) _specialCodes = s;
+        })
+        .catch(() => { /* unknown codes simply stay plain text */ });
+    } catch { /* ignore */ }
+  }
+
+  // True when this token really is one of our emoji codes.
+  function _isKnownCode(code) {
+    const raw = String(code || '').toLowerCase();
+    if (!raw) return false;
+    const inner = raw.replace(/^:/, '').replace(/:$/, '');
+    if (!inner) return false;
+    // Legacy form is unambiguous (sp_ prefix) — always a code.
+    if (inner.startsWith('sp_')) return true;
+    if (_publicCodes.has(':' + inner + ':')) return true;
+    if (_specialCodes.has(inner)) return true;
+    for (const it of _items) {
+      if (it && it.code && String(it.code).toLowerCase() === inner) return true;
+    }
+    return false;
+  }
+
   function _codeBase(filename) {
     const base = String(filename || '').split('/').pop().replace(/\.[^.]+$/, '');
     const clean = base.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
@@ -122,6 +166,9 @@ const SpecialEmoji = (() => {
   // Public map is tiny — load it right away so Pchat codes render even
   // before the Special pack is unlocked.
   _loadPublicCodes();
+  // Same for the Special pack: the code list is public metadata (the images
+  // stay password protected), so a locked code can still be recognised.
+  _loadSpecialCodes();
 
   function urlForShortcode(code) {
     // Public Pchat codes first — they need no password.
@@ -135,21 +182,25 @@ const SpecialEmoji = (() => {
   function containsShortcode(text) {
     if (!text || typeof text !== 'string') return false;
     SHORTCODE_RE.lastIndex = 0;
-    return SHORTCODE_RE.test(text);
+    const m = text.match(new RegExp(SHORTCODE_RE.source, 'g'));
+    if (!m) return false;
+    return m.some(tok => _isKnownCode(tok));
   }
 
-  // Strip every shortcode (both forms) — for emoji-only detection.
+  // Strip every KNOWN shortcode (both forms) — for emoji-only detection.
+  // Unknown :word: tokens are left alone so normal text is never mangled.
   function stripShortcodes(text) {
     if (!text || typeof text !== 'string') return text;
     SHORTCODE_RE.lastIndex = 0;
-    return text.replace(SHORTCODE_RE, '');
+    return text.replace(SHORTCODE_RE, (tok) => (_isKnownCode(tok) ? '' : tok));
   }
 
-  // Count shortcodes (both forms) — for big-bubble sizing.
+  // Count KNOWN shortcodes (both forms) — for big-bubble sizing.
   function countShortcodes(text) {
     if (!text || typeof text !== 'string') return 0;
     const m = text.match(new RegExp(SHORTCODE_RE.source, 'g'));
-    return m ? m.length : 0;
+    if (!m) return 0;
+    return m.filter(tok => _isKnownCode(tok)).length;
   }
 
   // Input must already be HTML-escaped (shortcode chars are escape-safe).
@@ -167,8 +218,14 @@ const SpecialEmoji = (() => {
         const label = match.replace(/"/g, '&quot;');
         return `<img src="${url}" alt="${label}" title="${label}" data-code="${match}" class="custom-emoji" loading="lazy" draggable="false" onerror="this.replaceWith(document.createTextNode(this.dataset.code))" />`;
       }
-      const label = match.replace(/"/g, '&quot;');
-      return `<span class="special-emoji-locked" title="Locked special emoji ${label}" role="img" aria-label="Locked special emoji"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 11.5 11 13.5 15 9.5"></polyline></svg></span>`;
+      // Known code whose image is not available yet (locked Special pack):
+      // show the lock badge so the message still reads as an emoji.
+      if (_isKnownCode(match)) {
+        const label = match.replace(/"/g, '&quot;');
+        return `<span class="special-emoji-locked" title="Locked special emoji ${label}" role="img" aria-label="Locked special emoji"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 11.5 11 13.5 15 9.5"></polyline></svg></span>`;
+      }
+      // NOT one of our codes — a normal word like ":error:". Leave it as text.
+      return match;
     });
   }
 

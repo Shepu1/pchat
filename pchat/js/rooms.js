@@ -101,6 +101,26 @@ const Rooms = {
   updateRoom(id, u)  { Storage.updateRoom(id, u); },
   removeRoom(id)     { Storage.removeRoom(id); },
 
+  // Mirror a room status change into THIS device's local mock store.
+  //
+  // A Quick room's status lives in the owner's localStorage. When the owner
+  // locks the room, the status is relayed to the other devices — but their
+  // own mock store still said "active", so the send path happily accepted
+  // messages in a room that was supposed to be read-only. Writing the new
+  // status locally makes the mock's own guard reject the send.
+  setLocalRoomStatus(roomId, status) {
+    try {
+      const key = 'shepu_mock_room_' + roomId;
+      const raw = localStorage.getItem(key);
+      if (!raw) return false;
+      const roomData = JSON.parse(raw);
+      if (!roomData || typeof roomData !== 'object') return false;
+      roomData.status = status;
+      localStorage.setItem(key, JSON.stringify(roomData));
+      return true;
+    } catch { return false; }
+  },
+
   generateRoomId()     { return Crypto.generateRoomId(); },
   generateSecret()     { return Crypto.generateSecret(); },
   generateRoomSecret() { return Crypto.generateSecret(); },
@@ -136,7 +156,24 @@ const Rooms = {
     for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
     return this.QUICK_ROOM_ICONS[hash % this.QUICK_ROOM_ICONS.length];
   },
+  // The icon the owner picked in the create form (chat/trend/rocket/…).
+  // Rendered as an SVG data URI so every consumer can keep using <img src>.
+  roomIconDataUri(room) {
+    const key = room && (room.icon || room.roomIcon);
+    if (!key || typeof key !== 'string') return '';
+    try {
+      if (typeof Icons === 'undefined' || !Icons || typeof Icons[key] !== 'function') return '';
+      let markup = Icons[key](64);
+      if (typeof markup !== 'string' || !markup) return '';
+      // currentColor has no meaning inside a data URI — use a concrete colour.
+      markup = markup.replace(/currentColor/g, '#ffffff');
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+    } catch { return ''; }
+  },
   roomIcon(room, kindHint) {
+    // The owner's pick wins — it used to be stored and then never read.
+    const picked = this.roomIconDataUri(room);
+    if (picked) return picked;
     return this.roomKind(room, kindHint) === 'saved'
       ? 'assets/icons/saved.webp'
       : this.quickIconFor(room);
@@ -173,10 +210,13 @@ const Rooms = {
       || localStorage.getItem('shepu_display_name')
       || 'Owner';
     const memberId = 'u_owner_' + roomId.slice(0, 6);
+    // Random owner credential — NOT derived from the room secret (that
+    // travels in every invite link, so a derived token is a public token).
+    const ownerToken = this.ensureOwnerToken(room);
     const sessionData = {
       roomId,
       memberId,
-      sessionToken: 'owner_sess_' + roomSecret,
+      sessionToken: ownerToken,
       displayName: resolvedOwner,
       role: 'owner',
       joinedAt: now,
@@ -248,6 +288,29 @@ const Rooms = {
     return fresh;
   },
 
+  // ── Owner session token ───────────────────────────────────────
+  // The owner's credential used to be DERIVED from the room secret
+  // ('owner_sess_' + secret). The secret travels in every invite link
+  // (#k=...), and the room id in the query string (?r=...), so anybody
+  // holding an invite could reconstruct the owner's memberId + token and
+  // act as the owner (delete the room, ban members, wipe the chat).
+  // The token is now a random value that lives only in this device's
+  // registry — it is never derivable from anything in the link.
+  ensureOwnerToken(room) {
+    if (!room) return '';
+    if (room.ownerToken) return room.ownerToken;
+    const token = 'owner_sess_' + Crypto.randomBase62(40);
+    // Set it on the record FIRST. If persisting throws (quota, a missing
+    // config), the in-memory value must survive — otherwise the owner would
+    // get a brand-new token on every call and the backend would reject it.
+    room.ownerToken = token;
+    try {
+      // Persist it so a later reload can rebuild the same session.
+      this.updateRoom(room.id, { ownerToken: token });
+    } catch { /* keep the in-memory value even if persistence fails */ }
+    return token;
+  },
+
   // Ensure the owner has a valid members-sheet row with role=owner.
   // Legacy rooms (created before this row was written at creation time) had
   // no owner row, so every Apps Script room_op failed with FORBIDDEN.
@@ -255,7 +318,10 @@ const Rooms = {
     if (!room || !room.spreadsheetId || !session || session.role !== 'owner') return false;
     if (typeof Sheets === 'undefined' || !Sheets.readValues) return false;
     if (!room.deploymentUrl || room.deploymentUrl.startsWith('mock://')) return false;
-    const token = session.sessionToken || ('owner_sess_' + (room.secret || room.id));
+    // The token must be the random one from the registry. Falling back to a
+    // secret-derived token would re-expose the owner credential, because the
+    // secret travels in every invite link.
+    const token = session.sessionToken || this.ensureOwnerToken(room);
     const now = new Date().toISOString();
     try {
       const rows = await Sheets.readValues(room.spreadsheetId, `${CONFIG.SHEETS.MEMBERS}!A:I`);
@@ -300,7 +366,10 @@ const Rooms = {
     const roomSecret = Crypto.generateSecret();
     const now = new Date().toISOString();
     const memberId = 'u_owner_' + roomId.slice(0, 6);
-    const ownerSessionToken = 'owner_sess_' + roomSecret;
+    // Random owner credential. It used to be derived from the room secret,
+    // which travels in every invite link — that made the owner's token
+    // public. Stored on the room record below so a reload can rebuild it.
+    const ownerSessionToken = 'owner_sess_' + Crypto.randomBase62(40);
     const name = (roomName && roomName.trim()) || 'Private Room';
     const description = (roomDesc && roomDesc.trim()) || 'Private chat room';
 
@@ -381,6 +450,9 @@ const Rooms = {
       spreadsheetId: spreadsheetId || null,
       sheetUrl: sheetUrl || null,
       backendMode: spreadsheetId ? 'google-sheets' : 'p2p',
+      // The owner credential lives here (device-local) so it survives a
+      // reload and can never be recomputed from the invite link.
+      ownerToken: ownerSessionToken,
     };
     this.addMyRoom(room);
 
@@ -536,15 +608,50 @@ const Rooms = {
 
 window.Rooms = Rooms;
 
+// ── Allowed room backends ─────────────────────────────────────────
+// A room's backend URL travels in the invite link (?ep=), and the invite
+// link is UNTRUSTED input: anybody can craft one. Without this check a
+// link like `join.html?r=X&ep=<b64 of https://evil.example/collect>`
+// silently repoints the victim's chat at a foreign server — their
+// display name, their picture and the room-password verifier are POSTed
+// there, and every message they send afterwards travels in plaintext.
+//
+// Only the endpoints this app actually creates are allowed:
+//   • mock://local/<roomId>  — instant (P2P/relay) rooms
+//   • https://script.google.com/…            — Apps Script web app
+//   • https://script.googleusercontent.com/…  — the same, via the CDN host
+const ALLOWED_ENDPOINT_RE = /^https:\/\/script\.google(usercontent)?\.com\/[^\s"'<>]+$/i;
+const ALLOWED_MOCK_RE      = /^mock:\/\/local\/[A-Za-z0-9_-]{1,64}$/;
+
+function isAllowedEndpoint(url) {
+  if (!url || typeof url !== 'string') return false;
+  const u = url.trim();
+  if (!u) return false;
+  if (ALLOWED_MOCK_RE.test(u)) return true;
+  return ALLOWED_ENDPOINT_RE.test(u);
+}
+window.isAllowedEndpoint = isAllowedEndpoint;
+
 // ── Room API Client ───────────────────────────────────────────────
 // All chat operations go through the room's Apps Script web app endpoint.
 // Guests NEVER touch the Google Sheet directly.
 
 const RoomAPI = {
+  // Shared with the join/create flows so both sides apply the same rule.
+  isAllowedEndpoint,
+
   // Base fetch to the room's Apps Script endpoint
   async _fetch(endpointUrl, method, body) {
     if (endpointUrl && endpointUrl.startsWith('mock://')) {
       return this._mockFetch(endpointUrl, method, body);
+    }
+
+    // Choke point: every room operation funnels through here, so a single
+    // allow-list check protects join/read/send/moderate alike. An endpoint
+    // that is not on the list can only have arrived from a crafted invite
+    // link (?ep=) — never from this app's own room creation.
+    if (!isAllowedEndpoint(endpointUrl)) {
+      throw new Error('This room link points to an unrecognised backend and was refused.');
     }
 
     const url = method === 'GET'
@@ -568,6 +675,10 @@ const RoomAPI = {
         const res = await fetch(url, options);
 
         if (res.status === 429 || res.status >= 500) {
+          // Keep the status so the caller learns WHY the request failed
+          // (e.g. "HTTP 429: rate limited") instead of a generic
+          // "Request failed" after the retries run out.
+          lastErr = new Error('HTTP ' + res.status);
           const wait = CONFIG.BASE_BACKOFF_MS * Math.pow(2, attempt);
           await sleep(wait);
           attempt++;
@@ -726,6 +837,20 @@ const RoomAPI = {
     if (!Array.isArray(roomData.messages)) roomData.messages = [];
     if (!Array.isArray(roomData.members)) roomData.members = [];
 
+    // Persist the local mirror of the room. This is BEST EFFORT: the mock
+    // store grows with every message, and a full (or blocked) localStorage
+    // used to throw a QuotaExceededError out of sendMessage — the message was
+    // then marked "failed" even though the relay publish would have worked.
+    const _persistMockRoom = () => {
+      try {
+        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        return true;
+      } catch (e) {
+        try { console.warn('[mock] could not persist room data:', (e && e.name) || e); } catch {}
+        return false;
+      }
+    };
+
     if (action === 'room') {
       // Guests on other devices have no local mock row — fall back to the
       // registry/session name before surrendering to 'Private Room'.
@@ -781,11 +906,12 @@ const RoomAPI = {
         return false;
       })();
       const existingMember = roomData.members.find(m => (m.id || m.memberId) === memberId);
+      // The role comes from THIS device's session or from the stored member
+      // row only. The old "u_owner_" prefix check let any guest claim the
+      // owner role by sending a crafted memberId.
       const role = isOwnerDevice
         ? 'owner'
-        : (memberId.startsWith('u_owner_')
-          ? 'owner'
-          : (existingMember ? (existingMember.role || 'member') : 'member'));
+        : (existingMember ? (existingMember.role || 'member') : 'member');
 
       // Broadcast join to public relay (works on GitHub Pages & phones)
       // NOTE: join carries no secret — P2P proof is verified separately.
@@ -801,7 +927,7 @@ const RoomAPI = {
       } else {
         roomData.members.push({ id: memberId, name: displayName, picture, role, status: 'online', lastActive: Date.now() });
       }
-      localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+      _persistMockRoom();
       return {
         success: true,
         sessionToken: 'mock_sess_' + Date.now(),
@@ -817,14 +943,33 @@ const RoomAPI = {
       // Sort chronologically
       roomData.messages.sort((a, b) => new Date(a.createdAt || a.timestamp || 0) - new Date(b.createdAt || b.timestamp || 0));
 
-      const allMsgs = roomData.messages.map((m, idx) => ({ ...m, row: idx + 1 }));
-      const newMsgs = afterRow > 0 ? allMsgs.filter(m => m.row > afterRow) : allMsgs;
+      // The cursor is a MONOTONIC sequence number, never the array index.
+      // Using the index broke after clear_chat: the rows restarted at 1 while
+      // clients still held a cursor of 50, so nothing new was ever delivered.
+      let seq = Number(roomData.seq) || 0;
+      let seqChanged = false;
+      const allMsgs = roomData.messages.map((m) => {
+        if (typeof m._seq !== 'number' || !isFinite(m._seq)) {
+          seq += 1;
+          m._seq = seq;
+          seqChanged = true;
+        } else if (m._seq > seq) {
+          seq = m._seq;
+        }
+        return m;
+      });
+      if (seqChanged || Number(roomData.seq) !== seq) {
+        roomData.seq = seq;
+        _persistMockRoom();
+      }
+
+      const newMsgs = afterRow > 0 ? allMsgs.filter(m => m._seq > afterRow) : allMsgs;
 
       return {
         success: true,
         messages: newMsgs,
         total: allMsgs.length,
-        lastRow: allMsgs.length,
+        lastRow: seq,
       };
     }
 
@@ -852,13 +997,18 @@ const RoomAPI = {
       };
 
       if (!roomData.messages.some(m => m.id === newMsg.id)) {
+        // Monotonic sequence — survives clear_chat, so clients keep polling
+        // from the right place.
+        roomData.seq = (Number(roomData.seq) || 0) + 1;
+        newMsg._seq = roomData.seq;
         roomData.messages.push(newMsg);
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
       }
 
-      // 1. Broadcast to cloud relay (ntfy.sh) so phones & other browsers receive it instantly.
-      // Messages are already E2EE ciphertext (enc:...) when a room key exists.
-      _relay({ type: 'message', msg: newMsg });
+      // NOTE: the message is NOT relayed from here. chat.js broadcasts every
+      // message itself (P2P + cloud relay) right after the send succeeds,
+      // so relaying here as well published every message TWICE — twice the
+      // traffic and twice the exposure to the relay's payload size limit.
 
       return { success: true, messageId: newMsg.id };
     }
@@ -867,7 +1017,7 @@ const RoomAPI = {
       const msg = roomData.messages.find(m => m.id === params.messageId);
       if (msg) {
         msg.deleted = true;
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
       }
       return { success: true };
     }
@@ -877,7 +1027,7 @@ const RoomAPI = {
       if (msg) {
         msg.message = params.message;
         msg.edited = true;
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
       }
       return { success: true };
     }
@@ -893,7 +1043,7 @@ const RoomAPI = {
             status: params.status || 'online',
             lastActive: Date.now(),
           };
-          localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+          _persistMockRoom();
         }
       }
       return { success: true };
@@ -905,7 +1055,7 @@ const RoomAPI = {
         const ix = roomData.members.findIndex(m => (m.id || m.memberId) === mid);
         if (ix >= 0) {
           roomData.members[ix] = { ...roomData.members[ix], status: 'offline', lastActive: Date.now() };
-          localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+          _persistMockRoom();
         }
       }
       return { success: true };
@@ -934,12 +1084,12 @@ const RoomAPI = {
       }
       if (op === 'clear_chat') {
         roomData.messages = [];
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         return { success: true };
       }
       if (op === 'lock' || op === 'unlock' || op === 'disable' || op === 'enable') {
         roomData.status = op === 'lock' ? 'locked' : op === 'disable' ? 'disabled' : 'active';
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         // Tell connected guests immediately; otherwise only this device
         // sees the room as locked/disabled.
         _relay({ type: 'room_status', status: roomData.status, roomId, updatedBy: params.memberId });
@@ -947,30 +1097,30 @@ const RoomAPI = {
       }
       if (op === 'delete') {
         roomData.status = 'deleted';
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         _relay({ type: 'room_status', status: 'deleted', roomId, updatedBy: params.memberId });
         return { success: true };
       }
       if (op === 'rename' && params.name) {
         roomData.name = String(params.name).slice(0, 80);
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         return { success: true };
       }
       if ((op === 'ban_member' || op === 'remove_member') && params.targetId) {
         roomData.members = (roomData.members || []).filter(m => (m.id || m.memberId) !== params.targetId);
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         return { success: true };
       }
       if (op === 'set_password' && /^[0-9a-f]{64}$/i.test(String(params.passwordHash || ''))) {
         roomData.passwordHash = String(params.passwordHash).toLowerCase();
         roomData.passwordLocked = true;
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         return { success: true, passwordLocked: true };
       }
       if (op === 'remove_password') {
         roomData.passwordHash = '';
         roomData.passwordLocked = false;
-        localStorage.setItem(mockStorageKey, JSON.stringify(roomData));
+        _persistMockRoom();
         return { success: true, passwordLocked: false };
       }
       return { success: true };

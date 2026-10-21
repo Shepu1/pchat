@@ -9,6 +9,25 @@
  * 6. Redirect to room.html
  */
 
+// ── Shared join context ───────────────────────────────────────────
+// The join form can be shown from three different places (first join,
+// password-locked rejoin, "Join with a different name"), so the values the
+// submit handler needs must NOT live inside the DOMContentLoaded callback.
+// Keeping them here lets every path reach the same handler.
+const _joinCtx = {
+  roomId: null,
+  deploymentUrl: null,
+  roomInfo: null,
+  roomSecret: null,
+  room: null,
+  kindParam: null,
+  inviteTheme: null,
+  // True only when the backend actually answered with a room object.
+  roomInfoTrusted: false,
+  // The invite link's &pw=1 flag.
+  pwParam: false,
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(location.search);
   const roomId = params.get('r');
@@ -39,7 +58,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       // base64url → base64 → string
       const b64 = epParam.replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0, (4 - epParam.length % 4) % 4);
-      deploymentUrl = atob(b64);
+      const decoded = atob(b64);
+      // The invite link is untrusted input. Only the backends this app
+      // creates are accepted — otherwise a crafted ?ep= could repoint the
+      // whole chat (and the password verifier) at a foreign server.
+      if (isAllowedEndpoint(decoded)) {
+        deploymentUrl = decoded;
+      } else {
+        console.warn('Refused an unrecognised room backend from the invite link.');
+        try {
+          const warn = document.getElementById('join-error-msg');
+          if (warn) {
+            warn.textContent = 'This invite link points to an unrecognised server and was refused. Ask the owner for a fresh link.';
+          }
+          const panel = document.getElementById('join-error');
+          if (panel) panel.style.display = '';
+        } catch { /* the error slot is optional */ }
+      }
     } catch (e) {
       console.warn('Could not decode ep param:', e);
     }
@@ -136,6 +171,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   if ((!roomInfo.name || roomInfo.name === 'Private Room') && room && room.name && room.name !== 'Private Room') {
     roomInfo.name = room.name;
   }
+  // Publish the resolved context so the join form handler (bound later, from
+  // showJoinForm) can reach it regardless of which path showed the form.
+  _joinCtx.roomId       = roomId;
+  _joinCtx.deploymentUrl = deploymentUrl;
+  _joinCtx.roomInfo     = roomInfo;
+  _joinCtx.roomSecret   = roomSecret;
+  _joinCtx.room         = room;
+  _joinCtx.kindParam    = kindParam;
+  _joinCtx.inviteTheme  = inviteTheme;
+  _joinCtx.roomInfoTrusted = roomInfoTrusted;
+  _joinCtx.pwParam      = pwParam;
   // Room kind for the profile icon: link param → backend → registry.
   roomInfo.kind = kindParam
     || (roomInfo.spreadsheetId ? 'saved' : null)
@@ -179,8 +225,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   showJoinForm(roomInfo);
 
   // ── Join form submit ──────────────────────────────────────────
-  document.getElementById('join-form').addEventListener('submit', async (e) => {
+  // The handler itself lives in bindJoinForm() so that every path which shows
+  // the join form (first join, locked-room rejoin, "different name") also gets
+  // a working submit button.
+  bindJoinForm();
+});
+
+// ── UI helpers ────────────────────────────────────────────────────
+
+// Attach the join-form submit handler exactly once.
+// Called from showJoinForm() so EVERY path that reveals the form (first join,
+// locked-room rejoin, "Join with a different name") has a working button.
+// Without this, the browser falls back to a native form GET which reloads the
+// page and throws away the typed nickname.
+function bindJoinForm() {
+  const form = document.getElementById('join-form');
+  if (!form || form.dataset.joinBound === '1') return;
+  form.dataset.joinBound = '1';
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    const roomId        = _joinCtx.roomId;
+    const deploymentUrl = _joinCtx.deploymentUrl;
+    const roomInfo      = _joinCtx.roomInfo || {};
+    const roomSecret    = _joinCtx.roomSecret;
+    const room          = _joinCtx.room;
+    const kindParam     = _joinCtx.kindParam;
+    const inviteTheme   = _joinCtx.inviteTheme;
 
     const displayName = document.getElementById('join-name').value.trim();
     if (!displayName) {
@@ -197,7 +269,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Effective picture: manual Settings photo → Google photo → ''
       const picture = (typeof UI !== 'undefined' && UI.effectivePicture)
         ? UI.effectivePicture()
-        : (authUser?.picture || '');
+        : ((typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.picture || '') : '');
 
       // Password-locked rooms: derive the key FIRST (stays on this device),
       // then prove knowledge with a hash — the password itself never travels.
@@ -280,9 +352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('join-form-error-text').textContent = err.message || 'Join failed.';
     }
   });
-});
-
-// ── UI helpers ────────────────────────────────────────────────────
+}
 
 function showLoading() {
   document.getElementById('join-loading').style.display = '';
@@ -375,8 +445,13 @@ function showJoinForm(roomInfo) {
   // partial link). Joining anyway means locked messages — tell them now.
   // Password rooms are the exception: their links never carry a key.
   try {
-    const storedSecret = (room && room.secret) ? room.secret : null;
-    const warning = inviteKeyWarning(!!roomSecret || !!storedSecret, roomInfo.passwordLocked === true);
+    // Read the room/secret from the shared context — `room` and `roomSecret`
+    // are locals of the DOMContentLoaded callback and were never visible here,
+    // so the ReferenceError was swallowed and this badge never rendered.
+    const ctxRoom   = _joinCtx.room;
+    const ctxSecret = _joinCtx.roomSecret;
+    const storedSecret = (ctxRoom && ctxRoom.secret) ? ctxRoom.secret : null;
+    const warning = inviteKeyWarning(!!ctxSecret || !!storedSecret, roomInfo.passwordLocked === true);
     if (warning && badges) {
       badges.innerHTML += ' <span class="badge badge-warning">' + warning + '</span>';
     }
@@ -396,6 +471,9 @@ function showJoinForm(roomInfo) {
       if (knownName) joinInput.select();
     }
   }, 100);
+
+  // The submit handler must exist on every path that shows this form.
+  bindJoinForm();
 }
 
 function showRejoin(roomInfo, session) {
@@ -407,10 +485,14 @@ function showRejoin(roomInfo, session) {
     const epP = qp.get('ep');
     let freshSecret = null;
     let freshDep = null;
+    // The invite secret was already read (and ?k= stripped from the URL) before
+    // we got here, so take it from the shared context. Re-reading ?k= would
+    // always fail because the parameter no longer exists.
+    try { freshSecret = _joinCtx.roomSecret || null; } catch {}
     try {
-      freshSecret = (typeof InstantSecurity !== 'undefined')
-        ? InstantSecurity.getInviteSecret()
-        : null;
+      if (!freshSecret && typeof InstantSecurity !== 'undefined') {
+        freshSecret = InstantSecurity.getInviteSecret();
+      }
     } catch {}
     if (!freshSecret) {
       const kP = qp.get('k');
@@ -470,7 +552,12 @@ function showRejoin(roomInfo, session) {
       if (!reg.kind && session.roomKind) patch.kind = session.roomKind;
       // Owner may have removed the password: clear the stale flag so rejoin
       // stops prompting forever. Uses all four signals (link/backend/trust).
-      const desiredLocked = passwordLockPatch(reg.passwordLocked, roomInfo.passwordLocked, roomInfoTrusted, pwParam);
+      const desiredLocked = passwordLockPatch(
+        reg.passwordLocked,
+        roomInfo.passwordLocked,
+        _joinCtx.roomInfoTrusted,
+        _joinCtx.pwParam
+      );
       if (desiredLocked !== !!reg.passwordLocked) patch.passwordLocked = desiredLocked;
       try {
         const thP = qp.get('th');

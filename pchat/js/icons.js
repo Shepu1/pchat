@@ -261,6 +261,30 @@ const Icons = {
     return this.svg('<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>', size);
   },
 
+  // ── Room-icon picker set ──────────────────────────────────────
+  // The create-room picker offers these eight; every one of them must
+  // resolve to a real icon or the picker's choice is silently dropped.
+
+  trend(size = 20) {
+    return this.svg('<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline>', size);
+  },
+
+  game(size = 20) {
+    return this.svg('<line x1="6" y1="11" x2="6" y2="13"></line><line x1="5" y1="12" x2="7" y2="12"></line><line x1="7" y1="12" x2="7" y2="12"></line><line x1="15" y1="12" x2="15" y2="12"></line><line x1="14" y1="11" x2="14" y2="13"></line><line x1="16" y1="11" x2="16" y2="13"></line><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14 2 14a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-1h12v1a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2c0-3.5-.68-6.258-1.685-8.258A4 4 0 0 0 17.32 5z"></path>', size);
+  },
+
+  chill(size = 20) {
+    return this.svg('<path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"></path><path d="M6 1v3M10 1v3M14 1v3"></path>', size);
+  },
+
+  private(size = 20) {
+    return this.svg('<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>', size);
+  },
+
+  instant(size = 20) {
+    return this.svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>', size);
+  },
+
   // ── Render helper: returns an <span> wrapping the SVG ─────────
   // Usage in HTML: ${Icons.render('sparkles', 20, 'accent')}
   render(name, size = 20, colorClass = '') {

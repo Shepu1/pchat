@@ -9,7 +9,12 @@ const Members = (() => {
   async function fetchAndCache(endpointUrl, roomId) {
     try {
       const res = await RoomAPI.getMembers(endpointUrl);
-      if (!res.success) return [];
+      // The backend answers {success:false} with HTTP 200, so this branch is
+      // reached without an exception — returning [] wiped the roster even
+      // though a cached copy existed. Fall through to the cache instead.
+      if (!res || !res.success) {
+        throw new Error((res && res.error) || 'Could not load members');
+      }
 
       const members = res.members || [];
 
