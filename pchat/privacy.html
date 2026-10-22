@@ -194,7 +194,7 @@
           <li>Ciphertext is prefixed with <code>enc:</code> so the app knows to decrypt it.</li>
           <li>The key stays in this tab's memory (and, for a password-locked room, in session storage). <strong>It is never sent to Google, to the relay, or to any other server.</strong></li>
         </ul>
-        <p>The invite link carries a random room secret in the URL fragment (the part after <code>#</code>). Browsers do not send that fragment to web servers, and it is what makes the relay topic unguessable. That automatic key lets a guest read earlier history, but it does <strong>not</strong> encrypt new messages — only a passphrase does.</p>
+        <p>The invite link carries a random room secret in the URL fragment (the part after <code>#</code>) — older links may carry it in the query string instead. Browsers do not send the fragment to web servers, and it is what makes the relay topic unguessable. That automatic key lets a guest read earlier history, but it does <strong>not</strong> encrypt new messages — only a passphrase does.</p>
         <p><strong>What encryption protects:</strong> the content of messages and attachments while they sit in the Sheet or pass through the relay.</p>
         <p><strong>What it does not protect:</strong> who talked to whom, when, how often, and message sizes. It also cannot protect a room without a passphrase, a screenshot, a compromised device, or someone who has the passphrase. And a forgotten passphrase cannot be recovered — the key is not stored anywhere it could be reset from.</p>
       </div>
@@ -247,6 +247,7 @@
       <h2>12. 🌐 Other requests the page makes</h2>
       <div class="about-prose">
         <ul>
+          <li><strong>The web host.</strong> Whoever serves these files — a static host, a school server, a friend's VPS — sees your IP address and the page you requested, as with any website. That is outside the app's control.</li>
           <li><strong>Google Fonts.</strong> The stylesheet loads three font families from <code>fonts.googleapis.com</code>, so Google sees your IP address and browser when the page loads. No account information is sent with that request.</li>
           <li><strong>Google sign-in.</strong> The Google Identity script is loaded from <code>accounts.google.com</code> only when sign-in is used or needed.</li>
           <li><strong>QR codes are generated on your device</strong> by a bundled library. If that library were unavailable, the fallback strips the secret fragment from the link before sending it to a QR image service.</li>
