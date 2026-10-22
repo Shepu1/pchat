@@ -16,6 +16,128 @@ const CustomEmoji = (() => {
     'symbol', 'technology', 'vehicle', 'hand', 'pchat',
   ];
 
+  // ── Pick order ────────────────────────────────────────────────
+  // index.json is alphabetical by file name, which is not how anyone
+  // looks for an emoji: it splits "happy" from "laughing", and sorts
+  // lip_10 before lip_2. Each category is grouped by meaning here;
+  // inside a group the order is natural (2 before 10). Anything that
+  // matches no group stays at the end, alphabetically, so a newly
+  // added emoji still shows up — just outside a themed group.
+  // Labels are for readers; the picker renders one grid per category.
+  const ORDER_GROUPS = {
+    face: [
+      ['Happy & laughing', /happy|grin|laugh|joy|\bsmiling|slightly[_ ]smiling|star[-_ ]?struck|partying|hugging|saluting|^relieved/],
+      ['Love & kisses', /kiss|heart|blush/],
+      ['Playful & silly', /wink|tongue|zany|smirk|upside|money|nerd|cool|cowboy|disguis|clown|peek|^face[_ ]with[_ ]hand[_ ]over[_ ]mouth|shush|lying|shak|zipper|savor/],
+      ['Sad & crying', /cry|tear|sad|frown|disappoint|pensive|plead|downcast|persever|weary|exhal|melt|anxious|worried/],
+      ['Angry & annoyed', /angry|steam|swear|unamused|eye[-_ ]roll|grimac/],
+      ['Surprised & shocked', /astonish|scream|fear|surprised|mind|open[-_ ]mouth|hush|dizzy|woozy|spiral/],
+      ['Confused & thinking', /think|confus|confound|monocle|diagonal|dotted|without[-_ ]mouth|expressionless|neutral/],
+      ['Tired & unwell', /sleep|yawn|tired|thermometer|mask|bandage|nausea|sneez|drool/],
+      ['Other characters', /skull|poop|ghost|moai|blackmoon|eyes/],
+    ],
+    animal: [
+      ['Pets', /dog|cat|rabbit|teddy|panda|koala|fox|otter/],
+      ['Wild', /bear|hedgehog|raccoon|monkey/],
+      ['Birds & insects', /chick|owl|penguin|bee|butterfly|ladybug|spider|mosquito/],
+      ['Sea', /dolphin|whale|shark|octopus|turtle/],
+      ['Fantasy', /dragon|unicorn|tyrannosaurus/],
+      ['Other', /frog|snake|paw/],
+    ],
+    drinks: [
+      ['Hot drinks', /tea|teapot|coffee|espresso/],
+      ['Juices & soft drinks', /juice|lemonade|smoothie|mocktail|soda|bubble|coconut/],
+      ['Water & bottles', /water|bottle|milk/],
+    ],
+    festival: [
+      ['Party', /party|confetti|balloon|celebration[-_ ]star|birthday/],
+      ['Gifts', /gift|envelope/],
+      ['Seasonal', /christmas|snowman|jack[-_ ]o|wreath/],
+      ['Lights & sky', /lantern|firework/],
+    ],
+    fruit: [
+      ['Fruit', /apple|banana|mango|orange|pineapple|watermelon|grapes|strawberry|coconut|avocado/],
+      ['Vegetables', /tomato|carrot|corn|cucumber|broccoli|chili/],
+    ],
+    love: [
+      ['Red hearts', /^0[1-9]_|^10_/],
+      ['Colour hearts', /heart/],
+      ['Love symbols', /letter|kiss|rose|couple|hands|ring|hug|devil/],
+    ],
+    medical: [
+      ['Care', /first[-_ ]aid|bandage|cross|stethoscope|monitor|thermometer|syringe|medicine|ice[-_ ]pack|crutch|wheelchair/],
+      ['Hygiene', /soap|sanitizer|mask|tooth/],
+      ['Body', /brain/],
+    ],
+    'music&games': [
+      ['Music', /musical|guitar|piano|drum|microphone|turntable/],
+      ['Games', /controller|joystick|dice|chess|puzzle/],
+      ['Art & film', /palette|paint|clapper|film|theatre/],
+    ],
+    nature: [
+      ['Plants', /flower|daisy|tulip|leaf|herb|seed|clover|tree|cactus|mushroom/],
+      ['Sky & weather', /sun|moon|star|cloud|rain|storm|thunder|tornado|rainbow|snow|umbrella/],
+      ['Land & sea', /mountain|wave|flame/],
+    ],
+    people: [
+      ['Family', /baby|family|parent|child|pregnant/],
+      ['Everyday', /adult|waving|curly|glasses|elderly/],
+      ['Actions', /dancing|running|meditating|wheelchair|speaking/],
+      ['Reactions', /shrug|facepalm/],
+    ],
+    romantic: [
+      ['Lips', /^lip_\d+|kiss/],
+      ['Flirt', /desire|flustered|attract|smirk|wink|seductive|tongue|biting|whisper/],
+      ['Romance', /heart|rose|lock|tied/],
+    ],
+    rood: [
+      ['Meals', /bread|burger|sandwich|hot[-_ ]dog|pizza|fries|chicken|taco|ramen|rice|sushi|dumpling|salad|pan[_ ]with[_ ]egg|^egg/],
+      ['Sweets & snacks', /cake|cupcake|chocolate|donut|cookie|croissant|ice[-_ ]cream|lollipop|candy|popcorn/],
+      ['Extras', /cheese|honey/],
+    ],
+    symbol: [
+      ['Marks & status', /check|cross|exclamation|question|hundred|impact|sparkles|star|prohibited|warning|stop|target|sos|beacon|recycl|sleep/],
+      ['Locks & security', /lock|key|shield/],
+      ['Mail & messages', /envelope|inbox|outbox|memo|paperclip|pushpin|bubble|bell|megaphone|email/],
+      ['Money & magic', /money|wand/],
+      ['Objects', /bulb|magnif|broom|bathtub|shower|toilet|wastebasket|chain|cap|crown/],
+      ['Places', /pin|globe|arrow|flag/],
+      ['Shapes', /circle|infinity/],
+    ],
+    technology: [
+      ['Time', /clock|stopwatch|calendar|watch/],
+      ['Phones & computers', /smartphone|tablet|laptop|monitor|keyboard|mouse/],
+      ['Audio', /headphone|earbud|speaker|microphone/],
+      ['Cameras', /camera/],
+      ['Power & signal', /battery|plug|signal/],
+      ['Fun', /controller|headset|robot/],
+    ],
+    vehicle: [
+      ['Road', /car|taxi|bus|ambulance|motorcycle|bicycle|scooter|rikshaw|tractor/],
+      ['Rail', /train/],
+      ['Air', /airplane|helicopter|rocket/],
+      ['Water', /ship|sailboat/],
+    ],
+    hand: [
+      ['Pointing', /point|backhand/],
+      ['Open hands', /raised_hand|raising_hands|open_hands|splayed|palm|back_of_hand/],
+      ['Fists', /fist|biceps/],
+      ['Thumbs', /thumbs/],
+      ['OK & pinch', /ok_hand|pinch|call_me/],
+      ['Signs', /victory|love_you|horns|vulcan|crossed|finger_heart|nail/],
+      ['Clap & pray', /clapping|folded/],
+      ['Rude', /middle/],
+    ],
+    pchat: [
+      ['Food & culture', /tea|jalebi|jhal|pani|samosa|guava|lungi|gamcha/],
+      ['Reactions', /face|brain|zipper|blown|noodle|split|smug|tooth|middle/],
+      ['Hands', /hand/],
+      ['Objects & status', /megaphone|sun|status|light|balloon/],
+    ],
+  };
+
+  const NATURAL = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+
   let _items = [];          // [{file, unicode, category, name, src}]
   let _byUnicode = new Map(); // unicode -> first item (for auto-replace)
   let _byCategory = new Map();
@@ -56,6 +178,41 @@ const CustomEmoji = (() => {
     return 'assets/emoji/' + encodeURIComponent(category) + '/' + encodeURIComponent(file);
   }
 
+  function groupIndex(category, file) {
+    const groups = ORDER_GROUPS[category];
+    if (!groups) return 0;
+    const name = file.toLowerCase();
+    for (let i = 0; i < groups.length; i++) {
+      if (groups[i][1].test(name)) return i;
+    }
+    return groups.length;
+  }
+
+  function sortForDisplay() {
+    for (const [category, items] of _byCategory) {
+      if (!ORDER_GROUPS[category]) {
+        items.sort((a, b) => NATURAL.compare(a.file, b.file));
+        continue;
+      }
+      const rank = new Map();
+      for (const it of items) rank.set(it, groupIndex(category, it.file));
+      items.sort((a, b) =>
+        (rank.get(a) - rank.get(b)) || NATURAL.compare(a.file, b.file));
+    }
+    // The flat list feeds "All" search results — keep it in the same
+    // category-then-group order the picker shows.
+    const ordered = [];
+    for (const cat of CATEGORY_ORDER) {
+      const arr = _byCategory.get(cat);
+      if (arr) ordered.push(...arr);
+    }
+    const known = new Set(CATEGORY_ORDER);
+    for (const [cat, arr] of _byCategory) {
+      if (!known.has(cat)) ordered.push(...arr);
+    }
+    _items = ordered;
+  }
+
   function ingest(items) {
     _items = [];
     _byUnicode = new Map();
@@ -75,6 +232,7 @@ const CustomEmoji = (() => {
       if (!_byCategory.has(e.category)) _byCategory.set(e.category, []);
       _byCategory.get(e.category).push(item);
     }
+    sortForDisplay();
     // Longest unicode first so ZWJ/variant sequences match before prefixes
     const keys = [..._byUnicode.keys()].sort((a, b) => b.length - a.length);
     const esc = keys.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));

@@ -242,8 +242,10 @@ PCHAT/
 │   └── responsive.css  — Breakpoints (360px → 1280px+)
 │
 ├── tools/
-│   ├── generate-help.js  — Scans the project → js/help-data.js
-│   └── verify-help.js    — Smoke test for the About & Help pages
+│   ├── generate-help.js        — Scans the project → js/help-data.js
+│   ├── verify-help.js          — Smoke test for the About & Help pages
+│   ├── verify-encrypted-reply.js — Encrypted replies and notifications
+│   └── verify-emoji-order.js   — Smoke test for emoji picker ordering
 │
 ├── js/
 │   ├── config.js       — Central configuration (set CLIENT_ID here)
