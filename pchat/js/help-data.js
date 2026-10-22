@@ -6,10 +6,10 @@
  * Re-run that script after changing a feature; it refuses to write
  * until every change in the code is described.
  *
- * Generated: 2026-10-21T14:41:45.755Z
+ * Generated: 2026-10-22T15:47:44.668Z
  */
 window.HelpData = {
-  "generatedAt": "2026-10-21T14:41:45.755Z",
+  "generatedAt": "2026-10-22T15:47:44.668Z",
   "app": {
     "name": "Pchat shepu",
     "aka": "SHEPU ROOMS",
@@ -67,6 +67,13 @@ window.HelpData = {
       "blurb": "Everything only the owner can do: statistics, moderation, renaming, locking, backups and link tools."
     },
     {
+      "file": "privacy.html",
+      "title": "Privacy Policy",
+      "pageTitle": "Privacy Policy",
+      "description": "What Pchat shepu does with your data, in plain language: what stays on your device, what is saved in the room owner's Drive, and what travels over the public relay.",
+      "blurb": "Plain-language description of what the app stores on your device, what is saved in the room owner’s Drive, and what the public relay can see."
+    },
+    {
       "file": "room.html",
       "title": "Chat room",
       "pageTitle": "Chat",
@@ -78,7 +85,7 @@ window.HelpData = {
       "title": "Settings",
       "pageTitle": "Settings",
       "description": "Pchat shepu account and application preferences.",
-      "blurb": "Your account, notifications, relay servers, the privacy tools and developer information."
+      "blurb": "Your account, privacy tools, notifications, relay servers, and the way into the help and about pages."
     }
   ],
   "controls": {
@@ -235,6 +242,7 @@ window.HelpData = {
         "label": "Save Endpoint"
       }
     ],
+    "privacy.html": [],
     "room.html": [
       {
         "id": "close-sidebar-btn",

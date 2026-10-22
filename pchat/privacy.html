@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Pchat shepu</title>
+  <meta name="description" content="What Pchat shepu does with your data, in plain language: what stays on your device, what is saved in the room owner's Drive, and what travels over the public relay." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261022b" type="image/png" />
+  <link rel="stylesheet" href="css/base.css?v=20261022b" />
+  <link rel="stylesheet" href="css/layout.css?v=20261022b" />
+  <link rel="stylesheet" href="css/components.css?v=20261022b" />
+  <link rel="stylesheet" href="css/responsive.css?v=20261022b" />
+  <link rel="stylesheet" href="css/help.css?v=20261022b" />
+</head>
+<body>
+<div class="bg-mesh" aria-hidden="true"></div>
+
+<nav class="navbar">
+  <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
+    <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-weight:800;font-size:1.25rem;">
+      <img src="assets/icons/icon.png?v=20261022b" alt="Pchat shepu" class="app-logo-img" />
+      Pchat shepu
+    </a>
+    <div class="navbar-actions">
+      <a href="help.html" class="btn btn-ghost btn-sm">Help</a>
+      <a href="about.html" class="btn btn-ghost btn-sm">About</a>
+      <a href="settings.html" class="btn btn-ghost btn-sm">← Settings</a>
+    </div>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="container" style="position:relative;z-index:1;">
+
+    <!-- ── Hero ──────────────────────────────────────────────── -->
+    <div class="about-hero">
+      <div class="about-logo" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      </div>
+      <h1>Privacy Policy</h1>
+      <p>Plain language, no fine print. Here is exactly what this app does with your data — written to describe the code as it actually runs.</p>
+      <p style="color:var(--muted);font-size:0.85rem;margin-top:0.6rem;">Last updated: 22 October 2026</p>
+    </div>
+
+    <!-- ── Contents ──────────────────────────────────────────── -->
+    <section class="doc-section" style="margin-bottom:2.5rem;">
+      <div class="panel" style="padding:1.25rem 1.5rem;">
+        <h2 style="font-size:0.95rem;margin:0 0 0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);">On this page</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.35rem 1.25rem;font-size:0.875rem;">
+          <a href="#short" style="color:var(--accent-2);text-decoration:none;">1. The short version</a>
+          <a href="#who" style="color:var(--accent-2);text-decoration:none;">2. Who is responsible</a>
+          <a href="#not-collected" style="color:var(--accent-2);text-decoration:none;">3. What this app does not do</a>
+          <a href="#device" style="color:var(--accent-2);text-decoration:none;">4. What stays on your device</a>
+          <a href="#rooms" style="color:var(--accent-2);text-decoration:none;">5. What is saved in a room</a>
+          <a href="#relay" style="color:var(--accent-2);text-decoration:none;">6. The public relay</a>
+          <a href="#encryption" style="color:var(--accent-2);text-decoration:none;">7. Encryption, exactly</a>
+          <a href="#google" style="color:var(--accent-2);text-decoration:none;">8. Google sign-in and Drive</a>
+          <a href="#ai" style="color:var(--accent-2);text-decoration:none;">9. The Shepu-AI bot</a>
+          <a href="#calls" style="color:var(--accent-2);text-decoration:none;">10. Calls</a>
+          <a href="#notifications" style="color:var(--accent-2);text-decoration:none;">11. Notifications</a>
+          <a href="#third-parties" style="color:var(--accent-2);text-decoration:none;">12. Other requests</a>
+          <a href="#retention" style="color:var(--accent-2);text-decoration:none;">13. How long data is kept</a>
+          <a href="#choices" style="color:var(--accent-2);text-decoration:none;">14. Your choices</a>
+          <a href="#children" style="color:var(--accent-2);text-decoration:none;">15. Children</a>
+          <a href="#changes" style="color:var(--accent-2);text-decoration:none;">16. Changes</a>
+          <a href="#contact" style="color:var(--accent-2);text-decoration:none;">17. Contact</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 1. Short version ──────────────────────────────────── -->
+    <section class="doc-section" id="short">
+      <h2>1. 🔎 The short version</h2>
+      <div class="about-prose">
+        <ul>
+          <li><strong>There is no Pchat account and no Pchat message server.</strong> The app is a set of static files. Nothing is sent to the people who wrote it.</li>
+          <li><strong>A saved room's history is written to a Google Sheet in the room owner's Google Drive.</strong> The owner controls that file, not us.</li>
+          <li><strong>A quick room has no backend at all.</strong> Its messages live in the browsers of the people in the room, plus the public relay described below.</li>
+          <li><strong>Messages also travel through public relay servers</strong> so they arrive across networks. In a room with a passphrase, those servers see ciphertext instead of the message text.</li>
+          <li><strong>No analytics, no advertising, no tracking pixels, no selling data.</strong> The app sets no cookies of its own.</li>
+        </ul>
+        <p style="color:var(--muted);font-size:0.875rem;">The rest of this page explains each of those points, including the parts that are less comfortable.</p>
+      </div>
+    </section>
+
+    <!-- ── 2. Who is responsible ─────────────────────────────── -->
+    <section class="doc-section" id="who">
+      <h2>2. 🏠 Who is responsible for your data</h2>
+      <div class="about-prose">
+        <p>Pchat is self-hosted software: one folder of HTML, CSS and JavaScript that anyone can put on any web host. There is no company behind this particular copy that receives your messages.</p>
+        <p><strong>If someone sent you a room link, that person is your first point of contact.</strong> They chose where the app is hosted and they usually own the room. <strong>The room owner is the one who controls the saved history</strong>, because it is stored in their own Google Drive.</p>
+        <p>If you are running this copy of the app yourself, then you are the operator: you choose the host, and the privacy commitments on this page describe what the software does — not a service agreement from a third party.</p>
+      </div>
+    </section>
+
+    <!-- ── 3. What it does not do ────────────────────────────── -->
+    <section class="doc-section" id="not-collected">
+      <h2>3. 🚫 What this app does not do</h2>
+      <div class="about-prose">
+        <ul>
+          <li><strong>No sign-up.</strong> You can use a quick room without a name, an email or a password.</li>
+          <li><strong>No central message database.</strong> There is no server that stores your conversations.</li>
+          <li><strong>No advertising or analytics.</strong> There is no Google Analytics, no Meta pixel, no session recording, no fingerprinting script and no A/B testing service.</li>
+          <li><strong>No selling or sharing of personal data.</strong> There is no business model that needs it.</li>
+          <li><strong>No reading of your messages for ads or AI training.</strong> The one exception is when you explicitly ask the Shepu-AI bot something — see <a href="#ai" style="color:var(--accent-2);">section 9</a>.</li>
+          <li><strong>No app cookies.</strong> The app never calls <code>document.cookie</code>. It stores state in localStorage, sessionStorage and IndexedDB instead (section 4).</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── 4. Local storage ──────────────────────────────────── -->
+    <section class="doc-section" id="device">
+      <h2>4. 💾 What stays on your device</h2>
+      <p class="doc-lede">These are the only places the app writes to locally. None of them is uploaded anywhere by itself.</p>
+
+      <div class="panel" style="padding:0.5rem 0.75rem;margin-bottom:1rem;overflow-x:auto;">
+        <table class="doc-table">
+          <thead>
+            <tr><th>Where</th><th>What</th><th>Why</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>localStorage<br /><code>shepu_auth</code></td><td>Google access token, its expiry, and your name, email, picture and Google subject ID</td><td>So you stay signed in and can create or back up a saved room</td></tr>
+            <tr><td>localStorage<br /><code>shepu_rooms</code></td><td>Your room list: names, IDs, links, spreadsheet IDs, themes</td><td>To show your dashboard without asking the network</td></tr>
+            <tr><td>localStorage<br /><code>shepu_session</code>, <code>shepu_current_room</code></td><td>The room you are in and your member identity in it (member ID, display name, picture, role, theme)</td><td>To restore the room you were last in</td></tr>
+            <tr><td>localStorage<br /><code>shepu_display_name</code>, <code>shepu_profile_pic</code>, <code>shepu_pic_custom</code></td><td>The nickname and avatar you chose</td><td>To show the right name and photo to other members</td></tr>
+            <tr><td>localStorage<br /><code>shepu_notify_pref</code>, <code>shepu_music_vol</code>, <code>shepu_relay_servers</code>, <code>shepu_google_client_id</code></td><td>Notification preference, music volume, custom relay list (only if you edit it), saved Google client ID</td><td>To remember your settings</td></tr>
+            <tr><td>localStorage<br /><code>pending_&lt;id&gt;</code>, <code>sync_&lt;id&gt;</code></td><td>Messages waiting to be sent when the network returns, and a sync cursor (a row number)</td><td>So nothing is lost offline and the sync knows where it stopped</td></tr>
+            <tr><td>localStorage<br /><code>shepu_mock_room_&lt;id&gt;</code></td><td>Messages of a quick room, kept on this device</td><td>So the history survives a reload while the room exists</td></tr>
+            <tr><td>localStorage<br /><code>shepu_bot_session_&lt;id&gt;</code></td><td>The bot's own room session token</td><td>So the bot can post replies without using your identity</td></tr>
+            <tr><td>IndexedDB<br /><code>SHEPURooms</code></td><td>An offline cache of messages, rooms and members for the rooms you have opened</td><td>To open a room faster and show history while offline</td></tr>
+            <tr><td>sessionStorage</td><td>For a password-locked room: the derived encryption key and the private topic secret</td><td>So you do not retype the passphrase on every reload. Closing the tab discards it.</td></tr>
+            <tr><td>Memory only</td><td>The live encryption key and the current decrypted messages</td><td>Needed to read and send messages while the tab is open</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="about-prose">
+        <p><strong>To erase it:</strong> open <a href="settings.html" style="color:var(--accent-2);">Settings</a> → <strong>Privacy</strong> → <em>Clear local app data</em> (removes everything above, including the login token) or <em>Clear message cache only</em> (keeps your account and room list). You can also remove the site's data in your browser settings.</p>
+        <p style="color:var(--muted);font-size:0.875rem;">Clearing local data does not delete messages that were already saved in the room, and it does not delete other members' copies.</p>
+      </div>
+    </section>
+
+    <!-- ── 5. What is saved in a room ────────────────────────── -->
+    <section class="doc-section" id="rooms">
+      <h2>5. 🗂️ What is saved in a room</h2>
+      <div class="about-prose">
+        <p>There are two kinds of room, and they store data very differently.</p>
+        <p><strong>Quick rooms</strong> have no backend. Messages travel directly between members (and over the relay) and each member's browser keeps its own copy. The app itself stores no copy on a server; what was relayed remains only as long as the relay's own retention.</p>
+        <p><strong>Saved rooms</strong> use a Google Sheet in the owner's Drive. The owner's device writes each message there as a row:</p>
+      </div>
+
+      <div class="panel" style="padding:0.5rem 0.75rem;margin:0.75rem 0 1rem;overflow-x:auto;">
+        <table class="doc-table">
+          <thead><tr><th>Sheet tab</th><th>Columns</th></tr></thead>
+          <tbody>
+            <tr><td><code>messages</code></td><td>message ID, timestamp, sender ID, sender name, type, body, reply-to ID, edited flag, deleted flag</td></tr>
+            <tr><td><code>members</code></td><td>member ID, display name, joined time, last seen, online status, role, removed flag, active flag, session token</td></tr>
+            <tr><td><code>room_config</code></td><td>the room's settings: name, theme, wallpapers, lock state and similar</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="about-prose">
+        <p style="color:var(--muted);font-size:0.85rem;">The spreadsheet also gets three empty helper tabs — <code>attachments</code>, <code>moderation</code> and <code>sync_state</code> — created with headers when the room is made. This version of the app does not write rows to them.</p>
+        <p>The message <strong>body</strong> is whatever was sent: plain text, an attachment encoded as a data URL, or ciphertext starting with <code>enc:</code> when a passphrase is in use. Attachments therefore count against the owner's Google Drive storage.</p>
+        <p>Guests never receive the owner's Google credentials or direct edit access to the Sheet; their messages reach it through the room's transport. The owner, however, can open the Sheet at any time: <strong>a saved room without a passphrase is private, not secret, from the owner.</strong></p>
+        <p>Deleting a room in the app removes it from your list; to remove the history permanently, the owner also deletes the Sheet from Google Drive.</p>
+      </div>
+    </section>
+
+    <!-- ── 6. Relay ──────────────────────────────────────────── -->
+    <section class="doc-section" id="relay">
+      <h2>6. 📡 The public relay</h2>
+      <div class="about-prose">
+        <p>For instant delivery across networks, the app publishes each event to several independent public <a href="https://ntfy.sh" target="_blank" rel="noopener noreferrer" style="color:var(--accent-2);">ntfy</a> servers. The defaults are <code>ntfy.sh</code>, <code>ntfy.envs.net</code>, <code>ntfy.adminforge.de</code> and <code>ntfy.mzte.de</code>. You can change this list in Settings → Relay.</p>
+        <p><strong>What those servers receive:</strong> a topic name, plus a JSON envelope containing the message ID, sender ID and display name, timestamp, message type, reply-to ID and the message body.</p>
+        <p><strong>Which topic:</strong> a private name derived from the room's random secret. For compatibility with older invite links, a normal room also publishes to a legacy topic named after the room ID (<code>shepu_pchat_&lt;roomId&gt;</code>). A password-locked room uses the private topic only. Anyone who knows a room's ID can subscribe to its legacy topic, which is why the private topic exists and why a passphrase matters.</p>
+        <p><strong>What the body is:</strong> ciphertext (<code>enc:…</code>) in a room with a passphrase. <strong>In a room without one, it is plain text</strong> — readable by whoever operates the relay, and by anyone who obtains the topic. The private topic is not guessable without the invite link, but it is not a secret the relay keeps for you.</p>
+        <p>Relay operators may log connection IP addresses and may retain messages for a period (typically hours) under their own policies. <strong>We do not control those servers and cannot delete data from them.</strong> Treat them as post offices, not vaults.</p>
+        <p style="color:var(--muted);font-size:0.875rem;">This is why the app offers encryption, and why the honest answer is: use a passphrase for anything you would not want a stranger to read.</p>
+      </div>
+    </section>
+
+    <!-- ── 7. Encryption ─────────────────────────────────────── -->
+    <section class="doc-section" id="encryption">
+      <h2>7. 🔐 Encryption, exactly</h2>
+      <div class="about-prose">
+        <p>When a room has a passphrase, messages are encrypted <strong>on your device, before they leave it</strong>:</p>
+        <ul>
+          <li><strong>AES-256-GCM</strong> with a fresh random 12-byte IV for every message.</li>
+          <li>The key is derived from the passphrase with <strong>PBKDF2-SHA-256, 100,000 iterations</strong>.</li>
+          <li>Ciphertext is prefixed with <code>enc:</code> so the app knows to decrypt it.</li>
+          <li>The key stays in this tab's memory (and, for a password-locked room, in session storage). <strong>It is never sent to Google, to the relay, or to any other server.</strong></li>
+        </ul>
+        <p>The invite link carries a random room secret in the URL fragment (the part after <code>#</code>). Browsers do not send that fragment to web servers, and it is what makes the relay topic unguessable. That automatic key lets a guest read earlier history, but it does <strong>not</strong> encrypt new messages — only a passphrase does.</p>
+        <p><strong>What encryption protects:</strong> the content of messages and attachments while they sit in the Sheet or pass through the relay.</p>
+        <p><strong>What it does not protect:</strong> who talked to whom, when, how often, and message sizes. It also cannot protect a room without a passphrase, a screenshot, a compromised device, or someone who has the passphrase. And a forgotten passphrase cannot be recovered — the key is not stored anywhere it could be reset from.</p>
+      </div>
+    </section>
+
+    <!-- ── 8. Google ─────────────────────────────────────────── -->
+    <section class="doc-section" id="google">
+      <h2>8. 🔑 Google sign-in and Drive</h2>
+      <div class="about-prose">
+        <p>Google sign-in is <strong>optional</strong>. It is only needed to create or back up a saved room, because that room uses your own Drive.</p>
+        <p>When you sign in, the app receives your <strong>name, email address, profile picture and Google account ID</strong> from Google, plus an <strong>access token</strong>. The token is stored in localStorage on this device and expires on its own. You can revoke access at any time from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style="color:var(--accent-2);">Google account permissions</a>.</p>
+        <p>The scopes requested are <code>openid</code>, <code>email</code> and <code>profile</code>. Creating a saved room additionally asks for Drive file access, Sheets access, and Apps Script project/deployment access — that is what lets the app create the spreadsheet and the room endpoint in your account.</p>
+        <p>The app does not send your Google profile or token anywhere else. Google's own handling of your account is covered by <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" style="color:var(--accent-2);">Google's privacy policy</a>.</p>
+      </div>
+    </section>
+
+    <!-- ── 9. AI ─────────────────────────────────────────────── -->
+    <section class="doc-section" id="ai">
+      <h2>9. 🤖 The Shepu-AI bot</h2>
+      <div class="about-prose">
+        <p>The bot in the chat is opt-in: it only wakes up when someone writes <code>@shepu-ai</code>. Most answers come from a reference database bundled with the app, with no network request at all.</p>
+        <p>When the bundled data does not cover a question, the bot asks an external text service (Pollinations, at <code>text.pollinations.ai</code>) to compose an answer. That request contains <strong>your question, your display name, and the last six messages of your conversation with the bot</strong> — not the room's general chat. The request asks the service to treat it as private and sends no credentials and no referrer.</p>
+        <p>Image requests work differently: the prompt becomes part of a link to <code>image.pollinations.ai</code>, and <strong>every member's browser loads that link</strong>. The prompt is therefore visible to that service and to anyone who can see the message.</p>
+        <p>The app does not write AI training data to Google Sheets, and the bot does not read your room history to learn from it. Still: <strong>do not give the bot passwords, private documents or anything you would not put in a search engine.</strong></p>
+      </div>
+    </section>
+
+    <!-- ── 10. Calls ─────────────────────────────────────────── -->
+    <section class="doc-section" id="calls">
+      <h2>10. 📞 Calls</h2>
+      <div class="about-prose">
+        <p>Audio and video calls use WebRTC. The media normally travels <strong>directly between the people on the call</strong>, encrypted in transit with DTLS-SRTP, which WebRTC requires.</p>
+        <p>To establish that connection the app uses Google's public STUN servers to discover network addresses, and PeerJS's public TURN servers when a direct path is impossible. On a TURN relay, the media passes through that server, still encrypted. As with any call, the other participants can see your IP address, and the infrastructure providers can see that a connection exists.</p>
+        <p>The app does not record calls and does not store audio or video anywhere.</p>
+      </div>
+    </section>
+
+    <!-- ── 11. Notifications ─────────────────────────────────── -->
+    <section class="doc-section" id="notifications">
+      <h2>11. 🔔 Notifications</h2>
+      <div class="about-prose">
+        <p>Notifications are generated locally by a service worker. They are not sent through a push service, and no message content goes to a notification provider.</p>
+        <p>A notification shows the sender's name and a short preview of the message. That preview can appear on your lock screen or in your notification history, where other people or your operating system may see it. If that matters to you, turn notifications off in Settings → Notifications, or in your browser's site settings.</p>
+        <p>The service worker deliberately caches nothing: it exists only to display notifications and to focus the right tab when one is tapped.</p>
+      </div>
+    </section>
+
+    <!-- ── 12. Other requests ────────────────────────────────── -->
+    <section class="doc-section" id="third-parties">
+      <h2>12. 🌐 Other requests the page makes</h2>
+      <div class="about-prose">
+        <ul>
+          <li><strong>Google Fonts.</strong> The stylesheet loads three font families from <code>fonts.googleapis.com</code>, so Google sees your IP address and browser when the page loads. No account information is sent with that request.</li>
+          <li><strong>Google sign-in.</strong> The Google Identity script is loaded from <code>accounts.google.com</code> only when sign-in is used or needed.</li>
+          <li><strong>QR codes are generated on your device</strong> by a bundled library. If that library were unavailable, the fallback strips the secret fragment from the link before sending it to a QR image service.</li>
+          <li><strong>No other third-party scripts, fonts, pixels or widgets are loaded.</strong> Everything else — the icons, the emoji set, the chat engine — ships with the app.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── 13. Retention ─────────────────────────────────────── -->
+    <section class="doc-section" id="retention">
+      <h2>13. ⏳ How long data is kept</h2>
+      <div class="panel" style="padding:0.5rem 0.75rem;overflow-x:auto;">
+        <table class="doc-table">
+          <thead><tr><th>Data</th><th>How long</th><th>Who can delete it</th></tr></thead>
+          <tbody>
+            <tr><td>Browser storage (localStorage, IndexedDB)</td><td>Until you clear it or the browser does</td><td>You</td></tr>
+            <tr><td>Password-room key in sessionStorage</td><td>Until the tab closes</td><td>You</td></tr>
+            <tr><td>Saved room history (Google Sheet)</td><td>Until the owner deletes it</td><td>The room owner</td></tr>
+            <tr><td>Quick room history</td><td>While the room exists on members' devices</td><td>Each member, on their own device</td></tr>
+            <tr><td>Relay copies (public ntfy servers)</td><td>Per that relay's own retention policy</td><td>The relay operator</td></tr>
+            <tr><td>AI requests (Pollinations)</td><td>Per that provider's policy</td><td>That provider</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="about-prose" style="margin-top:1rem;">
+        <p style="color:var(--muted);font-size:0.875rem;">Because the app is serverless, there is no central place to send a deletion request to. Deletion is done locally, or by the room owner in their Drive.</p>
+      </div>
+    </section>
+
+    <!-- ── 14. Choices ───────────────────────────────────────── -->
+    <section class="doc-section" id="choices">
+      <h2>14. ✅ Your choices</h2>
+      <div class="about-prose">
+        <ul>
+          <li><strong>Leave a room</strong> at any time; your local copy can be cleared in Settings → Privacy.</li>
+          <li><strong>Rotate the room link</strong> if it has been shared too widely. Old links stop working for new joins.</li>
+          <li><strong>Set a passphrase</strong> before saying anything sensitive. Without one, the owner and the relay can read the content.</li>
+          <li><strong>Turn notifications off</strong> so previews do not appear on your screen.</li>
+          <li><strong>Avoid the bot</strong> if you do not want a question sent to an external AI service. Ordinary chat does not involve it.</li>
+          <li><strong>Use Google sign-in only when you need a saved room.</strong> A quick room needs no account at all.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ── 15. Children ──────────────────────────────────────── -->
+    <section class="doc-section" id="children">
+      <h2>15. 🧒 Children</h2>
+      <div class="about-prose">
+        <p>This app is not directed at children under 13 (or the minimum age required in your country). It has no age verification, because it has no accounts and collects no personal data itself. A parent or guardian who runs a room should decide whether it is appropriate for the people they invite.</p>
+      </div>
+    </section>
+
+    <!-- ── 16. Changes ───────────────────────────────────────── -->
+    <section class="doc-section" id="changes">
+      <h2>16. 📝 Changes to this policy</h2>
+      <div class="about-prose">
+        <p>This page ships with the app, so it changes when the app changes. The date at the top is the last time the text was updated. If a change affects what leaves your device, it will be reflected in the sections above — there is no separate mailing list to notify you through.</p>
+      </div>
+    </section>
+
+    <!-- ── 17. Contact ───────────────────────────────────────── -->
+    <section class="doc-section" id="contact" style="margin-bottom:3rem;">
+      <h2>17. ✉️ Contact</h2>
+      <div class="about-prose">
+        <p>For questions about a specific room, contact the person who sent you the link — they own the room and its data. For questions about this copy of the app, contact whoever hosts it. There is no central support desk, because there is no central service.</p>
+      </div>
+      <div class="panel" style="text-align:center;padding:1.5rem;margin-top:1.25rem;">
+        <p style="color:var(--text-2);margin:0 0 1rem;font-size:0.9rem;">Want the technical detail behind these promises?</p>
+        <div style="display:flex;gap:0.6rem;justify-content:center;flex-wrap:wrap;">
+          <a href="about.html" class="btn btn-primary btn-sm">How the app works</a>
+          <a href="help.html" class="btn btn-ghost btn-sm">Help centre</a>
+          <a href="settings.html" class="btn btn-ghost btn-sm">Open Settings</a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer style="border-top:1px solid var(--border);padding:1.5rem 0;margin-top:1rem;">
+  <div class="container" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+    <span style="color:var(--muted);font-size:0.8rem;">
+      Pchat shepu ·
+      <a href="privacy.html" style="color:var(--accent-2);text-decoration:none;">Privacy</a> ·
+      <a href="help.html" style="color:var(--accent-2);text-decoration:none;">Help</a> ·
+      <a href="about.html" style="color:var(--accent-2);text-decoration:none;">About</a> ·
+      <a href="index.html" style="color:var(--accent-2);text-decoration:none;">Chats</a>
+    </span>
+    <span style="color:var(--muted);font-size:0.75rem;">Plain language · no trackers</span>
+  </div>
+</footer>
+
+</body>
+</html>

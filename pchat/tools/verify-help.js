@@ -19,7 +19,10 @@ const D = dataCtx.window.HelpData;
 
 console.log('\n[1] generated data');
 ck('HelpData exists', !!D);
-ck('has pages', Array.isArray(D.pages) && D.pages.length >= 9);
+ck('has pages', Array.isArray(D.pages) && D.pages.length >= 10);
+ck('privacy page is in the generated data', D.pages.some(p => p.file === 'privacy.html'));
+ck('privacy page has a blurb', D.pages.some(p => p.file === 'privacy.html' && p.blurb.length > 20));
+ck('privacy page has controls', Array.isArray(D.controls['privacy.html']));
 ck('has bot actions', (D.bot.actions || []).length >= 10);
 ck('has sheet tabs', (D.sheets || []).length === 6);
 ck('has relay servers', (D.relay.servers || []).length === 4);
@@ -76,11 +79,41 @@ for (const path of ['D.assets.emoji.total', 'D.assets.themes', 'D.assets.music',
   ck('reads ' + path, aboutJs.includes(path));
 }
 
+// ── privacy.html ───────────────────────────────────────────────────
+console.log('\n[6b] privacy.html');
+const privacy = read('privacy.html');
+ck('has a title', /<title>Privacy Policy — Pchat shepu<\/title>/.test(privacy));
+ck('has a meta description', /<meta name="description" content="[^"]{40,}"/.test(privacy));
+ck('loads help.css', /css\/help\.css\?v=/.test(privacy));
+ck('states the last-updated date', /Last updated:\s*\d{1,2} \w+ \d{4}/.test(privacy));
+ck('links to settings.html', privacy.includes('href="settings.html"'));
+ck('links to help.html', privacy.includes('href="help.html"'));
+ck('links to about.html', privacy.includes('href="about.html"'));
+ck('covers local storage', /localStorage/.test(privacy) && /IndexedDB/.test(privacy));
+ck('covers the relay', /ntfy/.test(privacy) && /relay/i.test(privacy));
+ck('covers encryption', /AES-256-GCM/.test(privacy) && /PBKDF2/.test(privacy));
+ck('covers Google sign-in', /Google sign-in/.test(privacy) && /access token/.test(privacy));
+ck('covers the AI bot', /Pollinations/.test(privacy));
+ck('covers deletion', /Clear local app data/.test(privacy));
+ck('says there are no trackers', /no analytics/i.test(privacy) && /no tracking/i.test(privacy));
+// every in-page link must land on a real section
+const anchorIds = new Set([...privacy.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
+const anchorLinks = [...privacy.matchAll(/href="#([^"]+)"/g)].map(m => m[1]);
+ck('has in-page anchor links', anchorLinks.length >= 10, anchorLinks.length + ' links');
+const broken = anchorLinks.filter(a => !anchorIds.has(a));
+ck('every anchor link has a target', broken.length === 0, broken.join(', '));
+for (const required of ['short', 'device', 'rooms', 'relay', 'encryption', 'google', 'ai', 'retention', 'choices', 'contact']) {
+  ck('has section #' + required, anchorIds.has(required));
+}
+
 // ── navigation from the app ────────────────────────────────────────
 console.log('\n[6] links inside the app');
 const settings = read('settings.html');
 ck('settings.html links to About', settings.includes('href="about.html"'));
 ck('settings.html links to Help', settings.includes('href="help.html"'));
+ck('settings.html links to the privacy policy', settings.includes('href="privacy.html"'));
+ck('the privacy link lives in the Privacy section',
+  /id="section-privacy"[\s\S]*?href="privacy\.html"/.test(settings));
 ck('settings nav has a Help section', settings.includes('data-section="help"'));
 ck('settings nav has an About section', settings.includes('data-section="about"'));
 ck('settings nav has a Relay section', settings.includes('data-section="relay"'));

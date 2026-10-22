@@ -173,7 +173,7 @@ Room commands are understood on the device — they never reach the AI provider.
 
 - Store your messages in any Pchat database
 - Hand out your Google Sheet to guests
-- Keep your Google sign-in beyond the browser session
+- Use your Google token for anything except your own Drive and Apps Script
 - Track you across sites, devices or rooms
 
 **A note on links:** anyone holding your room link can read the room. Share it with people you actually want in it. If that list changes, rotate the link.
@@ -255,9 +255,10 @@ Setup, deployment, the backend API and the project structure live in the
 [`README.md`](README.md). The current defect list and the fix history live
 in [`BUGS.md`](BUGS.md).
 
-Inside the app itself there are two more pages: **`help.html`** (every
-feature, generated from the app source, so it is never out of date) and
-**`about.html`** (this page, with live numbers).
+Inside the app itself there are three more pages: **`help.html`** (every
+feature, generated from the app source, so it is never out of date),
+**`about.html`** (this page, with live numbers), and **`privacy.html`**
+(the plain-language privacy policy, one click from *Settings → Privacy*).
 
 ---
 

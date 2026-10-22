@@ -230,6 +230,7 @@ PCHAT/
 ├── owner.html          — Owner management panel
 ├── about.html          — About the app (public product page)
 ├── help.html           — Help: every feature, generated from the app
+├── privacy.html        — Privacy policy (public page, linked from Settings)
 │
 ├── css/
 │   ├── base.css        — CSS variables, reset, typography
