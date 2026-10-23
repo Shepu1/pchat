@@ -344,6 +344,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Recover room from registry OR rebuild from session ────────
   let room = Rooms.getRoom(roomId);
 
+  // Expose room context for the encrypted-invite picker (invites.js uses this
+  // when the user clicks "Invite a Pchat friend" from the share modal).
+  window.getRoomInviteContext = function () {
+    try {
+      const urls = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
+      return {
+        roomId:         room.id,
+        roomName:       room.name,
+        link:           urls.defaultUrl,
+        passwordLocked: room.passwordLocked === true,
+      };
+    } catch { return null; }
+  };
+
   if (!room) {
     // Room not in registry but session is valid — reconstruct from session
     room = {
@@ -1089,6 +1103,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       shareModal.classList.remove('hidden');
     });
+
+    // Encrypted friend invite button (inside the share modal)
+    const inviteFriendsBtn = document.getElementById('room-invite-friends-btn');
+    if (inviteFriendsBtn) {
+      inviteFriendsBtn.addEventListener('click', () => {
+        shareModal.classList.add('hidden');
+        if (typeof Invites !== 'undefined' && Invites.openPicker) {
+          Invites.openPicker().catch((err) => {
+            UI.toast('error', 'Invite failed', err.message || String(err));
+          });
+        } else {
+          UI.toast('info', 'Not available', 'Sign in with Google to invite friends.');
+        }
+      });
+    }
 
     if (shareClose) shareClose.addEventListener('click', () => shareModal.classList.add('hidden'));
     if (shareDone)  shareDone.addEventListener('click',  () => shareModal.classList.add('hidden'));

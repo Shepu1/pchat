@@ -79,6 +79,14 @@ Mention `@shepu-ai` and it answers questions — and understands what you mean b
 
 Member statistics, moderation, a link you can regenerate, a QR code, and a CSV export of the whole conversation.
 
+### 🤝 Friends (optional social layer)
+
+- Search for people by @handle and send friend requests
+- See who is **active now** (within the last 15 minutes) — a timestamp, not a live tracker
+- **Invite friends directly inside a room** — the room link is encrypted end-to-end with their public key before it reaches Firestore; the server never sees the link
+- Turn off your active status or delete all social data at any time from Settings → Friends
+- Friends is entirely optional: rooms, chat, and calls work without it; only the Friends panel degrades if Firebase is unavailable
+
 ---
 
 ## How it works

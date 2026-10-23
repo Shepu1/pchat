@@ -1,0 +1,164 @@
+rules_version = '2';
+
+// SHEPU ROOMS — Firestore rules
+//
+// Design notes:
+//  - The friend graph lives in users/{uid}.friendUids so the read rule costs
+//    ZERO extra rule reads. Rules get()/exists() calls are billed as reads.
+//  - Presence is users/{uid}.lastActiveAt, folded into the same document the
+//    friends list already reads.
+//  - Invite documents never contain a plaintext room link; the client
+//    encrypts the link with the recipient's public key.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function me() {
+      return request.auth.uid;
+    }
+
+    function userDoc(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function requestDoc(from, to) {
+      return /databases/$(database)/documents/friendRequests/$(from + '_' + to);
+    }
+
+    function pendingRequest(from, to) {
+      return exists(requestDoc(from, to))
+        && get(requestDoc(from, to)).data.status == 'pending';
+    }
+
+    // ── Users: profile, friend graph, presence ──────────────────
+    match /users/{uid} {
+      // Only self and friends may read a profile.
+      allow get: if signedIn()
+        && (me() == uid || me() in resource.data.friendUids);
+      allow list: if false;
+
+      allow create: if signedIn()
+        && me() == uid
+        && request.resource.data.friendUids.size() == 0
+        && request.resource.data.flags.showPresence == true;
+
+      // Self updates are split in two:
+      //  - routine updates (presence, name, flags, own friendUids) keep the
+      //    handle and createdAt unchanged;
+      //  - the one-time handle claim goes from '' to a value backed by a
+      //    usernames/{handle} document owned by this user.
+      // A friend may add exactly themselves after a pending request, or
+      // remove exactly themselves when unfriending. The size + hasOnly checks
+      // stop a recipient from smuggling a third UID into the sender's friend
+      // list during an accept.
+      allow update: if signedIn() && (
+        (
+          me() == uid
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (
+            request.resource.data.handle == resource.data.handle
+            || (
+              resource.data.handle == ''
+              && request.resource.data.handle.matches('^[a-z0-9_]{3,20}$')
+              && exists(/databases/$(database)/documents/usernames/$(request.resource.data.handle))
+              && get(/databases/$(database)/documents/usernames/$(request.resource.data.handle)).data.uid == uid
+            )
+          )
+        )
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friendUids'])
+          && (
+            (
+              request.resource.data.friendUids.size() == resource.data.friendUids.size() + 1
+              && request.resource.data.friendUids.hasOnly(resource.data.friendUids.concat([me()]))
+              && me() in request.resource.data.friendUids
+              && pendingRequest(uid, me())
+            )
+            || (
+              resource.data.friendUids.size() > 0
+              && request.resource.data.friendUids.size() == resource.data.friendUids.size() - 1
+              && resource.data.friendUids.hasOnly(request.resource.data.friendUids.concat([me()]))
+              && !(me() in request.resource.data.friendUids)
+            )
+          )
+        )
+      );
+
+      allow delete: if signedIn() && me() == uid;
+
+      // ── Encrypted room invites ────────────────────────────────
+      match /invites/{inviteId} {
+        allow read, delete: if signedIn() && me() == uid;
+
+        allow create: if signedIn()
+          && request.resource.data.from == me()
+          && inviteId == me() + '_' + request.resource.data.roomId
+          && me() in get(userDoc(uid)).data.friendUids
+          && request.resource.data.keys().hasOnly([
+            'from', 'roomId', 'ciphertext', 'seen', 'createdAt'
+          ])
+          && request.resource.data.roomId is string
+          && request.resource.data.roomId.size() > 0
+          && request.resource.data.roomId.size() <= 64
+          && request.resource.data.seen == false
+          && request.resource.data.ciphertext is string
+          && request.resource.data.ciphertext.size() < 4000;
+
+        allow update: if false;
+      }
+    }
+
+    // ── Handle search index ─────────────────────────────────────
+    match /usernames/{handle} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.uid == me()
+        && handle.matches('^[a-z0-9_]{3,20}$');
+
+      allow delete: if signedIn() && resource.data.uid == me();
+      allow update: if false;
+    }
+
+    // ── Friend requests ─────────────────────────────────────────
+    match /friendRequests/{requestId} {
+      // `resource == null` lets a sender probe a missing canonical request
+      // before creating it. Existing requests stay party-only.
+      allow read: if signedIn()
+        && (
+          resource == null
+          || resource.data.from == me()
+          || resource.data.to == me()
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.from == me()
+        && request.resource.data.to != me()
+        && request.resource.data.status == 'pending'
+        && requestId == me() + '_' + request.resource.data.to
+        && request.resource.data.keys().hasOnly([
+          'from', 'to', 'status', 'fromName', 'fromHandle', 'toHandle', 'createdAt'
+        ])
+        && request.resource.data.fromName is string
+        && request.resource.data.fromName.size() <= 80
+        && request.resource.data.fromHandle is string
+        && request.resource.data.fromHandle.size() <= 20
+        && request.resource.data.toHandle is string
+        && request.resource.data.toHandle.size() <= 20;
+
+      allow update: if signedIn()
+        && resource.data.to == me()
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['accepted', 'declined'];
+
+      allow delete: if signedIn()
+        && (resource.data.from == me() || resource.data.to == me());
+    }
+  }
+}

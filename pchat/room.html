@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="css/components.css?v=20261022b" />
   <link rel="stylesheet" href="css/chat.css?v=20261022b" />
   <link rel="stylesheet" href="css/calls.css?v=20261022b" />
+  <link rel="stylesheet" href="css/friends.css?v=20261024d" />
+  <link rel="stylesheet" href="css/invites.css?v=20261024d" />
   <link rel="stylesheet" href="css/responsive.css?v=20261022b" />
   <script src="js/icons.js?v=20261022b"></script>
 </head>
@@ -460,8 +462,17 @@
       <button class="modal-close" id="share-modal-close" aria-label="Close" style="position:absolute;right:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
     </div>
 
-    <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
-      Scan with phone or copy link to invite friends.
+    <!-- Invite a Pchat friend (encrypted, end-to-end) -->
+    <button type="button" class="btn btn-primary" id="room-invite-friends-btn"
+      style="width:100%;justify-content:center;margin-bottom:0.9rem;gap:0.45rem;display:flex;align-items:center;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           style="flex-shrink:0;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/>
+        <line x1="23" y1="11" x2="17" y2="11"/></svg>
+      Invite a Pchat friend
+    </button>
+    <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:1.1rem;margin-top:-0.3rem;">
+      Friends get an end-to-end encrypted invite. Or share the link below.
     </p>
 
     <!-- QR Code container (local-first: secret never leaves device) -->
@@ -525,7 +536,7 @@
       <button class="modal-close" id="theme-modal-close" aria-label="Close" style="position:absolute;right:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
     </div>
     <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:1rem;">Everyone in this room will see it.</p>
-    <div id="theme-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.5rem;"></div>
+    <div id="theme-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;"></div>
   </div>
 </div>
 
@@ -569,6 +580,10 @@
 <script src="js/shepu-actions.js?v=20261022b"></script>
 <script src="js/shepu-bot.js?v=20261022b"></script>
 <script src="js/chat.js?v=20261022b"></script>
+<script src="js/firebase-config.js?v=20261024d"></script>
+<script src="js/firebase.js?v=20261024d"></script>
+<script src="js/friends.js?v=20261024d"></script>
+<script src="js/invites.js?v=20261024d"></script>
 <script src="js/calls.js?v=20261022b"></script>
 <script src="js/app.js?v=20261022b"></script>
 </body>

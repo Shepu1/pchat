@@ -242,14 +242,57 @@
       </div>
     </section>
 
-    <!-- ── 12. Other requests ────────────────────────────────── -->
+    </section>
+
+    <!-- ── 12. Firebase / Friends social layer ──────────────────── -->
+    <section class="doc-section" id="firebase">
+      <h2>12. 🤝 Friends &amp; social layer (Firebase)</h2>
+      <div class="about-prose">
+        <p>
+          The optional <strong>Friends</strong> feature uses <strong>Google Firebase
+          (Firestore)</strong> to store a small social graph. This is separate from your
+          rooms and messages, which never touch Firebase.
+        </p>
+        <h3 style="font-size:1rem;margin:1rem 0 0.5rem;">What Firestore stores (opt-in only)</h3>
+        <ul>
+          <li>Your <strong>Firebase UID</strong> — a random identifier derived from your Google account.</li>
+          <li>Your <strong>display name</strong> and chosen <strong>@handle</strong> (permanent in v1).</li>
+          <li>An <strong>emoji avatar or initial</strong> — never a photo.</li>
+          <li>Your <strong>friend list</strong> (UIDs only).</li>
+          <li>A <strong>last-active timestamp</strong> — updated at most once every 12 minutes while the app is open, only while your active-status toggle is on.</li>
+          <li><strong>Friend requests</strong> (sender UID, recipient UID, status).</li>
+          <li><strong>Encrypted room invites</strong> — an opaque ciphertext. Firestore never sees the room link, room name, or encryption key.</li>
+        </ul>
+        <h3 style="font-size:1rem;margin:1rem 0 0.5rem;">What Firestore never stores</h3>
+        <ul>
+          <li>Chat messages, voice notes, or files.</li>
+          <li>Room links, room secrets, or room names.</li>
+          <li>Your Google OAuth token or Drive credentials.</li>
+          <li>Any personally identifiable data beyond your name and handle.</li>
+        </ul>
+        <h3 style="font-size:1rem;margin:1rem 0 0.5rem;">Your choices</h3>
+        <ul>
+          <li><strong>Active status:</strong> turn off in <em>Settings → Friends → Active status</em>. Presence writes stop immediately.</li>
+          <li><strong>Delete all social data:</strong> <em>Settings → Friends → Delete social data</em> removes your Firestore profile, handle, friend list, requests, and invites. Your rooms are unaffected.</li>
+          <li><strong>Never use Friends:</strong> guests and email-only users are never enrolled.</li>
+        </ul>
+        <p>
+          Firebase is operated by Google. Their privacy policy applies to the data stored there:
+          <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer"
+            style="color:var(--accent-2);">firebase.google.com/support/privacy</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── 13. Other requests the page makes ────────────────────── -->
     <section class="doc-section" id="third-parties">
-      <h2>12. 🌐 Other requests the page makes</h2>
+      <h2>13. 🌐 Other requests the page makes</h2>
       <div class="about-prose">
         <ul>
           <li><strong>The web host.</strong> Whoever serves these files — a static host, a school server, a friend's VPS — sees your IP address and the page you requested, as with any website. That is outside the app's control.</li>
           <li><strong>Google Fonts.</strong> The stylesheet loads three font families from <code>fonts.googleapis.com</code>, so Google sees your IP address and browser when the page loads. No account information is sent with that request.</li>
           <li><strong>Google sign-in.</strong> The Google Identity script is loaded from <code>accounts.google.com</code> only when sign-in is used or needed.</li>
+          <li><strong>Firebase (Friends only).</strong> If you use Friends, the app connects to <code>firestore.googleapis.com</code>. If you never open the Friends panel, no Firebase requests are made.</li>
           <li><strong>QR codes are generated on your device</strong> by a bundled library. If that library were unavailable, the fallback strips the secret fragment from the link before sending it to a QR image service.</li>
           <li><strong>No other third-party scripts, fonts, pixels or widgets are loaded.</strong> Everything else — the icons, the emoji set, the chat engine — ships with the app.</li>
         </ul>

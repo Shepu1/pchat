@@ -1,0 +1,393 @@
+/* SHEPU ROOMS — friend invites (Firestore social layer)
+   The invite picker is injected by js/invites.js so room.html does not need
+   a second full friends panel. The banner is also used on index/settings. */
+
+#room-invite-friends-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.invite-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(3, 7, 14, 0.66);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.invite-overlay[hidden] {
+  display: none !important;
+}
+
+.invite-card {
+  width: min(430px, 100%);
+  max-height: min(82vh, 680px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface, #141b2c);
+  color: var(--text, #f8fafc);
+  border: 1px solid var(--border-2, rgba(255, 255, 255, 0.15));
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg, 0 16px 50px rgba(0, 0, 0, 0.6));
+}
+
+.invite-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1.1rem 1.15rem 0.7rem;
+}
+
+.invite-head-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  color: var(--accent-2, #3b82f6);
+  background: var(--accent-dim, rgba(37, 99, 235, 0.12));
+}
+
+.invite-head-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.invite-title {
+  margin: 0;
+  font-size: 1.06rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.invite-subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-2, #94a3b8);
+}
+
+.invite-close {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2, #94a3b8);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.invite-close:hover {
+  color: var(--text, #f8fafc);
+  background: var(--glass-2, rgba(255, 255, 255, 0.06));
+}
+
+.invite-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.2rem 1.15rem 0.55rem;
+  font-size: 0.78rem;
+  color: var(--text-2, #94a3b8);
+}
+
+.invite-link-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent-2, #3b82f6);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.invite-link-btn:hover {
+  text-decoration: underline;
+}
+
+.invite-note {
+  margin: 0 1.15rem 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: var(--warning-dim, rgba(245, 158, 11, 0.12));
+  color: var(--warning, #f59e0b);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.invite-list {
+  min-height: 90px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.15rem 0.65rem 0.65rem;
+}
+
+.invite-friend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.invite-friend-row:hover,
+.invite-friend-row:focus-within {
+  background: var(--glass-2, rgba(255, 255, 255, 0.06));
+}
+
+.invite-friend-row.is-disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.invite-friend-row input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  accent-color: var(--accent, #2563eb);
+  cursor: inherit;
+}
+
+.invite-avatar {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.invite-friend-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.invite-friend-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.invite-friend-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.73rem;
+  color: var(--text-2, #94a3b8);
+}
+
+.invite-friend-sub.is-ready {
+  color: var(--success, #10b981);
+}
+
+.invite-empty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-2, #94a3b8);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.invite-empty strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text, #f8fafc);
+  font-size: 0.92rem;
+}
+
+.invite-status {
+  padding: 0 1.15rem 0.55rem;
+  min-height: 1.1rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-2, #94a3b8);
+}
+
+.invite-status.is-error {
+  color: var(--danger, #ef4444);
+}
+
+.invite-status.is-success {
+  color: var(--success, #10b981);
+}
+
+.invite-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.8rem 1.15rem 1rem;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+
+.invite-foot .btn {
+  min-width: 0;
+}
+
+.invite-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: invite-spin 0.7s linear infinite;
+}
+
+@keyframes invite-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Incoming invite banner */
+.shepu-invite-host {
+  position: fixed;
+  right: 16px;
+  bottom: 88px;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.shepu-invite-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--border-2, rgba(255, 255, 255, 0.15));
+  border-radius: 15px;
+  background: var(--surface, #141b2c);
+  color: var(--text, #f8fafc);
+  box-shadow: var(--shadow-lg, 0 16px 50px rgba(0, 0, 0, 0.6));
+  pointer-events: auto;
+  animation: invite-slide-in 0.22s ease-out;
+}
+
+@keyframes invite-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.shepu-invite-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--accent-2, #3b82f6);
+  background: var(--accent-dim, rgba(37, 99, 235, 0.12));
+}
+
+.shepu-invite-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.shepu-invite-title {
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.shepu-invite-text {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-2, #94a3b8);
+  overflow-wrap: anywhere;
+}
+
+.shepu-invite-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.6rem;
+}
+
+.shepu-invite-actions .btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+.shepu-invite-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3, #64748b);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.shepu-invite-close:hover {
+  color: var(--text, #f8fafc);
+  background: var(--glass-2, rgba(255, 255, 255, 0.06));
+}
+
+@media (max-width: 600px) {
+  .invite-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .invite-card {
+    width: 100%;
+    max-height: 88vh;
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
+  }
+
+  #room-invite-friends-btn span {
+    display: none;
+  }
+
+  #room-invite-friends-btn {
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+  }
+
+  .shepu-invite-host {
+    right: 10px;
+    bottom: 80px;
+    width: calc(100vw - 20px);
+  }
+}

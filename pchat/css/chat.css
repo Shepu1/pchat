@@ -82,87 +82,77 @@
   min-height: 0;
   position: relative;
   background-color: #070a13;
+  /* Each theme only swaps these two URLs; the rules below pick the right
+     one (desktop vs phone) and keep the overlay/gradient in one place. */
+  --wallpaper-desktop: url('../assets/themes/theme1.webp');
+  --wallpaper-mobile: url('../assets/themes/theme1_and.webp');
   /* Default = theme1 (rooms created before themes existed) */
   background-image:
     linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
-    url('../assets/themes/theme1.webp');
+    var(--wallpaper-desktop);
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
 
-/* Room wallpapers — picked at creation (theme1=30%, theme2-5=17.5% each).
-   Applied via RoomTheme.apply() as .theme-N on .chat-main. */
+/* Room wallpapers — picked at creation. Applied via RoomTheme.apply()
+   as .theme-N on .chat-main. */
 .chat-main.theme-1 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
-    url('../assets/themes/theme1.webp');
+  --wallpaper-desktop: url('../assets/themes/theme1.webp');
+  --wallpaper-mobile: url('../assets/themes/theme1_and.webp');
 }
 .chat-main.theme-2 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
-    url('../assets/themes/theme2.webp');
+  --wallpaper-desktop: url('../assets/themes/theme2.webp');
+  --wallpaper-mobile: url('../assets/themes/theme2_and.webp');
 }
 .chat-main.theme-3 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
-    url('../assets/themes/theme3.webp');
+  --wallpaper-desktop: url('../assets/themes/theme3.webp');
+  --wallpaper-mobile: url('../assets/themes/theme3_and.webp');
 }
 .chat-main.theme-4 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
-    url('../assets/themes/theme4.webp');
+  --wallpaper-desktop: url('../assets/themes/theme4.webp');
+  --wallpaper-mobile: url('../assets/themes/theme4_and.webp');
 }
 .chat-main.theme-5 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.45), rgba(7, 10, 19, 0.65)),
-    url('../assets/themes/theme5.webp');
+  --wallpaper-desktop: url('../assets/themes/theme5.webp');
+  --wallpaper-mobile: url('../assets/themes/theme5_and.webp');
+}
+.chat-main.theme-6 {
+  --wallpaper-desktop: url('../assets/themes/theme6.webp');
+  --wallpaper-mobile: url('../assets/themes/theme6_and.webp');
+}
+.chat-main.theme-7 {
+  --wallpaper-desktop: url('../assets/themes/theme7.webp');
+  --wallpaper-mobile: url('../assets/themes/theme7_and.webp');
+}
+.chat-main.theme-8 {
+  --wallpaper-desktop: url('../assets/themes/theme8.webp');
+  --wallpaper-mobile: url('../assets/themes/theme8_and.webp');
+}
+.chat-main.theme-9 {
+  --wallpaper-desktop: url('../assets/themes/theme9.webp');
+  --wallpaper-mobile: url('../assets/themes/theme9_and.webp');
+}
+.chat-main.theme-10 {
+  --wallpaper-desktop: url('../assets/themes/theme10.webp');
+  --wallpaper-mobile: url('../assets/themes/theme10_and.webp');
+}
+.chat-main.theme-11 {
+  --wallpaper-desktop: url('../assets/themes/theme11.webp');
+  --wallpaper-mobile: url('../assets/themes/theme11_and.webp');
+}
+.chat-main.theme-12 {
+  --wallpaper-desktop: url('../assets/themes/theme12.webp');
+  --wallpaper-mobile: url('../assets/themes/theme12_and.webp');
 }
 
 /* Phone / Mobile Screen Themes (*_and.webp) */
 @media (max-width: 900px), (hover: none) and (pointer: coarse) {
-  .chat-main,
-  .chat-main.theme-1 {
+  .chat-main {
     background-image:
       linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-      url('../assets/themes/theme1_and.webp') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: scroll !important;
-  }
-  .chat-main.theme-2 {
-    background-image:
-      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-      url('../assets/themes/theme2_and.webp') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: scroll !important;
-  }
-  .chat-main.theme-3 {
-    background-image:
-      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-      url('../assets/themes/theme3_and.webp') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: scroll !important;
-  }
-  .chat-main.theme-4 {
-    background-image:
-      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-      url('../assets/themes/theme4_and.webp') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: scroll !important;
-  }
-  .chat-main.theme-5 {
-    background-image:
-      linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-      url('../assets/themes/theme5_and.webp') !important;
+      var(--wallpaper-mobile) !important;
     background-size: cover !important;
     background-position: center center !important;
     background-repeat: no-repeat !important;
@@ -171,47 +161,10 @@
 }
 
 /* JS-driven mobile fallback (same images as the media query above) */
-.is-mobile .chat-main,
-.is-mobile .chat-main.theme-1 {
+.is-mobile .chat-main {
   background-image:
     linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-    url('../assets/themes/theme1_and.webp') !important;
-  background-size: cover !important;
-  background-position: center center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: scroll !important;
-}
-.is-mobile .chat-main.theme-2 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-    url('../assets/themes/theme2_and.webp') !important;
-  background-size: cover !important;
-  background-position: center center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: scroll !important;
-}
-.is-mobile .chat-main.theme-3 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-    url('../assets/themes/theme3_and.webp') !important;
-  background-size: cover !important;
-  background-position: center center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: scroll !important;
-}
-.is-mobile .chat-main.theme-4 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-    url('../assets/themes/theme4_and.webp') !important;
-  background-size: cover !important;
-  background-position: center center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: scroll !important;
-}
-.is-mobile .chat-main.theme-5 {
-  background-image:
-    linear-gradient(rgba(7, 10, 19, 0.4), rgba(7, 10, 19, 0.6)),
-    url('../assets/themes/theme5_and.webp') !important;
+    var(--wallpaper-mobile) !important;
   background-size: cover !important;
   background-position: center center !important;
   background-repeat: no-repeat !important;

@@ -13,13 +13,14 @@ SHEPU ROOMS is a privacy-first chat platform where every room's data lives in th
 ## Architecture Overview
 
 ```
-Guest
+Guest / Member
   ↓
 SHEPU ROOMS frontend (HTML/CSS/JS)
-  ↓
-Room endpoint (Google Apps Script web app)
-  ↓
-Owner's Google Sheet (owner's Drive)
+  ├─ Room endpoint (Google Apps Script web app)
+  │    └─ Owner's Google Sheet (owner's Drive)   ← chat messages live here
+  └─ Firebase Firestore (optional social layer)   ← friends, presence, invites
+       · never sees room links, messages, or secrets
+       · chat works without Firebase; only Friends degrades if Firebase is down
 ```
 
 Each room is backed by:
@@ -27,7 +28,28 @@ Each room is backed by:
 2. A **Google Apps Script web app** bound to that Sheet (the room's backend API)
 3. A **shareable room link** that embeds the endpoint URL (base64-encoded)
 
-> **Privacy note:** Room data is stored in the room owner's connected Google storage rather than in a central SHEPU ROOMS message database. The platform hosts only the frontend and static assets.
+> **Privacy note:** Room data is stored in the room owner's connected Google storage rather than in a central SHEPU ROOMS message database. The platform hosts only the frontend and static assets. The optional Friends layer uses Firebase Firestore for the social graph only — no message content ever reaches Firebase.
+
+---
+
+## Firebase Social Layer Setup (optional)
+
+The Friends / Invite system uses Firebase Spark (free tier). Chat works without it.
+
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com) (Google Analytics: **off**).
+2. Enable **Firestore** (Production mode, region `asia-south1`).
+3. Enable **Authentication → Google sign-in**.
+4. Register a Web app — copy the `firebaseConfig` object into `js/firebase-config.js`.
+5. In **Authentication → Sign-in method → Google → Safelist client IDs from external projects**, add your GIS client ID.
+6. Deploy Firestore rules and indexes:
+
+```bash
+npx firebase-tools deploy --only firestore
+```
+
+7. Set `FRIENDS_ENABLED: true` and `PRESENCE_ENABLED: true` in `js/config.js` (already the default).
+
+> **Kill switch:** set either flag to `false` in `js/config.js` to disable the social layer without removing script tags. Chat is never affected.
 
 ---
 

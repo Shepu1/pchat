@@ -47,11 +47,11 @@ const Crypto = {
 
 window.Crypto = Crypto;
 
-// ── Room Theme (weighted random: theme1=30%, theme2-5=17.5% each) ───
+// ── Room Theme (weighted random: theme1=15%, the rest split 85%) ───
 // Theme travels with the room (?th= in the invite link) so every device
-// shows the same chat wallpaper. Not secret — just a digit 1-5.
+// shows the same chat wallpaper. Not secret — just a digit 1-N.
 const RoomTheme = (() => {
-  const WEIGHTS = [30, 17.5, 17.5, 17.5, 17.5];
+  const WEIGHTS = [15, ...Array(11).fill(85 / 11)];
 
   function pick() {
     const r = Math.random() * 100;
@@ -74,7 +74,7 @@ const RoomTheme = (() => {
     try {
       const el = document.querySelector('.chat-main');
       if (!el) return;
-      el.classList.remove('theme-1', 'theme-2', 'theme-3', 'theme-4', 'theme-5');
+      for (let i = 1; i <= WEIGHTS.length; i++) el.classList.remove('theme-' + i);
       el.classList.add('theme-' + normalize(n));
     } catch {}
   }

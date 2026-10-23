@@ -1955,7 +1955,7 @@ const Chat = (() => {
   function openThemePicker() {
     const grid = document.getElementById('theme-grid');
     if (grid) {
-      const count = (typeof RoomTheme !== 'undefined') ? RoomTheme.count : 5;
+      const count = (typeof RoomTheme !== 'undefined') ? RoomTheme.count : 12;
       const current = (_room && _room.theme) || 1;
       grid.innerHTML = '';
       for (let n = 1; n <= count; n++) {

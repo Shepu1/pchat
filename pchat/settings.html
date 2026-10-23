@@ -60,6 +60,10 @@
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
           <span class="item-label">About</span>
         </button>
+        <button class="sidebar-item" data-section="friends">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span class="item-label">Friends</span>
+        </button>
       </nav>
 
       <!-- Settings Sections -->
@@ -321,6 +325,63 @@
           </div>
         </section>
 
+        <!-- Friends -->
+        <section class="settings-section" id="section-friends">
+          <div class="settings-content">
+            <h3 style="margin-bottom:1.25rem;">Friends &amp; Social</h3>
+
+            <!-- Handle card -->
+            <div class="panel" id="settings-friends-handle-card" style="margin-bottom:1rem;">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Your handle
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                Friends find you by @handle. It is permanent in v1.
+              </p>
+              <div id="settings-friends-status" style="font-size:0.875rem;color:var(--muted);">
+                Sign in with Google to use Friends.
+              </div>
+              <div id="settings-friends-handle-row" style="display:none;margin-top:0.5rem;">
+                <span style="font-size:1.1rem;font-weight:700;color:var(--accent);" id="settings-friends-handle-val">—</span>
+              </div>
+            </div>
+
+            <!-- Active status toggle -->
+            <div class="panel" style="margin-bottom:1rem;">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Active status
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                When on, friends see "Active now" if you used the app in the last 15 minutes.
+                Turning this off stops the heartbeat write — no Firestore writes for presence.
+              </p>
+              <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;">
+                <input type="checkbox" id="settings-presence-toggle" style="width:1.1rem;height:1.1rem;accent-color:var(--accent);" checked />
+                <span style="font-size:0.9rem;">Show my active status to friends</span>
+              </label>
+            </div>
+
+            <!-- Delete social data -->
+            <div class="panel" style="background:var(--surface-2);">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;color:var(--danger,#ef4444)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Delete my social data
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                Removes your Firestore profile, handle, friend list, and pending requests.
+                Your rooms and chat history are not affected.
+              </p>
+              <button class="btn btn-danger btn-sm" id="settings-delete-social-btn"
+                style="display:inline-flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Delete social data
+              </button>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
   </div>
@@ -330,6 +391,9 @@
 
 <script src="js/config.js?v=20261022b"></script>
 <script src="js/storage.js?v=20261022b"></script>
+<script src="js/firebase-config.js?v=20261024d"></script>
+<script src="js/firebase.js?v=20261024d"></script>
+<script src="js/friends.js?v=20261024d"></script>
 <script src="js/ui.js?v=20261022b"></script>
 <script src="js/auth.js?v=20261022b"></script>
 <script src="js/instant-security.js?v=20261022b"></script>
@@ -626,6 +690,92 @@ document.addEventListener('DOMContentLoaded', () => {
       else UI.toast('error', 'Copy failed', 'Clipboard access was blocked. Copy the origin manually.');
     });
   }
+
+  // ── Friends section ─────────────────────────────────────────────
+  (function initFriendsSettings() {
+    const statusEl   = document.getElementById('settings-friends-status');
+    const handleRow  = document.getElementById('settings-friends-handle-row');
+    const handleVal  = document.getElementById('settings-friends-handle-val');
+    const presToggle = document.getElementById('settings-presence-toggle');
+    const delBtn     = document.getElementById('settings-delete-social-btn');
+
+    function updateFriendsUI() {
+      if (typeof Friends === 'undefined' || !Friends.getState) return;
+      const s = Friends.getState();
+
+      if (s.status === 'ready' && s.profile) {
+        if (statusEl) { statusEl.style.display = 'none'; }
+        if (handleRow) { handleRow.style.display = 'block'; }
+        if (handleVal) { handleVal.textContent = s.profile.handle ? '@' + s.profile.handle : '(no handle yet)'; }
+        if (presToggle) { presToggle.checked = s.profile.showPresence !== false; }
+      } else if (s.status === 'loading') {
+        if (statusEl) { statusEl.textContent = 'Loading…'; statusEl.style.display = ''; }
+      } else if (s.gate === 'not-google') {
+        if (statusEl) { statusEl.textContent = 'Sign in with Google to use Friends.'; statusEl.style.display = ''; }
+        if (handleRow) handleRow.style.display = 'none';
+      } else if (s.status === 'error') {
+        if (statusEl) {
+          statusEl.textContent = (s.error && s.error.message) || 'Friends unavailable.';
+          statusEl.style.display = '';
+        }
+        if (handleRow) handleRow.style.display = 'none';
+      }
+    }
+
+    // Presence toggle
+    if (presToggle) {
+      presToggle.addEventListener('change', async () => {
+        if (typeof Friends === 'undefined' || !Friends.setShowPresence) {
+          UI.toast('info', 'Not available', 'Sign in with Google to use Friends.');
+          presToggle.checked = !presToggle.checked;
+          return;
+        }
+        try {
+          await Friends.setShowPresence(presToggle.checked);
+          UI.toast('success', presToggle.checked ? 'Active status on' : 'Active status off',
+            presToggle.checked ? 'Friends can see when you are active.' : 'You appear offline to friends.');
+        } catch (e) {
+          UI.toast('error', 'Failed', e.message || 'Could not update setting.');
+          presToggle.checked = !presToggle.checked;
+        }
+      });
+    }
+
+    // Delete social data
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        if (typeof Friends === 'undefined' || !Friends.deleteSocialData) {
+          UI.toast('info', 'Not available', 'Sign in with Google to use Friends.');
+          return;
+        }
+        const confirmed = await UI.confirm(
+          'Delete social data?',
+          'This permanently removes your Firestore profile, @handle, friend list, and all pending requests. Your rooms and messages are not affected. This cannot be undone.',
+          { confirmLabel: 'Delete', danger: true }
+        ).catch(() => false);
+        if (!confirmed) return;
+        delBtn.disabled = true;
+        try {
+          await Friends.deleteSocialData();
+          UI.toast('success', 'Deleted', 'Your social data has been removed from Firestore.');
+          updateFriendsUI();
+        } catch (e) {
+          UI.toast('error', 'Failed', e.message || 'Could not delete social data.');
+        } finally {
+          delBtn.disabled = false;
+        }
+      });
+    }
+
+    // Subscribe to Friends state changes
+    if (typeof Friends !== 'undefined' && Friends.subscribe) {
+      Friends.subscribe(updateFriendsUI);
+    }
+    // Trigger an update once Friends has loaded (lazy init on page open)
+    setTimeout(() => {
+      if (typeof Friends !== 'undefined' && Friends.getState) updateFriendsUI();
+    }, 800);
+  })();
 
 });
 </script>

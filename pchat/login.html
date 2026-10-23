@@ -378,6 +378,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       await Auth.signIn();
+
+      // Firebase is linked in the background on the next page. Login never
+      // waits for the social layer, so a Firebase outage cannot block chat.
       window.location.href = redirect;
     } catch (err) {
       loginView.style.display = 'block';

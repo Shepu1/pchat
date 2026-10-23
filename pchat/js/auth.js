@@ -242,6 +242,16 @@ const Auth = (() => {
     if (auth && auth.accessToken && !auth.isDemo && typeof google !== 'undefined' && google.accounts?.oauth2) {
       try { google.accounts.oauth2.revoke(auth.accessToken, () => {}); } catch { /* ignore */ }
     }
+    // Also end the Firebase social session, if the SDK was loaded.
+    // Fire-and-forget: signing out of the app must never block.
+    try {
+      if (window.Friends && typeof window.Friends.reset === 'function') {
+        window.Friends.reset();
+      }
+      if (window.Firebase && window.Firebase.isInitialized()) {
+        window.Firebase.signOut();
+      }
+    } catch { /* non-fatal */ }
     Storage.clearAuth();
     Storage.clearSession();
   }

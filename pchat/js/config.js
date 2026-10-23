@@ -102,6 +102,14 @@ const CONFIG = {
     MODERATION:  'moderation',
     SYNC_STATE:  'sync_state',
   },
+
+  // ── Firebase Social Layer Kill Switches ───────────────────────
+  // Set to false to disable the social layer without removing script tags.
+  // Chat, rooms, and calls continue working regardless of these flags.
+  // At 70 % of daily Firestore quota: reduce PRESENCE throttle to 20 min.
+  // At 85 % quota: set PRESENCE_ENABLED = false (cached "last seen" shown).
+  FRIENDS_ENABLED:  true,   // friend graph, search, requests, invites
+  PRESENCE_ENABLED: true,   // lastActiveAt heartbeat + "active now" status
 };
 
 // Make globally accessible

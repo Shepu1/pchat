@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss: http://localhost:* ws://localhost:*; frame-src 'self' https://pchat-shepu.firebaseapp.com https://accounts.google.com http://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Pchat shepu — Fast & Private Messaging</title>
   <meta name="description"
@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="css/components.css?v=20261022b" />
   <link rel="stylesheet" href="css/calls.css?v=20261022b" />
   <link rel="stylesheet" href="css/responsive.css?v=20261022b" />
+  <link rel="stylesheet" href="css/friends.css?v=20261024d" />
   <script src="js/icons.js?v=20261022b"></script>
   <style>
     @font-face {
@@ -1544,6 +1545,16 @@
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
             </svg>
           </button>
+          <button class="top-action-btn" id="friends-open-btn" title="Friends" aria-label="Friends" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span class="friends-badge" id="friends-badge" hidden>0</span>
+          </button>
           <button class="top-action-btn" id="top-settings-btn" title="Settings" aria-label="Settings"
             onclick="window.location.href='settings.html'">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -2284,6 +2295,108 @@
       <p style="font-size:0.75rem;color:rgba(255,255,255,0.35);margin:0;">This may take 10-20 seconds</p>
     </div>
 
+    <!-- ── Friends panel (Firebase social layer) ───────────────────── -->
+    <div class="modal-overlay hidden" id="friends-modal" role="dialog" aria-modal="true" aria-hidden="true"
+      aria-labelledby="friends-title">
+      <div class="friends-card">
+        <div class="friends-header">
+          <div class="friends-header-copy">
+            <div class="friends-title-row">
+              <h3 id="friends-title">Friends</h3>
+              <span class="friends-private-pill">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                No message data
+              </span>
+            </div>
+            <p class="friends-subtitle" id="friends-subtitle">Private by design · no message data</p>
+          </div>
+          <button type="button" class="friends-close" id="friends-close" aria-label="Close friends">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="friends-gate" id="friends-gate">
+          <div class="friends-gate-icon" id="friends-gate-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <h4 class="friends-gate-title" id="friends-gate-title">Sign in to use Friends</h4>
+          <p class="friends-gate-message" id="friends-gate-message">Friends work across devices with a Google
+            sign-in. Chat and rooms keep working without it.</p>
+          <button type="button" class="friends-btn primary" id="friends-gate-action" data-action="login">Sign in with
+            Google</button>
+          <button type="button" class="friends-btn ghost" id="friends-gate-secondary">Keep chatting</button>
+        </div>
+
+        <div class="friends-main" id="friends-main" hidden>
+          <div class="friends-handle-setup" id="friends-handle-setup" hidden>
+            <div class="friends-handle-title">Choose your @handle</div>
+            <p class="friends-handle-desc">Friends find you with this exact handle. It is permanent in v1.</p>
+            <form class="friends-handle-form" id="friends-handle-form" autocomplete="off">
+              <span class="friends-at">@</span>
+              <input class="friends-input" id="friends-handle-input" type="text" maxlength="20"
+                placeholder="your_handle" autocapitalize="none" autocorrect="off" spellcheck="false" />
+              <button class="friends-btn primary small" id="friends-handle-save" type="submit">Claim</button>
+            </form>
+            <div class="friends-hint" id="friends-handle-msg" role="status"></div>
+          </div>
+
+          <div class="friends-tabs" role="tablist" aria-label="Friends sections">
+            <button type="button" class="friends-tab-btn active" data-tab="add" role="tab"
+              aria-selected="true">Add Friend</button>
+            <button type="button" class="friends-tab-btn" data-tab="requests" role="tab"
+              aria-selected="false">Friend Requests <span class="friends-tab-count is-alert" id="friends-requests-count"
+                hidden></span></button>
+            <button type="button" class="friends-tab-btn" data-tab="friends" role="tab"
+              aria-selected="false">Your Friends <span class="friends-tab-count" id="friends-tab-count" hidden></span></button>
+          </div>
+
+          <div class="friends-body">
+            <section class="friends-panel active" id="friends-panel-friends" role="tabpanel">
+              <div class="friends-list" id="friends-list" tabindex="-1"></div>
+              <div class="friends-hint" id="friends-list-note" hidden></div>
+              <button type="button" class="friends-btn ghost small friends-load-more" id="friends-load-more"
+                hidden>Show more</button>
+            </section>
+
+            <section class="friends-panel" id="friends-panel-requests" role="tabpanel">
+              <div id="friends-incoming-list"></div>
+              <div id="friends-outgoing-list" style="margin-top:1.1rem;"></div>
+            </section>
+
+            <section class="friends-panel" id="friends-panel-add" role="tabpanel">
+              <form class="friends-search-form" id="friends-search-form" autocomplete="off">
+                <span class="friends-at">@</span>
+                <input class="friends-input" id="friends-search-input" type="text" maxlength="20"
+                  placeholder="search_handle" autocapitalize="none" autocorrect="off" spellcheck="false" />
+                <button type="submit" class="friends-btn primary small" id="friends-search-btn">Search</button>
+              </form>
+              <div class="friends-hint" id="friends-add-note" hidden>Claim your handle above to search and send
+                requests.</div>
+              <div id="friends-search-result"></div>
+            </section>
+          </div>
+
+          <div class="friends-footer">
+            <span id="friends-footer-handle">No handle yet</span>
+            <span id="friends-footer-presence">Active = seen in the last 15 minutes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
 
@@ -2293,6 +2406,10 @@
     <script src="js/ui.js?v=20261022b"></script>
 <script src="js/custom-emoji.js?v=20261022c"></script>
     <script src="js/auth.js?v=20261022b"></script>
+    <script src="js/firebase-config.js?v=20261024d"></script>
+    <script src="js/firebase.js?v=20261024d"></script>
+    <script src="js/friends.js?v=20261024d"></script>
+    <script src="js/friend-ui.js?v=20261024d"></script>
     <script src="js/google.js?v=20261022b"></script>
     <script src="js/drive.js?v=20261022b"></script>
     <script src="js/sheets.js?v=20261022b"></script>

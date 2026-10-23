@@ -6,10 +6,10 @@
  * Re-run that script after changing a feature; it refuses to write
  * until every change in the code is described.
  *
- * Generated: 2026-10-22T15:47:44.668Z
+ * Generated: 2026-10-23T17:42:09.406Z
  */
 window.HelpData = {
-  "generatedAt": "2026-10-22T15:47:44.668Z",
+  "generatedAt": "2026-10-23T17:42:09.406Z",
   "app": {
     "name": "Pchat shepu",
     "aka": "SHEPU ROOMS",
@@ -818,6 +818,7 @@ window.HelpData = {
       "shepu_auth",
       "shepu_current_room",
       "shepu_display_name",
+      "shepu_firebase_emulator",
       "shepu_google_client_id",
       "shepu_insecure_ack",
       "shepu_lan_ip",
@@ -1007,7 +1008,7 @@ window.HelpData = {
       "count": 16,
       "imagesInPack": 32
     },
-    "themes": 5,
+    "themes": 12,
     "music": 6,
     "sounds": 3,
     "icons": 7

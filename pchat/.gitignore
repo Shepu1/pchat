@@ -17,5 +17,8 @@ Thumbs.db
 # Logs
 *.log
 
+# Firebase CLI
+.firebase/
+
 # Node (if any dev tooling added later)
 node_modules/

@@ -120,7 +120,7 @@ const ShepuActions = (() => {
   // null  = no number mentioned ("pick one for me")
   // 1..N = the theme they want
   // out-of-range numbers are returned as-is so the bot can say "there are
-  // only 5 themes" instead of silently picking a different one.
+  // only N themes" instead of silently picking a different one.
   function _extractThemeNumber(text) {
     let t = String(text == null ? '' : text).replace(/[০-৯]/g, d => (BN_DIGITS[d] || d));
 
