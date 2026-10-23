@@ -426,10 +426,18 @@ function showJoinForm(roomInfo) {
     img.alt = '';
     img.setAttribute('aria-hidden', 'true');
     img.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:20px;';
+    img.onload = () => {
+      try {
+        avEl.style.fontSize = '0';
+        avEl.style.background = 'none';
+        avEl.style.boxShadow = 'none';
+      } catch {}
+    };
     img.onerror = () => { try { img.remove(); } catch {} };
     avEl.style.position = 'relative';
     avEl.style.overflow = 'hidden';
     avEl.appendChild(img);
+
   } catch {}
   document.getElementById('join-room-name').innerHTML      = emoName(roomInfo.name || 'Room');
   document.getElementById('join-room-desc').textContent      = roomInfo.description || 'Private chat room';

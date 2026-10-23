@@ -1048,6 +1048,13 @@
   flex-shrink: 0;
   box-shadow: 0 4px 14px var(--accent-glow);
   position: relative;
+  overflow: hidden;
+}
+
+.chat-avatar.has-photo {
+  font-size: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .chat-avatar .online-indicator {
