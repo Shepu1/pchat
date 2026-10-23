@@ -1,24 +1,49 @@
 # SHEPU ROOMS — .gitignore
 
-# Never commit real credentials
+# ── Credentials & secrets ────────────────────────────────────────
+# firebase-config.js contains your public API key (safe to commit),
+# but service-account keys and .env secrets must never be committed.
 .env
 .env.*
 secrets.*
+service-account*.json
 
-# OS
+# ── Node / build ─────────────────────────────────────────────────
+node_modules/
+package-lock.json
+dist/
+build/
+.cache/
+
+# ── Firebase CLI ──────────────────────────────────────────────────
+.firebase/
+firestore-debug.log
+ui-debug.log
+database-debug.log
+
+# ── Test / emulator artifacts ─────────────────────────────────────
+# Keep tests/ source but ignore emulator data
+.firestore/
+emulator-data/
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+
+# ── OS ────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Editor
+# ── Editor ────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
-# Logs
-*.log
-
-# Firebase CLI
-.firebase/
-
-# Node (if any dev tooling added later)
-node_modules/
+# ── Temp / scratch ────────────────────────────────────────────────
+temp/
+tmp/
+*.tmp
+*.bak
+*.old
