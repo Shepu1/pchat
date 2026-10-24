@@ -6,10 +6,10 @@
  * Re-run that script after changing a feature; it refuses to write
  * until every change in the code is described.
  *
- * Generated: 2026-10-23T17:42:09.406Z
+ * Generated: 2026-10-24T15:29:39.758Z
  */
 window.HelpData = {
-  "generatedAt": "2026-10-23T17:42:09.406Z",
+  "generatedAt": "2026-10-24T15:29:39.758Z",
   "app": {
     "name": "Pchat shepu",
     "aka": "SHEPU ROOMS",
@@ -86,6 +86,20 @@ window.HelpData = {
       "pageTitle": "Settings",
       "description": "Pchat shepu account and application preferences.",
       "blurb": "Your account, privacy tools, notifications, relay servers, and the way into the help and about pages."
+    },
+    {
+      "file": "setup-handle.html",
+      "title": "Choose your @handle",
+      "pageTitle": "Choose your @handle",
+      "description": "Choose a unique @handle so friends can find and add you on Pchat shepu.",
+      "blurb": "The one-time step after Google sign-in: pick the permanent @handle friends will use to find you. You can skip it and set one later from Settings."
+    },
+    {
+      "file": "terms.html",
+      "title": "Terms of Service",
+      "pageTitle": "Terms of Service",
+      "description": "The terms for using Pchat shepu (SHEPU ROOMS): what this software is, who owns your messages, acceptable use, availability, and how to stop using it.",
+      "blurb": "The plain-language terms for using this copy of the app: what the service is, who owns your messages, acceptable use, third-party services, availability with no uptime promise, how to leave, and liability."
     }
   ],
   "controls": {
@@ -150,6 +164,42 @@ window.HelpData = {
       {
         "id": "share-modal-chat",
         "label": "Enter Chat &rarr;"
+      },
+      {
+        "id": "friends-gate-action",
+        "label": "Sign in with Google"
+      },
+      {
+        "id": "friends-gate-secondary",
+        "label": "Keep chatting"
+      },
+      {
+        "id": "friends-handle-save",
+        "label": "Claim"
+      },
+      {
+        "id": "friends-tab-add",
+        "label": "Add Friend"
+      },
+      {
+        "id": "friends-tab-requests",
+        "label": "Friend Requests"
+      },
+      {
+        "id": "friends-tab-friends",
+        "label": "Your Friends"
+      },
+      {
+        "id": "friends-load-more",
+        "label": "Show more"
+      },
+      {
+        "id": "friends-search-btn",
+        "label": "Search"
+      },
+      {
+        "id": "friends-copy-handle",
+        "label": "Copy"
       }
     ],
     "join.html": [
@@ -429,8 +479,35 @@ window.HelpData = {
       {
         "id": "relay-reset-btn",
         "label": "Reset to defaults"
+      },
+      {
+        "id": "settings-copy-handle",
+        "label": "Copy handle"
+      },
+      {
+        "id": "settings-repair-invite-key",
+        "label": "Reset invite key on this device"
+      },
+      {
+        "id": "settings-delete-social-btn",
+        "label": "Delete social data"
       }
-    ]
+    ],
+    "setup-handle.html": [
+      {
+        "id": "btn-claim",
+        "label": "Claim @handle"
+      },
+      {
+        "id": "skip-link",
+        "label": "do it later →"
+      },
+      {
+        "id": "copy-handle-btn",
+        "label": "Copy @handle"
+      }
+    ],
+    "terms.html": []
   },
   "settingsSections": [
     {
@@ -442,6 +519,11 @@ window.HelpData = {
       "key": "privacy",
       "label": "Privacy",
       "heading": "Privacy Model"
+    },
+    {
+      "key": "terms",
+      "label": "Terms",
+      "heading": "Terms of Service"
     },
     {
       "key": "notifications",
@@ -457,6 +539,11 @@ window.HelpData = {
       "key": "about",
       "label": "About",
       "heading": "About SHEPU ROOMS"
+    },
+    {
+      "key": "friends",
+      "label": "Friends",
+      "heading": "Friends &amp; Social"
     }
   ],
   "bot": {
@@ -811,6 +898,14 @@ window.HelpData = {
     {
       "key": "SHEETS",
       "value": "{"
+    },
+    {
+      "key": "FRIENDS_ENABLED",
+      "value": "true"
+    },
+    {
+      "key": "PRESENCE_ENABLED",
+      "value": "true"
     }
   ],
   "storage": {
@@ -820,6 +915,7 @@ window.HelpData = {
       "shepu_display_name",
       "shepu_firebase_emulator",
       "shepu_google_client_id",
+      "shepu_handle_set",
       "shepu_insecure_ack",
       "shepu_lan_ip",
       "shepu_music_vol",
@@ -828,7 +924,9 @@ window.HelpData = {
       "shepu_profile_pic",
       "shepu_relay_servers",
       "shepu_rooms",
-      "shepu_session"
+      "shepu_sent_invites_v1",
+      "shepu_session",
+      "shepu_social_linked"
     ],
     "localStoragePatterns": {
       "rooms": [
@@ -1115,6 +1213,36 @@ window.HelpData = {
         "blurb": "Generate a QR code for a room, or copy a link. The QR is drawn in the page, so the link never leaves your device."
       }
     ],
+    "friends": [
+      {
+        "title": "Your @handle",
+        "blurb": "Choose a handle once, then copy it from the Friends footer (or Settings → Friends) and send it to someone. People find you by this exact handle, not by name or email."
+      },
+      {
+        "title": "Friend requests",
+        "blurb": "Open Friends → Add Friend, type an exact @handle and send a request. The other person sees it in Friends → Friend Requests and can accept or decline. On the dashboard the Friends button shows a red count for pending requests."
+      },
+      {
+        "title": "Your friends",
+        "blurb": "The Your Friends tab shows your list, who was active in the last 15 minutes, and three actions per person: invite them to a room, block them, or unfriend them. Unfriending removes the connection on both sides."
+      },
+      {
+        "title": "Blocking",
+        "blurb": "Blocking removes the friendship and stops that account from sending you new friend requests or room invites. Manage blocked people in Settings → Friends → Blocked users, where you can unblock them. Blocking does not remove them from a room you both already share."
+      },
+      {
+        "title": "Invite a friend to a room",
+        "blurb": "Press the paper-plane button next to a friend, choose one of your rooms, and send. The room link is encrypted on your device for that friend only — the server never sees it. You can revoke an invite from the same picker."
+      },
+      {
+        "title": "Private by design",
+        "blurb": "Friends only sees a name, @handle, optional picture and a coarse active timestamp. It never receives room links in readable form, messages, emails, or room passwords. Turning Friends off or deleting social data does not affect your rooms."
+      },
+      {
+        "title": "New device?",
+        "blurb": "Encrypted invites are tied to a key on one browser. If a new device cannot open them, use Settings → Friends → Reset invite key on this device, then ask the friend to send the invite again. Resetting the key does not touch rooms or messages."
+      }
+    ],
     "owner": [
       {
         "title": "Statistics",
@@ -1147,12 +1275,20 @@ window.HelpData = {
         "blurb": "Ask the browser for permission and see whether notifications are on."
       },
       {
+        "title": "Friends & social",
+        "blurb": "Your @handle and a copy button, active-status toggle, the invite-key status with a reset button, and the option to delete all social data. Rooms and messages are not affected."
+      },
+      {
         "title": "Relay",
         "blurb": "Choose which public relay servers carry cross-device messages, test them, and see their live health. If chat only works on your own device, a relay is probably blocked on your network."
       },
       {
         "title": "Privacy",
         "blurb": "Where your data is stored, plus buttons to clear the message cache or wipe all local data."
+      },
+      {
+        "title": "Terms",
+        "blurb": "A three-line summary of the terms, plus links to the full terms of service page and the privacy policy — both written in plain language."
       },
       {
         "title": "Help",
@@ -1244,6 +1380,18 @@ window.HelpData = {
     {
       "q": "I forgot the room password",
       "a": "It cannot be recovered. The owner can set a new one, which invalidates the old link."
+    },
+    {
+      "q": "I cannot find a friend",
+      "a": "Friend search needs the exact @handle, not a display name or email. Ask them for their handle, or use their copied handle text."
+    },
+    {
+      "q": "A friend request never arrived",
+      "a": "Both people need a Google sign-in for Friends. Ask the sender to check the Sent list, and open Friends once on the receiving device so it can connect."
+    },
+    {
+      "q": "An invite will not open on my new phone",
+      "a": "Encrypted invites use a key stored on one browser. In Settings → Friends, reset the invite key on the new device, then ask your friend to send the room invite again. A copy-link invite also works."
     }
   ]
 };

@@ -278,7 +278,19 @@ document.addEventListener('DOMContentLoaded', () => {
     el.style.display = 'block';
   }
 
-  // If already authenticated, redirect
+  // afterLogin — goes to handle setup if never set, otherwise straight to redirect.
+  // We check localStorage for a fast path so we never block returning users.
+  function afterLogin(dest) {
+    const alreadyHasHandle = localStorage.getItem('shepu_handle_set') === '1';
+    if (alreadyHasHandle) {
+      window.location.href = dest;
+    } else {
+      const setupUrl = 'setup-handle.html?redirect=' + encodeURIComponent(dest);
+      window.location.href = setupUrl;
+    }
+  }
+
+  // If already authenticated, redirect (skip handle setup — they've been through it)
   if (Auth.isAuthenticated()) {
     window.location.href = redirect;
     return;
@@ -342,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       Auth.signInWithEmail(email);
       UI.toast('success', 'Welcome!', `Signed in as ${email}`);
-      setTimeout(() => { window.location.href = redirect; }, 350);
+      setTimeout(() => { afterLogin(redirect); }, 350);
     };
   }
 
@@ -351,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
     demoBtn.onclick = () => {
       Auth.signInAsDemo('Owner (Shepu)', 'shepu@gmail.com');
       UI.toast('success', 'Signed In', 'Logged in as Owner (shepu@gmail.com)');
-      setTimeout(() => { window.location.href = redirect; }, 300);
+      setTimeout(() => { afterLogin(redirect); }, 300);
     };
   }
 
@@ -379,9 +391,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await Auth.signIn();
 
-      // Firebase is linked in the background on the next page. Login never
-      // waits for the social layer, so a Firebase outage cannot block chat.
-      window.location.href = redirect;
+      // Route new users through handle setup; returning users skip it.
+      afterLogin(redirect);
     } catch (err) {
       loginView.style.display = 'block';
       loadingView.style.display = 'none';

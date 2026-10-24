@@ -13,7 +13,7 @@ const FriendUI = (() => {
   const PRESENCE_TICK_MS = 60 * 1000;
 
   const els = {};
-  let currentTab = 'add';
+  let currentTab = 'friends';
   let opened = false;
   let previousFocus = null;
   let presenceTimer = null;
@@ -26,6 +26,15 @@ const FriendUI = (() => {
   let handleMsg = '';
   let handleMsgType = '';
 
+  // Handle availability is checked against Firestore while the user types.
+  // Keeping the sequence number means a slow, older lookup can never
+  // overwrite the result for what is currently in the box.
+  let handleCheckTimer = null;
+  let handleCheckSeq = 0;
+  let handleAvailable = null;
+  let handleCheckedFor = '';
+  let handleChecking = false;
+
   const busy = new Set();
 
   const SVG = {
@@ -37,6 +46,8 @@ const FriendUI = (() => {
     lock: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
     warning: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
     check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    close: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+    block: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"></line></svg>',
   };
 
   const AVATAR_COLORS = [
@@ -105,11 +116,22 @@ const FriendUI = (() => {
     els.searchResult = $('friends-search-result');
     els.addNote = $('friends-add-note');
     els.footerHandle = $('friends-footer-handle');
+    els.footerCopyHandle = $('friends-copy-handle');
     els.footerPresence = $('friends-footer-presence');
   }
 
   function bind() {
-    if (els.openBtn) els.openBtn.addEventListener('click', () => open());
+    if (els.openBtn) {
+      els.openBtn.addEventListener('click', () => {
+        const state = Friends.getState();
+        // Open the tab that matters: pending requests first, then the friend
+        // list, and "Add friend" only for someone who has no friends yet.
+        const tab = (state.incoming && state.incoming.length)
+          ? 'requests'
+          : ((state.totalFriends || (state.friends || []).length) ? 'friends' : 'add');
+        open(tab);
+      });
+    }
     if (els.close) els.close.addEventListener('click', close);
     if (els.modal) {
       els.modal.addEventListener('click', (e) => {
@@ -121,12 +143,41 @@ const FriendUI = (() => {
       btn.addEventListener('click', () => setTab(btn.dataset.tab, true));
     });
 
+    // Standard tablist keyboard support: arrows move between tabs, Home and
+    // End jump to the first and last one.
+    const tablist = els.tabs.length ? els.tabs[0].parentElement : null;
+    if (tablist) {
+      tablist.addEventListener('keydown', (e) => {
+        const order = ['add', 'requests', 'friends'];
+        const i = order.indexOf(currentTab);
+        if (i < 0) return;
+        let next = null;
+        if (e.key === 'ArrowRight') next = order[(i + 1) % order.length];
+        else if (e.key === 'ArrowLeft') next = order[(i - 1 + order.length) % order.length];
+        else if (e.key === 'Home') next = order[0];
+        else if (e.key === 'End') next = order[order.length - 1];
+        if (!next) return;
+        e.preventDefault();
+        setTab(next, true);
+      });
+    }
+
     if (els.handleForm) {
       els.handleForm.addEventListener('submit', (e) => {
         e.preventDefault();
         claimHandle();
       });
     }
+
+    if (els.handleInput) {
+      els.handleInput.addEventListener('input', scheduleHandleCheck);
+    }
+
+    if (els.footerCopyHandle) {
+      els.footerCopyHandle.addEventListener('click', copyOwnHandle);
+    }
+
+    if (els.modal) els.modal.addEventListener('keydown', trapFocus);
 
     if (els.searchForm) {
       els.searchForm.addEventListener('submit', (e) => {
@@ -172,7 +223,7 @@ const FriendUI = (() => {
 
   function open(tab) {
     if (!els.modal) return;
-    if (tab) setTab(tab, false);
+    setTab(tab || currentTab, false);
     previousFocus = document.activeElement;
     opened = true;
     els.modal.classList.remove('hidden');
@@ -207,23 +258,61 @@ const FriendUI = (() => {
     } catch { /* ignore */ }
   }
 
+  function isVisible(el) {
+    return !!(el && el.isConnected && !el.hidden && el.getClientRects().length);
+  }
+
   function focusInitial() {
     try {
       if (!opened) return;
       if (els.gate && !els.gate.hidden) {
-        if (els.gateAction && !els.gateAction.hidden) { els.gateAction.focus(); return; }
+        if (els.gateAction && isVisible(els.gateAction)) { els.gateAction.focus(); return; }
         if (els.close) { els.close.focus(); return; }
       }
       if (els.handleSetup && !els.handleSetup.hidden && els.handleInput) {
         els.handleInput.focus();
         return;
       }
-      if (currentTab === 'add' && els.searchInput && !els.searchForm.hidden) {
+      if (currentTab === 'add' && els.searchInput && isVisible(els.searchInput)) {
         els.searchInput.focus();
         return;
       }
+      if (currentTab === 'friends' && els.list && isVisible(els.list)) {
+        els.list.focus();
+        return;
+      }
+      if (currentTab === 'requests') {
+        const first = els.incomingList && els.incomingList.querySelector('button');
+        if (first) { first.focus(); return; }
+      }
       if (els.close) els.close.focus();
     } catch { /* ignore */ }
+  }
+
+  function focusables() {
+    if (!els.modal) return [];
+    return [...els.modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter((el) => !el.disabled && isVisible(el));
+  }
+
+  // The Friends panel is a modal dialog: Tab must cycle inside it instead of
+  // silently moving focus to the page behind the overlay.
+  function trapFocus(e) {
+    if (!opened || e.key !== 'Tab') return;
+    const items = focusables();
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey) {
+      if (active === first || !els.modal.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || !els.modal.contains(active)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   function setTab(tab, focus) {
@@ -233,13 +322,21 @@ const FriendUI = (() => {
       const active = btn.dataset.tab === tab;
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      btn.tabIndex = active ? 0 : -1;
     });
     [els.tabFriends, els.tabRequests, els.tabAdd].forEach((panel) => {
-      if (panel) panel.classList.toggle('active', panel.id === `friends-panel-${tab}`);
+      if (!panel) return;
+      const active = panel.id === `friends-panel-${tab}`;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
     });
     if (focus) {
       if (tab === 'add' && els.searchInput) els.searchInput.focus();
       else if (tab === 'friends' && els.list) els.list.focus();
+      else if (tab === 'requests') {
+        const first = els.incomingList && els.incomingList.querySelector('button');
+        if (first) first.focus();
+      }
     }
   }
 
@@ -263,6 +360,9 @@ const FriendUI = (() => {
 
     els.gate.hidden = true;
     els.main.hidden = false;
+    // Keep the visible panel and the highlighted tab in step even when the
+    // panel was opened from a badge or the default markup changed.
+    setTab(currentTab, false);
 
     renderHeader(state);
     renderHandleSetup(state);
@@ -338,8 +438,8 @@ const FriendUI = (() => {
     els.handleSetup.hidden = hasHandle;
     if (hasHandle) return;
 
-    els.handleSave.disabled = handleBusy;
-    els.handleSave.textContent = handleBusy ? 'Claiming…' : 'Claim';
+    els.handleSave.disabled = handleBusy || handleChecking || handleAvailable === false;
+    els.handleSave.textContent = handleBusy ? 'Claiming…' : (handleChecking ? 'Checking…' : 'Claim');
     els.handleMsg.textContent = handleMsg || '';
     els.handleMsg.className = 'friends-hint' + (handleMsgType ? ` is-${handleMsgType}` : '');
   }
@@ -394,8 +494,24 @@ const FriendUI = (() => {
     return AVATAR_COLORS[h % AVATAR_COLORS.length];
   }
 
-  function avatarHtml(uid, name, handle, showDot) {
-    return `<div class="friends-avatar" style="background:${avatarStyle(uid)}">${esc(initialsFor(name, handle))}${showDot ? '<span class="friends-active-dot" aria-label="Active now"></span>' : ''}</div>`;
+  function avatarHtml(uid, name, handle, showDot, avatar) {
+    const initials = esc(initialsFor(name, handle));
+    const img = avatar
+      ? `<img class="friends-avatar-img" src="${esc(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`
+      : '';
+    return `<div class="friends-avatar" style="background:${avatarStyle(uid)}"><span class="friends-avatar-initials">${initials}</span>${img}${showDot ? '<span class="friends-active-dot" aria-label="Active now"></span>' : ''}</div>`;
+  }
+
+  function timeAgo(ts) {
+    const ms = tsToMs(ts);
+    if (!ms) return '';
+    const diff = Date.now() - ms;
+    if (diff < 0 || diff < 60000) return 'just now';
+    return relative(diff) + ' ago';
+  }
+
+  function byNewest(a, b) {
+    return tsToMs(b && b.createdAt) - tsToMs(a && a.createdAt);
   }
 
   function renderFriends(state) {
@@ -431,11 +547,13 @@ const FriendUI = (() => {
         const meta = `${handleText} · ${p.text}`;
         parts.push(`
           <div class="friends-row" data-uid="${esc(friend.uid)}">
-            ${avatarHtml(friend.uid, name, friend.handle, p.active)}
+            ${avatarHtml(friend.uid, name, friend.handle, p.active, friend.avatar)}
             <div class="friends-info">
               <div class="friends-name">${esc(name)}</div>
               <div class="friends-subline${p.active ? ' is-active' : ''}">${esc(meta)}</div>
             </div>
+            <button type="button" class="friends-icon-btn" data-action="invite-room" data-uid="${esc(friend.uid)}" title="Invite ${esc(name)} to a room" aria-label="Invite ${esc(name)} to a room">${SVG.send}</button>
+            <button type="button" class="friends-icon-btn" data-action="block" data-uid="${esc(friend.uid)}" title="Block ${esc(name)}" aria-label="Block ${esc(name)}">${SVG.block}</button>
             <button type="button" class="friends-icon-btn" data-action="unfriend" data-uid="${esc(friend.uid)}" title="Unfriend ${esc(name)}" aria-label="Unfriend ${esc(name)}">${SVG.userMinus}</button>
           </div>`);
       });
@@ -452,26 +570,27 @@ const FriendUI = (() => {
   }
 
   function requestName(req) {
-    return req.fromName || 'A Pchat user';
+    return req.fromName || 'Someone';
   }
 
   function renderRequests(state) {
     if (!els.incomingList || !els.outgoingList) return;
-    const incoming = state.incoming || [];
-    const outgoing = state.outgoing || [];
+    const incoming = (state.incoming || []).slice().sort(byNewest);
+    const outgoing = (state.outgoing || []).slice().sort(byNewest);
 
     const incomingHtml = incoming.length
       ? incoming.map((req) => {
         const name = requestName(req);
         const handle = req.fromHandle ? `@${req.fromHandle}` : 'no handle';
+        const when = req.createdAt ? ` · ${timeAgo(req.createdAt)}` : '';
         const acceptKey = `accept:${req.id}`;
         const declineKey = `decline:${req.id}`;
         return `
           <div class="friends-request-card">
-            ${avatarHtml(req.from, name, req.fromHandle, false)}
+            ${avatarHtml(req.from, name, req.fromHandle, false, req.fromAvatar)}
             <div class="friends-info">
               <div class="friends-name">${esc(name)}</div>
-              <div class="friends-subline">${esc(handle)} wants to be friends</div>
+              <div class="friends-subline">${esc(handle)} wants to be friends${when ? esc(when) : ''}</div>
             </div>
             <div class="friends-request-actions">
               <button type="button" class="friends-btn primary small" data-action="accept" data-id="${esc(req.id)}" ${busy.has(acceptKey) ? 'disabled' : ''}>${busy.has(acceptKey) ? '…' : 'Accept'}</button>
@@ -487,10 +606,10 @@ const FriendUI = (() => {
         const key = `cancel:${req.id}`;
         return `
           <div class="friends-request-card">
-            ${avatarHtml(req.to, '', req.toHandle, false)}
+            ${avatarHtml(req.to, '', req.toHandle, false, req.toAvatar)}
             <div class="friends-info">
               <div class="friends-name">${esc(label)}</div>
-              <div class="friends-subline">Waiting for a reply</div>
+              <div class="friends-subline">${req.createdAt ? `Sent ${timeAgo(req.createdAt)} · ` : ''}Waiting for a reply</div>
             </div>
             <button type="button" class="friends-btn ghost small" data-action="cancel" data-id="${esc(req.id)}" ${busy.has(key) ? 'disabled' : ''}>${busy.has(key) ? '…' : 'Cancel'}</button>
           </div>`;
@@ -544,6 +663,10 @@ const FriendUI = (() => {
       els.searchResult.innerHTML = `<div class="friends-result-card"><div class="friends-result-main">${esc(handle)}</div><div class="friends-hint">You are already friends.</div></div>`;
       return;
     }
+    if (r.blocked) {
+      els.searchResult.innerHTML = `<div class="friends-result-card"><div class="friends-result-main">${esc(handle)}</div><div class="friends-hint">You blocked this user. Unblock them in Settings → Friends first.</div></div>`;
+      return;
+    }
     if (r.incoming && r.incomingRequest) {
       const key = `accept:${r.incomingRequest.id}`;
       els.searchResult.innerHTML = `
@@ -581,6 +704,10 @@ const FriendUI = (() => {
   function renderFooter(state) {
     const handle = state.profile && state.profile.handle;
     if (els.footerHandle) els.footerHandle.textContent = handle ? `@${handle}` : 'No handle yet';
+    if (els.footerCopyHandle) {
+      els.footerCopyHandle.hidden = !handle;
+      els.footerCopyHandle.title = handle ? `Copy @${handle} to share with a friend` : '';
+    }
     if (els.footerPresence) els.footerPresence.textContent = 'Active = seen in the last 15 minutes';
   }
 
@@ -595,6 +722,60 @@ const FriendUI = (() => {
     }
   }
 
+  // Check the handle against Firestore a moment after typing stops. The
+  // permanent commitment deserves a real availability answer, not a format
+  // check followed by a surprise at submit time.
+  function scheduleHandleCheck() {
+    clearTimeout(handleCheckTimer);
+    const handle = Friends.normalizeHandle(els.handleInput.value);
+    handleAvailable = null;
+    handleCheckedFor = '';
+    handleChecking = false;
+
+    if (!handle) {
+      handleMsg = '';
+      handleMsgType = '';
+      render(lastState || Friends.getState());
+      return;
+    }
+    if (!Friends.HANDLE_RE.test(handle)) {
+      handleMsg = 'Use 3–20 characters: a–z, 0–9, or _';
+      handleMsgType = 'error';
+      render(lastState || Friends.getState());
+      return;
+    }
+
+    handleChecking = true;
+    handleMsg = 'Checking availability…';
+    handleMsgType = '';
+    render(lastState || Friends.getState());
+
+    const seq = ++handleCheckSeq;
+    handleCheckTimer = setTimeout(async () => {
+      try {
+        const result = await Friends.checkHandle(handle);
+        if (seq !== handleCheckSeq) return;
+        handleChecking = false;
+        handleCheckedFor = handle;
+        handleAvailable = !!(result && result.available);
+        if (handleAvailable) {
+          handleMsg = `@${handle} is available`;
+          handleMsgType = 'ok';
+        } else {
+          handleMsg = `@${handle} is already taken. Try another one.`;
+          handleMsgType = 'error';
+        }
+      } catch (err) {
+        if (seq !== handleCheckSeq) return;
+        handleChecking = false;
+        handleAvailable = null;
+        handleMsg = Friends.friendly(err);
+        handleMsgType = 'error';
+      }
+      render(lastState || Friends.getState());
+    }, 450);
+  }
+
   async function claimHandle() {
     if (handleBusy) return;
     const handle = Friends.normalizeHandle(els.handleInput.value);
@@ -607,6 +788,24 @@ const FriendUI = (() => {
       els.handleInput.focus();
       return;
     }
+    if (handleAvailable === false && handleCheckedFor === handle) {
+      handleMsg = `@${handle} is already taken. Try another one.`;
+      handleMsgType = 'error';
+      render(lastState || Friends.getState());
+      els.handleInput.focus();
+      return;
+    }
+
+    const ok = await UI.confirmDialog({
+      title: `Claim @${handle}?`,
+      message: 'Friends will find you by this handle. It is permanent in v1 and cannot be changed later.',
+      confirmText: 'Claim handle',
+      cancelText: 'Choose another',
+    });
+    if (!ok) {
+      els.handleInput.focus();
+      return;
+    }
 
     handleBusy = true;
     render(lastState || Friends.getState());
@@ -614,8 +813,10 @@ const FriendUI = (() => {
       await Friends.claimHandle(handle);
       handleMsg = '';
       handleMsgType = '';
+      handleAvailable = null;
+      handleCheckedFor = '';
       els.handleInput.value = '';
-      UI.toast('success', 'Handle claimed', `You are now @${handle}.`);
+      UI.toast('success', 'Handle claimed', `You are now @${handle}. Copy it from the footer to share.`);
       currentTab = 'add';
       setTab('add', false);
       setTimeout(() => { try { els.searchInput.focus(); } catch {} }, 80);
@@ -627,6 +828,15 @@ const FriendUI = (() => {
       handleBusy = false;
       render(Friends.getState());
     }
+  }
+
+  async function copyOwnHandle() {
+    const handle = (Friends.getState().profile && Friends.getState().profile.handle) || '';
+    if (!handle) return;
+    let ok = false;
+    try { ok = await UI.copyText('@' + handle); } catch { ok = false; }
+    if (ok) UI.toast('success', 'Handle copied', `Send @${handle} to a friend so they can add you.`);
+    else UI.toast('error', 'Copy failed', 'Your browser blocked clipboard access.');
   }
 
   async function runSearch() {
@@ -678,6 +888,104 @@ const FriendUI = (() => {
     }
   }
 
+  // Close the loop after accepting a friend: let them invite that friend to
+  // one of their rooms without first having to open the room's share modal.
+  function openRoomChooser(friend) {
+    if (!friend) return;
+    if (typeof Rooms === 'undefined' || typeof Rooms.getMyRooms !== 'function') {
+      UI.toast('info', 'Rooms unavailable', 'Open a room to invite a friend.');
+      return;
+    }
+    let rooms = [];
+    try {
+      const seen = new Set();
+      [...(Rooms.getMyRooms() || []), ...(Rooms.getJoinedRooms() || [])].forEach((r) => {
+        if (!r || !r.id || seen.has(r.id)) return;
+        seen.add(r.id);
+        rooms.push(r);
+      });
+    } catch { rooms = []; }
+
+    if (!rooms.length) {
+      UI.toast('info', 'No rooms yet', 'Create or join a room first, then invite a friend to it.');
+      return;
+    }
+    if (rooms.length === 1) {
+      openInviteForRoom(rooms[0], friend);
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'friends-room-picker';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Choose a room');
+    overlay.innerHTML = `
+      <div class="friends-room-picker-card">
+        <div class="friends-room-picker-head">
+          <div>
+            <div class="friends-room-picker-title">Invite ${esc(friend.name || 'friend')}</div>
+            <div class="friends-room-picker-sub">Choose a room — the invite is encrypted.</div>
+          </div>
+          <button type="button" class="friends-icon-btn" data-close aria-label="Close">${SVG.close}</button>
+        </div>
+        <div class="friends-room-picker-list" role="list"></div>
+      </div>`;
+    const list = overlay.querySelector('.friends-room-picker-list');
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+    rooms.forEach((room) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'friends-room-choice';
+      b.setAttribute('role', 'listitem');
+      b.textContent = room.name || 'Private room';
+      b.addEventListener('click', () => {
+        close();
+        openInviteForRoom(room, friend);
+      });
+      list.appendChild(b);
+    });
+    overlay.querySelector('[data-close]').addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const items = [...overlay.querySelectorAll('button')].filter((el) => !el.disabled && el.getClientRects().length);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    const first = overlay.querySelector('.friends-room-choice');
+    if (first) setTimeout(() => first.focus(), 40);
+  }
+
+  function openInviteForRoom(room, friend) {
+    if (typeof Invites === 'undefined' || typeof Invites.openPicker !== 'function') {
+      UI.toast('error', 'Invites unavailable', 'Friends are still connecting. Try again in a moment.');
+      return;
+    }
+    if (typeof Rooms === 'undefined' || typeof Rooms.getShareUrls !== 'function') {
+      UI.toast('error', 'Room not ready', 'Open the room and invite from there.');
+      return;
+    }
+    try {
+      const urls = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
+      Invites.openPicker({
+        roomId: room.id,
+        roomName: room.name || 'Private room',
+        link: urls.defaultUrl,
+        passwordLocked: !!room.passwordLocked,
+        preselectUid: friend.uid,
+      });
+    } catch (err) {
+      UI.toast('error', 'Invite not ready', (err && err.message) || 'Open the room and try again.');
+    }
+  }
+
   async function onAction(e) {
     const btn = e.target.closest('[data-action]');
     if (!btn || !els.main.contains(btn)) return;
@@ -693,6 +1001,30 @@ const FriendUI = (() => {
       Friends.refresh({ force: true }).catch((err) => {
         UI.toast('error', 'Friends', Friends.friendly(err));
       });
+      return;
+    }
+    if (action === 'invite-room') {
+      const friend = (state.friends || []).find((f) => f.uid === btn.dataset.uid);
+      if (friend) openRoomChooser(friend);
+      return;
+    }
+    if (action === 'block') {
+      const friend = (state.friends || []).find((f) => f.uid === btn.dataset.uid);
+      if (!friend) return;
+      const confirmed = await UI.confirmDialog({
+        title: `Block ${friend.name || 'this user'}?`,
+        message: 'They will be removed from your friends and cannot send new friend requests or room invites. You can unblock them later in Settings → Friends.',
+        confirmText: 'Block',
+        cancelText: 'Cancel',
+        danger: true,
+      });
+      if (!confirmed) return;
+      try {
+        await Friends.block(friend.uid, { name: friend.name, handle: friend.handle });
+        UI.toast('info', 'Blocked', `${friend.name || 'User'} can no longer contact you through Friends.`);
+      } catch (err) {
+        UI.toast('error', 'Could not block', Friends.friendly(err));
+      }
       return;
     }
     if (action === 'unfriend') {
@@ -811,11 +1143,9 @@ const FriendUI = (() => {
   }
 
   function onEvent(type, payload) {
-    if (type === 'request' && payload) {
-      const who = payload.fromName || 'Someone';
-      const handle = payload.fromHandle ? ` (@${payload.fromHandle})` : '';
-      UI.toast('info', 'New friend request', `${who}${handle} wants to be friends.`, 7000);
-    } else if (type === 'friend-accepted') {
+    // Request toasts are announced centrally by friends.js so they also show
+    // on room/settings pages. Only the acceptance confirmation lives here.
+    if (type === 'friend-accepted') {
       const msg = payload && payload.handle
         ? `@${payload.handle} accepted your request.`
         : 'Your friend request was accepted.';
@@ -852,6 +1182,13 @@ const FriendUI = (() => {
     if (!els.modal) return;
     bind();
     Friends.subscribe(render);
+    Friends.subscribe((state) => {
+      // When Friends confirms a handle exists, persist a fast-path flag so
+      // login.html skips the setup-handle page for this user on all future logins.
+      if (state.status === 'ready' && state.profile && state.profile.handle) {
+        try { localStorage.setItem('shepu_handle_set', '1'); } catch { /**/ }
+      }
+    });
     Friends.onEvent(onEvent);
     maybeBackgroundInit();
     render(Friends.getState());

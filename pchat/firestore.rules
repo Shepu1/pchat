@@ -36,9 +36,11 @@ service cloud.firestore {
 
     // ── Users: profile, friend graph, presence ──────────────────
     match /users/{uid} {
-      // Only self and friends may read a profile.
+      // Only self and non-blocked friends may read a profile.
       allow get: if signedIn()
-        && (me() == uid || me() in resource.data.friendUids);
+        && (me() == uid
+          || (me() in resource.data.friendUids
+            && !(me() in resource.data.get('blockedUids', []))));
       allow list: if false;
 
       allow create: if signedIn()
@@ -92,12 +94,18 @@ service cloud.firestore {
 
       // ── Encrypted room invites ────────────────────────────────
       match /invites/{inviteId} {
-        allow read, delete: if signedIn() && me() == uid;
+        allow read: if signedIn() && me() == uid;
+
+        // The recipient removes an invite after Join/Dismiss; the sender may
+        // also revoke it (they know the deterministic id) before it is opened.
+        allow delete: if signedIn()
+          && (me() == uid || resource.data.from == me());
 
         allow create: if signedIn()
           && request.resource.data.from == me()
           && inviteId == me() + '_' + request.resource.data.roomId
           && me() in get(userDoc(uid)).data.friendUids
+          && !(me() in get(userDoc(uid)).data.get('blockedUids', []))
           && request.resource.data.keys().hasOnly([
             'from', 'roomId', 'ciphertext', 'seen', 'createdAt'
           ])
@@ -108,7 +116,22 @@ service cloud.firestore {
           && request.resource.data.ciphertext is string
           && request.resource.data.ciphertext.size() < 4000;
 
-        allow update: if false;
+        // Re-inviting the same friend to the same room keeps the deterministic
+        // id and refreshes only the encrypted payload. The sender cannot
+        // change who it is for, which room it points at, or mark it seen.
+        allow update: if signedIn()
+          && resource.data.from == me()
+          && request.resource.data.from == me()
+          && request.resource.data.roomId == resource.data.roomId
+          && inviteId == me() + '_' + request.resource.data.roomId
+          && me() in get(userDoc(uid)).data.friendUids
+          && !(me() in get(userDoc(uid)).data.get('blockedUids', []))
+          && request.resource.data.keys().hasOnly([
+            'from', 'roomId', 'ciphertext', 'seen', 'createdAt'
+          ])
+          && request.resource.data.seen == false
+          && request.resource.data.ciphertext is string
+          && request.resource.data.ciphertext.size() < 4000;
       }
     }
 
@@ -139,6 +162,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.from == me()
         && request.resource.data.to != me()
+        && !(exists(userDoc(request.resource.data.to))
+          && me() in get(userDoc(request.resource.data.to)).data.get('blockedUids', []))
         && request.resource.data.status == 'pending'
         && requestId == me() + '_' + request.resource.data.to
         && request.resource.data.keys().hasOnly([

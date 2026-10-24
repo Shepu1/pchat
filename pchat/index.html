@@ -16,7 +16,8 @@
   <link rel="stylesheet" href="css/components.css?v=20261024e" />
   <link rel="stylesheet" href="css/calls.css?v=20261022b" />
   <link rel="stylesheet" href="css/responsive.css?v=20261022b" />
-  <link rel="stylesheet" href="css/friends.css?v=20261024d" />
+  <link rel="stylesheet" href="css/friends.css?v=20261024g" />
+  <link rel="stylesheet" href="css/invites.css?v=20261024g" />
   <script src="js/icons.js?v=20261022b"></script>
   <style>
     @font-face {
@@ -2356,29 +2357,29 @@
           </div>
 
           <div class="friends-tabs" role="tablist" aria-label="Friends sections">
-            <button type="button" class="friends-tab-btn active" data-tab="add" role="tab"
-              aria-selected="true">Add Friend</button>
-            <button type="button" class="friends-tab-btn" data-tab="requests" role="tab"
-              aria-selected="false">Friend Requests <span class="friends-tab-count is-alert" id="friends-requests-count"
+            <button type="button" class="friends-tab-btn" id="friends-tab-add" data-tab="add" role="tab"
+              aria-selected="false" aria-controls="friends-panel-add" tabindex="-1">Add Friend</button>
+            <button type="button" class="friends-tab-btn" id="friends-tab-requests" data-tab="requests" role="tab"
+              aria-selected="false" aria-controls="friends-panel-requests" tabindex="-1">Friend Requests <span class="friends-tab-count is-alert" id="friends-requests-count"
                 hidden></span></button>
-            <button type="button" class="friends-tab-btn" data-tab="friends" role="tab"
-              aria-selected="false">Your Friends <span class="friends-tab-count" id="friends-tab-count" hidden></span></button>
+            <button type="button" class="friends-tab-btn active" id="friends-tab-friends" data-tab="friends" role="tab"
+              aria-selected="true" aria-controls="friends-panel-friends" tabindex="0">Your Friends <span class="friends-tab-count" id="friends-tab-count" hidden></span></button>
           </div>
 
           <div class="friends-body">
-            <section class="friends-panel active" id="friends-panel-friends" role="tabpanel">
+            <section class="friends-panel active" id="friends-panel-friends" role="tabpanel" aria-labelledby="friends-tab-friends">
               <div class="friends-list" id="friends-list" tabindex="-1"></div>
               <div class="friends-hint" id="friends-list-note" hidden></div>
               <button type="button" class="friends-btn ghost small friends-load-more" id="friends-load-more"
                 hidden>Show more</button>
             </section>
 
-            <section class="friends-panel" id="friends-panel-requests" role="tabpanel">
+            <section class="friends-panel" id="friends-panel-requests" role="tabpanel" aria-labelledby="friends-tab-requests" hidden>
               <div id="friends-incoming-list"></div>
               <div id="friends-outgoing-list" style="margin-top:1.1rem;"></div>
             </section>
 
-            <section class="friends-panel" id="friends-panel-add" role="tabpanel">
+            <section class="friends-panel" id="friends-panel-add" role="tabpanel" aria-labelledby="friends-tab-add" hidden>
               <form class="friends-search-form" id="friends-search-form" autocomplete="off">
                 <span class="friends-at">@</span>
                 <input class="friends-input" id="friends-search-input" type="text" maxlength="20"
@@ -2387,12 +2388,15 @@
               </form>
               <div class="friends-hint" id="friends-add-note" hidden>Claim your handle above to search and send
                 requests.</div>
-              <div id="friends-search-result"></div>
+              <div id="friends-search-result" aria-live="polite"></div>
             </section>
           </div>
 
           <div class="friends-footer">
-            <span id="friends-footer-handle">No handle yet</span>
+            <span class="friends-footer-handle-wrap">
+              <span id="friends-footer-handle">No handle yet</span>
+              <button type="button" class="friends-link-btn" id="friends-copy-handle" hidden>Copy</button>
+            </span>
             <span id="friends-footer-presence">Active = seen in the last 15 minutes</span>
           </div>
         </div>
@@ -2410,8 +2414,9 @@
     <script src="js/auth.js?v=20261022b"></script>
     <script src="js/firebase-config.js?v=20261024d"></script>
     <script src="js/firebase.js?v=20261024d"></script>
-    <script src="js/friends.js?v=20261024d"></script>
-    <script src="js/friend-ui.js?v=20261024d"></script>
+    <script src="js/friends.js?v=20261024g"></script>
+    <script src="js/friend-ui.js?v=20261024g"></script>
+    <script src="js/invites.js?v=20261024g"></script>
     <script src="js/google.js?v=20261022b"></script>
     <script src="js/drive.js?v=20261022b"></script>
     <script src="js/sheets.js?v=20261022b"></script>

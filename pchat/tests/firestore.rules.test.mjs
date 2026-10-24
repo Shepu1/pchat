@@ -127,6 +127,23 @@ await test('unauthenticated cannot read a profile', async () => {
   await assertFails(getDoc(doc(anon, 'users', 'alice')));
 });
 
+await test('a blocked friend cannot read the blocker profile', async () => {
+  await seedProfile('alice', ['eve']);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), 'users', 'alice'), { blockedUids: ['eve'] });
+  });
+  await assertFails(getDoc(doc(eve, 'users', 'alice')));
+});
+
+await test('self can block a uid with a private reference row', async () => {
+  await seedProfile('alice');
+  await assertSucceeds(updateDoc(doc(alice, 'users', 'alice'), {
+    blockedUids: ['eve'],
+    'blockedInfo.eve': { name: 'Eve', handle: 'eve_1', at: Date.now() },
+  }));
+  await assertSucceeds(updateDoc(doc(alice, 'users', 'alice'), { blockedUids: [] }));
+});
+
 await test('self can update presence while keeping the handle unchanged', async () => {
   await seedProfile('alice', [], 'alice_1');
   await assertSucceeds(updateDoc(doc(alice, 'users', 'alice'), { lastActiveAt: new Date() }));
@@ -160,6 +177,22 @@ section('Friend requests');
 
 await test('sender can probe a missing request before creating it', async () => {
   await assertSucceeds(getDoc(doc(bob, 'friendRequests', 'bob_alice')));
+});
+
+await test('blocked user cannot create a friend request', async () => {
+  await seedProfile('alice');
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), 'users', 'alice'), { blockedUids: ['bob'] });
+  });
+  await assertFails(setDoc(doc(bob, 'friendRequests', 'bob_alice'), {
+    from: 'bob',
+    to: 'alice',
+    status: 'pending',
+    fromName: 'Bob',
+    fromHandle: 'bob_1',
+    toHandle: 'alice_1',
+    createdAt: new Date(),
+  }));
 });
 
 await test('can create a canonical request', async () => {
@@ -306,6 +339,20 @@ await test('friend can create an encrypted invite for a friend', async () => {
   }));
 });
 
+await test('blocked friend cannot create an invite', async () => {
+  await seedProfile('alice', ['bob']);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), 'users', 'alice'), { blockedUids: ['bob'] });
+  });
+  await assertFails(setDoc(doc(bob, 'users', 'alice', 'invites', 'bob_room1'), {
+    from: 'bob',
+    roomId: 'room1',
+    ciphertext: 'x',
+    seen: false,
+    createdAt: new Date(),
+  }));
+});
+
 await test('non-friend cannot create an invite', async () => {
   await seedProfile('alice', []);
   await assertFails(setDoc(doc(eve, 'users', 'alice', 'invites', 'eve_room1'), {
@@ -375,6 +422,59 @@ await test('only the recipient can read the invite', async () => {
 
   await assertSucceeds(getDoc(doc(alice, 'users', 'alice', 'invites', 'bob_room1')));
   await assertFails(getDoc(doc(bob, 'users', 'alice', 'invites', 'bob_room1')));
+});
+
+await test('sender can re-send an invite to refresh its ciphertext', async () => {
+  await seedProfile('alice', ['bob']);
+  await assertSucceeds(setDoc(doc(bob, 'users', 'alice', 'invites', 'bob_room1'), {
+    from: 'bob',
+    roomId: 'room1',
+    ciphertext: 'old',
+    seen: false,
+    createdAt: new Date(),
+  }));
+  await assertSucceeds(setDoc(doc(bob, 'users', 'alice', 'invites', 'bob_room1'), {
+    from: 'bob',
+    roomId: 'room1',
+    ciphertext: 'new',
+    seen: false,
+    createdAt: new Date(),
+  }));
+});
+
+await test('sender cannot move an invite to another room', async () => {
+  await seedProfile('alice', ['bob']);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', 'alice', 'invites', 'bob_room1'), {
+      from: 'bob', roomId: 'room1', ciphertext: 'old', seen: false, createdAt: new Date(),
+    });
+  });
+  await assertFails(updateDoc(doc(bob, 'users', 'alice', 'invites', 'bob_room1'), {
+    roomId: 'room2',
+  }));
+});
+
+await test('sender can revoke their own invite', async () => {
+  await seedProfile('alice', ['bob']);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', 'alice', 'invites', 'bob_room1'), {
+      from: 'bob', roomId: 'room1', ciphertext: 'old', seen: false, createdAt: new Date(),
+    });
+  });
+  await assertSucceeds(deleteDoc(doc(bob, 'users', 'alice', 'invites', 'bob_room1')));
+});
+
+await test('stranger cannot update or delete someone else\'s invite', async () => {
+  await seedProfile('alice', ['bob']);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'users', 'alice', 'invites', 'bob_room1'), {
+      from: 'bob', roomId: 'room1', ciphertext: 'old', seen: false, createdAt: new Date(),
+    });
+  });
+  await assertFails(updateDoc(doc(eve, 'users', 'alice', 'invites', 'bob_room1'), {
+    ciphertext: 'evil',
+  }));
+  await assertFails(deleteDoc(doc(eve, 'users', 'alice', 'invites', 'bob_room1')));
 });
 
 // ── Usernames ───────────────────────────────────────────────────

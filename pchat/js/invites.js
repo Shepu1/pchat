@@ -40,7 +40,9 @@ const Invites = (() => {
 
   let keyInfo = null;
   let keysReadyUid = null;
-  let memoryKeyRecord = null;
+  // One identity per Firebase account. A Map (not a single variable) keeps
+  // two accounts that sign in on the same browser from sharing a private key.
+  const memoryKeyRecords = new Map();
   let lastError = null;
 
   let host = null;
@@ -49,6 +51,13 @@ const Invites = (() => {
   let pickerFriends = [];
   let pickerBusy = false;
   let sendBusy = false;
+  let pickerSearch = '';
+  let pickerLoadBusy = false;
+  const selectedInviteUids = new Set();
+  // "Already invited" is a per-device convenience record. Firestore only
+  // stores the encrypted invite on the recipient's side, so the sender has
+  // no read access to a delivery history.
+  const SENT_KEY = 'shepu_sent_invites_v1';
 
   let currentBanner = null;
   const queue = [];
@@ -66,14 +75,14 @@ const Invites = (() => {
   function friendly(err) {
     if (!err) return 'Something went wrong.';
     const map = {
-      'invites/no-crypto': 'This browser needs Web Crypto (HTTPS or localhost) for encrypted invites.',
+      'invites/no-crypto': 'This browser cannot open encrypted invites. Use Copy link instead.',
       'invites/no-key': 'This invite was encrypted for another device. Ask your friend for the room link.',
-      'invites/decrypt': 'This invite could not be decrypted on this device.',
+      'invites/decrypt': 'This invite could not be opened on this device.',
       'invites/invalid-link': 'The room link in this invite was not valid.',
       'invites/not-ready': 'Friends are still connecting. Try again in a moment.',
       'invites/no-friends': 'Add a friend first, then invite them to the room.',
-      'permission-denied': 'Firestore refused this invite. The friend may have removed you, or the latest rules are not deployed.',
-      'resource-exhausted': 'Firebase free-tier quota reached. Copy the room link instead.',
+      'permission-denied': 'This invite could not be delivered. Your friend may have removed you; you can copy the room link instead.',
+      'resource-exhausted': 'Friends are paused for a little while. Copy the room link instead.',
       'unavailable': 'Friends are offline right now. Copy the room link instead.',
     };
     if (map[err.code]) return map[err.code];
@@ -172,6 +181,18 @@ const Invites = (() => {
     });
   }
 
+  async function idbDelete(key) {
+    const idb = await openKeyDb();
+    return new Promise((resolve, reject) => {
+      try {
+        const tx = idb.transaction(KEY_STORE, 'readwrite');
+        tx.objectStore(KEY_STORE).delete(key);
+        tx.oncomplete = () => { try { idb.close(); } catch {}; resolve(true); };
+        tx.onerror = () => { try { idb.close(); } catch {}; reject(tx.error || new Error('IndexedDB delete failed.')); };
+      } catch (err) { try { idb.close(); } catch {}; reject(err); }
+    });
+  }
+
   // ── Key setup ──────────────────────────────────────────────────
   // Generate an extractable pair, export the public key, then re-import the
   // private key as non-extractable. The extractable copy is discarded at the
@@ -212,6 +233,9 @@ const Invites = (() => {
     const state = (typeof Friends !== 'undefined') ? Friends.getState() : null;
     const uid = (state && state.uid) || currentUid || (typeof Firebase !== 'undefined' ? Firebase.getUid() : null);
     if (!uid) throw makeError('invites/not-ready', 'Sign in first.');
+    // The invite listener sets this too, but the picker can be opened before
+    // the first snapshot. sendOne()/deleteInvite() must not depend on that.
+    currentUid = uid;
     if (keyInfo && keysReadyUid === uid) return keyInfo;
 
     if (!subtleAvailable()) {
@@ -221,10 +245,13 @@ const Invites = (() => {
     }
 
     const profilePub = (state && state.profile && state.profile.pubKey) || '';
-    let record = memoryKeyRecord;
+    let record = memoryKeyRecords.get(uid) || null;
 
     if (!record) {
-      try { record = await idbGet('identity_' + uid); } catch { record = null; }
+      try {
+        record = await idbGet('identity_' + uid);
+        if (record) memoryKeyRecords.set(uid, record);
+      } catch { record = null; }
     }
 
     if (!record && profilePub) {
@@ -243,7 +270,7 @@ const Invites = (() => {
     if (!record) {
       try {
         record = await generateIdentity();
-        memoryKeyRecord = record;
+        memoryKeyRecords.set(uid, record);
         try { await idbSet('identity_' + uid, record); } catch { /* memory-only this session */ }
       } catch (err) {
         keyInfo = { supported: false, hasKey: false, reason: 'keygen', error: friendly(err) };
@@ -494,6 +521,9 @@ const Invites = (() => {
     }
     listenerUid = null;
     listenerStarting = false;
+    // Never leave a stale uid behind after sign-out or an account switch:
+    // it would let an old page write/delete invites under the wrong account.
+    currentUid = null;
     queue.length = 0;
     seenIds.clear();
     hiddenBadIds.clear();
@@ -533,6 +563,17 @@ const Invites = (() => {
       return;
     }
     if (data.seen !== false) return;
+
+    // A blocked account must not be able to surface a banner. Rules already
+    // stop new invites; this also clears any invite that was already queued.
+    try {
+      const blocked = (Friends.getState().profile && Friends.getState().profile.blockedUids) || [];
+      if (blocked.includes(data.from)) {
+        seenIds.add(id);
+        deleteInvite(id).catch(() => {});
+        return;
+      }
+    } catch { /* keep going if the profile is unavailable */ }
 
     const created = toMillis(data.createdAt);
     if (created && Date.now() - created > INVITE_TTL_MS) {
@@ -577,6 +618,45 @@ const Invites = (() => {
     });
   }
 
+  async function repairKey() {
+    const state = (typeof Friends !== 'undefined') ? Friends.getState() : null;
+    const uid = (state && state.uid) || currentUid || (typeof Firebase !== 'undefined' ? Firebase.getUid() : null);
+    if (!uid) throw makeError('invites/not-ready', 'Sign in first.');
+    if (!subtleAvailable()) throw makeError('invites/no-crypto', 'Web Crypto is unavailable.');
+    await ensureFirebase();
+
+    const record = await generateIdentity();
+    memoryKeyRecords.set(uid, record);
+    try { await idbSet('identity_' + uid, record); } catch { /* memory-only this session */ }
+    await fsMod.updateDoc(fsMod.doc(db, 'users', uid), { pubKey: record.publicKeySpki });
+
+    keyInfo = {
+      supported: true,
+      hasKey: true,
+      publicKeySpki: record.publicKeySpki,
+      profilePubKey: record.publicKeySpki,
+      mismatch: false,
+      privateKey: record.privateKey,
+    };
+    keysReadyUid = uid;
+    currentUid = uid;
+    try {
+      if (state && state.profile) state.profile.pubKey = record.publicKeySpki;
+    } catch { /* ignore */ }
+    lastError = null;
+    return keyInfo;
+  }
+
+  function keyStatus() {
+    return keyInfo ? {
+      supported: !!keyInfo.supported,
+      hasKey: !!keyInfo.hasKey,
+      reason: keyInfo.reason || '',
+      mismatch: !!keyInfo.mismatch,
+      profilePubKey: !!keyInfo.profilePubKey,
+    } : null;
+  }
+
   async function decryptDoc(docId, data) {
     if (!keyInfo || !keyInfo.supported) {
       throw makeError('invites/no-crypto', 'Web Crypto is unavailable on this device.');
@@ -614,8 +694,20 @@ const Invites = (() => {
   function safeRoomLink(raw, expectedRoomId) {
     try {
       const url = new URL(String(raw || ''), location.origin);
-      if (url.origin !== location.origin) return null;
       if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      if (url.origin !== location.origin) {
+        // On localhost, Rooms.getShareUrls() uses the configured LAN IP (so a
+        // phone on the same Wi-Fi can join). Allow that one development case;
+        // in production only the app's own origin is accepted.
+        const localDev = location.hostname === 'localhost'
+          || location.hostname === '127.0.0.1'
+          || location.hostname === '[::1]';
+        const privateV4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
+        if (!localDev
+          || url.protocol !== location.protocol
+          || url.port !== location.port
+          || !privateV4.test(url.hostname)) return null;
+      }
       const file = url.pathname.split('/').pop();
       if (file !== 'room.html' && file !== 'join.html') return null;
       const roomId = url.searchParams.get('r');
@@ -788,9 +880,13 @@ const Invites = (() => {
           </div>
           <div class="invite-head-copy">
             <h3 class="invite-title" id="invite-picker-title">Invite friends</h3>
-            <p class="invite-subtitle" id="invite-picker-subtitle">End-to-end encrypted, delivered inside Pchat.</p>
+            <p class="invite-subtitle" id="invite-picker-subtitle">End-to-end encrypted, delivered inside Pchat shepu.</p>
           </div>
           <button type="button" class="invite-close" id="invite-picker-close" aria-label="Close invites">×</button>
+        </div>
+        <div class="invite-search-wrap">
+          <input type="search" class="invite-search" id="invite-picker-search"
+            placeholder="Search friends…" aria-label="Search friends" autocomplete="off" />
         </div>
         <div class="invite-toolbar">
           <button type="button" class="invite-link-btn" id="invite-select-all">Select all</button>
@@ -798,7 +894,7 @@ const Invites = (() => {
         </div>
         <div class="invite-note hidden" id="invite-picker-note"></div>
         <div class="invite-list" id="invite-picker-list"></div>
-        <div class="invite-status" id="invite-picker-status"></div>
+        <div class="invite-status" id="invite-picker-status" role="status" aria-live="polite"></div>
         <div class="invite-foot">
           <button type="button" class="btn btn-ghost" id="invite-copy-link">Copy link</button>
           <button type="button" class="btn btn-primary" id="invite-send" disabled>Send invite</button>
@@ -811,8 +907,15 @@ const Invites = (() => {
     const send = picker.querySelector('#invite-send');
     const copy = picker.querySelector('#invite-copy-link');
     const list = picker.querySelector('#invite-picker-list');
+    const search = picker.querySelector('#invite-picker-search');
 
     if (close) close.addEventListener('click', closePicker);
+    if (search) {
+      search.addEventListener('input', () => {
+        pickerSearch = search.value;
+        renderPickerList(Friends.getState());
+      });
+    }
     if (picker) {
       picker.addEventListener('click', (e) => { if (e.target === picker) closePicker(); });
     }
@@ -821,13 +924,37 @@ const Invites = (() => {
     if (copy) copy.addEventListener('click', copyRoomLink);
     if (list) {
       list.addEventListener('change', (e) => {
-        if (e.target && e.target.matches('input[type="checkbox"]')) updatePickerSelection();
+        if (e.target && e.target.matches('input[type="checkbox"]')) {
+          if (e.target.checked) selectedInviteUids.add(e.target.value);
+          else selectedInviteUids.delete(e.target.value);
+          updatePickerSelection();
+        }
+      });
+      list.addEventListener('click', (e) => {
+        const more = e.target.closest('[data-invite-more]');
+        if (more) loadMorePickerFriends();
       });
     }
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && picker && !picker.hidden) {
+      if (!picker || picker.hidden) return;
+      if (e.key === 'Escape') {
         e.stopPropagation();
         closePicker();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const items = [...picker.querySelectorAll('button, input, [href]')]
+          .filter((el) => !el.disabled && el.getClientRects().length);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !picker.contains(document.activeElement))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !picker.contains(document.activeElement))) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     });
     return picker;
@@ -906,6 +1033,12 @@ const Invites = (() => {
     pickerContext = { ...ctx };
     pickerBusy = false;
     sendBusy = false;
+    pickerLoadBusy = false;
+    pickerSearch = '';
+    selectedInviteUids.clear();
+    if (ctx.preselectUid) selectedInviteUids.add(String(ctx.preselectUid));
+    const searchInput = picker.querySelector('#invite-picker-search');
+    if (searchInput) searchInput.value = '';
     setPickerSubtitle(`Invite friends to “${String(ctx.roomName || 'this room').slice(0, 80)}”.`);
     setPickerStatus('');
     setPickerNote(ctx.passwordLocked
@@ -914,14 +1047,115 @@ const Invites = (() => {
     picker.hidden = false;
     document.body.classList.add('invite-picker-open');
     showPickerLoading();
-    const close = picker.querySelector('#invite-picker-close');
-    if (close) setTimeout(() => { try { close.focus({ preventScroll: true }); } catch {} }, 50);
+    const search = picker.querySelector('#invite-picker-search');
+    if (search) setTimeout(() => { try { search.focus({ preventScroll: true }); } catch {} }, 50);
+    else {
+      const close = picker.querySelector('#invite-picker-close');
+      if (close) setTimeout(() => { try { close.focus({ preventScroll: true }); } catch {} }, 50);
+    }
 
     try {
       await loadPickerFriends();
     } catch (err) {
       showPickerError(friendly(err));
     }
+  }
+
+  async function loadMorePickerFriends() {
+    if (pickerLoadBusy || pickerBusy) return;
+    pickerLoadBusy = true;
+    setPickerStatus('Loading more friends…');
+    try {
+      await Friends.loadMoreFriends();
+      const state = Friends.getState();
+      if (state.status === 'ready' && state.friendsError) {
+        setPickerStatus(state.friendsError, 'error');
+      } else {
+        setPickerStatus('');
+      }
+      pickerLoadBusy = false;
+      renderPickerList(state);
+    } catch (err) {
+      setPickerStatus(friendly(err), 'error');
+    } finally {
+      pickerLoadBusy = false;
+    }
+  }
+
+  function readSentInvites() {
+    try {
+      const raw = localStorage.getItem(SENT_KEY);
+      const data = raw ? JSON.parse(raw) : {};
+      return data && typeof data === 'object' ? data : {};
+    } catch { return {}; }
+  }
+
+  function sentInviteAt(uid) {
+    if (!uid || !pickerContext) return 0;
+    const record = readSentInvites()[uid];
+    if (!record || record.roomId !== pickerContext.roomId) return 0;
+    return Number(record.at) || 0;
+  }
+
+  function markInviteSent(uid) {
+    if (!uid || !pickerContext) return;
+    try {
+      const all = readSentInvites();
+      all[uid] = { roomId: pickerContext.roomId, at: Date.now() };
+      localStorage.setItem(SENT_KEY, JSON.stringify(all));
+    } catch { /* private mode: the session still remembers the row */ }
+  }
+
+  function clearSentInvite(uid) {
+    try {
+      const all = readSentInvites();
+      delete all[uid];
+      localStorage.setItem(SENT_KEY, JSON.stringify(all));
+    } catch { /* ignore */ }
+  }
+
+  async function revokeInvite(friend) {
+    if (!friend || !friend.uid || !pickerContext || !fsMod || !db || !currentUid) return;
+    const name = friend.name || (friend.handle ? '@' + friend.handle : 'this friend');
+    let ok = true;
+    try {
+      if (window.UI && typeof UI.confirmDialog === 'function') {
+        ok = await UI.confirmDialog({
+          title: 'Revoke invite?',
+          message: `Remove the invite to ${name} for this room. They can still be invited again later.`,
+          confirmText: 'Revoke',
+          cancelText: 'Keep invite',
+          danger: true,
+        });
+      }
+    } catch { ok = false; }
+    if (!ok) return;
+
+    const inviteId = currentUid + '_' + pickerContext.roomId;
+    try {
+      await fsMod.deleteDoc(fsMod.doc(db, 'users', friend.uid, 'invites', inviteId));
+    } catch (err) {
+      // The recipient may have already opened or dismissed it, which deletes
+      // the document; rules then reject a delete on a missing doc. Treat that
+      // as already revoked instead of leaving a phantom row on this device.
+      if (!err || !['permission-denied', 'not-found'].includes(err.code)) {
+        toast('error', 'Could not revoke', friendly(err));
+        return;
+      }
+    }
+    clearSentInvite(friend.uid);
+    toast('success', 'Invite revoked', `The invite to ${name} was removed.`);
+    renderPickerList(Friends.getState());
+  }
+
+  function relativeShort(ms) {
+    const diff = Math.max(0, Date.now() - ms);
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(diff / 86400000)}d ago`;
   }
 
   async function loadPickerFriends() {
@@ -961,9 +1195,9 @@ const Invites = (() => {
       noteParts.push('Password-locked room: send the password separately.');
     }
     if (keyInfo && keyInfo.supported && !keyInfo.hasKey && keyInfo.profilePubKey) {
-      noteParts.push('This device can receive only copy-link invites sent to your other device.');
+      noteParts.push('This browser cannot receive encrypted invites. Sending still works; ask friends for a copy link, or reset your invite key in Settings → Friends.');
     } else if (keyInfo && keyInfo.supported && keyInfo.mismatch) {
-      noteParts.push('This device has an old invite key. Ask friends for a copy link.');
+      noteParts.push('This browser has a different invite key. Reset it in Settings → Friends if you want to receive invites here.');
     } else if (keyInfo && !keyInfo.supported) {
       noteParts.push('Encrypted invites are unavailable in this browser. Use Copy link instead.');
     }
@@ -1002,6 +1236,16 @@ const Invites = (() => {
     return (String(handle || '').replace(/^@/, '').slice(0, 2) || '?').toUpperCase();
   }
 
+  function filteredPickerFriends() {
+    const q = pickerSearch.trim().toLowerCase().replace(/^@+/, '');
+    if (!q) return pickerFriends;
+    return pickerFriends.filter((friend) => {
+      const name = String(friend.name || '').toLowerCase();
+      const handle = String(friend.handle || '').toLowerCase();
+      return name.includes(q) || handle.includes(q);
+    });
+  }
+
   function renderPickerList(state) {
     const list = picker && picker.querySelector('#invite-picker-list');
     if (!list) return;
@@ -1022,8 +1266,24 @@ const Invites = (() => {
       return;
     }
 
-    pickerFriends.forEach((friend) => {
+    const visible = filteredPickerFriends();
+    if (!visible.length) {
+      const empty = document.createElement('div');
+      empty.className = 'invite-empty';
+      const strong = document.createElement('strong');
+      strong.textContent = 'No friend matches';
+      const p = document.createElement('div');
+      p.textContent = `Nothing matched “${pickerSearch.trim()}”. Try a name or @handle.`;
+      empty.appendChild(strong);
+      empty.appendChild(p);
+      list.appendChild(empty);
+      updatePickerSelection();
+      return;
+    }
+
+    visible.forEach((friend) => {
       const ready = typeof friend.pubKey === 'string' && friend.pubKey.length > 20;
+      const sentAt = sentInviteAt(friend.uid);
       const row = document.createElement('label');
       row.className = 'invite-friend-row' + (!ready ? ' is-disabled' : '');
       row.dataset.uid = friend.uid;
@@ -1032,30 +1292,69 @@ const Invites = (() => {
       cb.type = 'checkbox';
       cb.value = friend.uid;
       cb.disabled = !ready;
+      cb.checked = ready && selectedInviteUids.has(friend.uid);
       cb.setAttribute('aria-label', `Invite ${friend.name || friend.handle || 'friend'}`);
       row.appendChild(cb);
 
       const avatar = document.createElement('div');
       avatar.className = 'invite-avatar';
       avatar.style.background = avatarColor(friend.uid);
-      avatar.textContent = initials(friend.name, friend.handle);
+      const initialsEl = document.createElement('span');
+      initialsEl.textContent = initials(friend.name, friend.handle);
+      avatar.appendChild(initialsEl);
+      if (friend.avatar) {
+        const img = document.createElement('img');
+        img.src = friend.avatar;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.referrerPolicy = 'no-referrer';
+        img.onerror = () => img.remove();
+        avatar.appendChild(img);
+      }
       row.appendChild(avatar);
 
       const info = document.createElement('div');
       info.className = 'invite-friend-info';
       const name = document.createElement('div');
       name.className = 'invite-friend-name';
-      name.textContent = friend.name || 'Pchat user';
+      name.textContent = friend.name || 'Pchat shepu user';
       const sub = document.createElement('div');
       sub.className = 'invite-friend-sub' + (ready ? ' is-ready' : '');
       sub.textContent = friend.handle ? `@${friend.handle}` : (friend.missing ? 'Profile unavailable' : 'No handle');
-      if (ready) sub.textContent += ' · Ready for encrypted invites';
-      else if (!friend.missing) sub.textContent += ' · Hasn’t enabled invites yet';
+      if (!ready && !friend.missing) sub.textContent += ' · Ask them to open Friends once';
+      else if (sentAt) sub.textContent += ` · Invited ${relativeShort(sentAt)}`;
+      else if (ready) sub.textContent += ' · Ready for an encrypted invite';
       info.appendChild(name);
       info.appendChild(sub);
       row.appendChild(info);
+
+      if (sentAt && ready) {
+        const revoke = document.createElement('button');
+        revoke.type = 'button';
+        revoke.className = 'invite-revoke-btn';
+        revoke.textContent = 'Revoke';
+        revoke.setAttribute('aria-label', `Revoke invite to ${friend.name || friend.handle || 'friend'}`);
+        revoke.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          revokeInvite(friend).catch(() => {});
+        });
+        row.appendChild(revoke);
+      }
       list.appendChild(row);
     });
+
+    if (state.hasMoreFriends) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'invite-more-btn';
+      more.dataset.inviteMore = '1';
+      more.textContent = pickerLoadBusy
+        ? 'Loading…'
+        : `Show more friends (${state.totalFriends - pickerFriends.length} left)`;
+      more.disabled = pickerLoadBusy || pickerBusy;
+      list.appendChild(more);
+    }
 
     updatePickerSelection();
   }
@@ -1067,17 +1366,16 @@ const Invites = (() => {
     const count = picker.querySelector('#invite-selected-count');
     const selectAll = picker.querySelector('#invite-select-all');
     if (!list) return;
-    const boxes = [...list.querySelectorAll('input[type="checkbox"]')];
-    const enabled = boxes.filter((b) => !b.disabled);
-    const checked = boxes.filter((b) => b.checked && !b.disabled);
-    if (count) count.textContent = `${checked.length} selected`;
+    const boxes = [...list.querySelectorAll('input[type="checkbox"]:not([disabled])')];
+    const checked = boxes.filter((b) => b.checked);
+    if (count) count.textContent = `${selectedInviteUids.size} selected`;
     if (send) {
-      send.disabled = pickerBusy || checked.length === 0;
+      send.disabled = pickerBusy || selectedInviteUids.size === 0;
       send.textContent = pickerBusy ? 'Sending…' : 'Send invite';
     }
     if (selectAll) {
-      selectAll.disabled = enabled.length === 0 || pickerBusy;
-      selectAll.textContent = enabled.length > 0 && checked.length === enabled.length
+      selectAll.disabled = boxes.length === 0 || pickerBusy;
+      selectAll.textContent = boxes.length > 0 && checked.length === boxes.length
         ? 'Clear all'
         : 'Select all';
     }
@@ -1089,15 +1387,17 @@ const Invites = (() => {
       .filter((b) => !b.disabled);
     if (!boxes.length) return;
     const allChecked = boxes.every((b) => b.checked);
-    boxes.forEach((b) => { b.checked = !allChecked; });
+    boxes.forEach((b) => {
+      b.checked = !allChecked;
+      if (b.checked) selectedInviteUids.add(b.value);
+      else selectedInviteUids.delete(b.value);
+    });
     updatePickerSelection();
   }
 
   async function sendSelected() {
     if (!picker || pickerBusy || sendBusy) return;
-    const boxes = [...picker.querySelectorAll('#invite-picker-list input[type="checkbox"]')]
-      .filter((b) => b.checked && !b.disabled);
-    if (!boxes.length) return;
+    if (!selectedInviteUids.size) return;
     if (!pickerContext || !pickerContext.link) {
       setPickerStatus('The room link is not ready yet.', 'error');
       return;
@@ -1108,7 +1408,7 @@ const Invites = (() => {
       return;
     }
 
-    const selected = boxes.map((b) => b.value);
+    const selected = [...selectedInviteUids];
     const targets = pickerFriends.filter((f) => selected.includes(f.uid));
     if (!targets.length) return;
 
@@ -1190,10 +1490,11 @@ const Invites = (() => {
   }
 
   function markSent(uid) {
+    markInviteSent(uid);
+    selectedInviteUids.delete(uid);
     if (!picker) return;
     const row = picker.querySelector(`.invite-friend-row[data-uid="${cssEscape(uid)}"]`);
     if (!row) return;
-    row.classList.add('is-disabled');
     const cb = row.querySelector('input[type="checkbox"]');
     if (cb) { cb.checked = false; cb.disabled = true; }
     const sub = row.querySelector('.invite-friend-sub');
@@ -1262,6 +1563,11 @@ const Invites = (() => {
     pickerFriends = [];
     pickerBusy = false;
     sendBusy = false;
+    pickerSearch = '';
+    pickerLoadBusy = false;
+    selectedInviteUids.clear();
+    const search = picker.querySelector('#invite-picker-search');
+    if (search) search.value = '';
   }
 
   // ── Public surface ─────────────────────────────────────────────
@@ -1292,9 +1598,27 @@ const Invites = (() => {
     currentUid = null;
     keysReadyUid = null;
     keyInfo = null;
+    memoryKeyRecords.clear();
     lastError = null;
     // fsMod/db are left intact: the Firebase SDK instance is shared with
     // Friends, and a later sign-in can reuse it.
+  }
+
+  // Used by Settings → Delete social data: remove this device's identity
+  // keys and the local "already invited" index as well as the Firestore data.
+  async function purgeLocal() {
+    const uids = new Set(memoryKeyRecords.keys());
+    if (currentUid) uids.add(currentUid);
+    for (const uid of uids) {
+      memoryKeyRecords.delete(uid);
+      try { await idbDelete('identity_' + uid); } catch { /* ignore */ }
+    }
+    try { localStorage.removeItem(SENT_KEY); } catch { /* ignore */ }
+    keyInfo = null;
+    keysReadyUid = null;
+    currentUid = null;
+    lastError = null;
+    return true;
   }
 
   function debug() {
@@ -1342,6 +1666,9 @@ const Invites = (() => {
     reset,
     openPicker,
     closePicker,
+    repairKey,
+    keyStatus,
+    purgeLocal,
     debug,
     friendly,
     _test: {

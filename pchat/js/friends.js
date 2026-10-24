@@ -119,17 +119,18 @@ const Friends = (() => {
       'friends/already-friends': 'You are already friends.',
       'friends/already-pending': 'A friend request is already pending.',
       'friends/not-friends': 'You are not friends with this user.',
+      'friends/blocked': 'You blocked this user. Unblock them in Settings → Friends first.',
       'friends/not-recipient': 'This request is not addressed to you.',
       'friends/not-sender': 'This request was not sent by you.',
       'friends/profile-missing': 'Your social profile is missing. Reconnect to recreate it.',
       'firebase/gate/signin': 'Sign in with Google to use Friends.',
-      'firebase/gate/google': 'Friends need a real Google sign-in. Email/demo sessions cannot use the social layer.',
+      'firebase/gate/google': 'Friends need a Google sign-in. Chat keeps working without it.',
       'firebase/gate/reconnect': 'Your Google session expired. Reconnect to use Friends.',
-      'firebase/not-configured': 'Firebase config is missing. Fill js/firebase-config.js.',
-      'firebase/not-google': 'Friends need a real Google sign-in. Demo/email sessions cannot use the social layer.',
-      'permission-denied': 'Firestore rules rejected this. Deploy the latest firestore.rules.',
-      'failed-precondition': 'Firestore needs an index. Deploy firestore.indexes.json.',
-      'resource-exhausted': 'Firebase free-tier quota reached. Friends are paused; chat still works.',
+      'firebase/not-configured': 'Friends are not available in this build yet.',
+      'firebase/not-google': 'Friends need a Google sign-in. Chat keeps working without it.',
+      'permission-denied': 'Friends could not complete that just now. Please try again.',
+      'failed-precondition': 'Friends are temporarily unavailable. Please try again.',
+      'resource-exhausted': 'Friends are paused for a little while. Chat still works.',
       'unavailable': 'Friends are offline right now. Chat still works.',
     };
     if (custom[err.code]) return custom[err.code];
@@ -153,6 +154,9 @@ const Friends = (() => {
       avatar: d.avatar || '',
       pubKey: d.pubKey || null,
       friendUids: [...new Set(list.filter((x) => typeof x === 'string' && x))],
+      blockedUids: [...new Set((Array.isArray(d.blockedUids) ? d.blockedUids : [])
+        .filter((x) => typeof x === 'string' && x && x !== uid))],
+      blockedInfo: (d.blockedInfo && typeof d.blockedInfo === 'object') ? d.blockedInfo : {},
       lastActiveAt: d.lastActiveAt || null,
       showPresence: !(d.flags && d.flags.showPresence === false),
       flags: d.flags || { showPresence: true },
@@ -256,7 +260,16 @@ const Friends = (() => {
   }
 
   function ownFriendUids() {
-    return ((profile && profile.friendUids) || []).filter((id) => id && id !== uid);
+    const blocked = new Set((profile && profile.blockedUids) || []);
+    return ((profile && profile.friendUids) || []).filter((id) => id && id !== uid && !blocked.has(id));
+  }
+
+  function ownBlockedUids() {
+    return ((profile && profile.blockedUids) || []).filter((id) => id && id !== uid);
+  }
+
+  function isBlocked(friendUid) {
+    return ownBlockedUids().includes(friendUid);
   }
 
   function getState() {
@@ -811,14 +824,18 @@ const Friends = (() => {
     );
     unsubIncoming = fsMod.onSnapshot(incomingQuery, (snap) => {
       const docs = snap.docs.map((d) => normalizeRequest(d.id, d.data()));
-      const pending = docs.filter((r) => r.status === 'pending');
+      const blocked = new Set(ownBlockedUids());
+      const pending = docs.filter((r) => r.status === 'pending' && !blocked.has(r.from));
       if (firstIncoming) {
         firstIncoming = false;
       } else {
         const prev = new Set(incoming.map((r) => r.id));
         const next = new Set(pending.map((r) => r.id));
         pending.forEach((r) => {
-          if (!prev.has(r.id)) emitEvent('request', r);
+          if (!prev.has(r.id)) {
+            emitEvent('request', r);
+            announceRequest(r);
+          }
         });
         const removed = incoming.filter((r) => !next.has(r.id));
         if (removed.length && !removed.every((r) => selfHandling.has(r.id))) {
@@ -840,7 +857,8 @@ const Friends = (() => {
     );
     unsubOutgoing = fsMod.onSnapshot(outgoingQuery, (snap) => {
       const docs = snap.docs.map((d) => normalizeRequest(d.id, d.data()));
-      const pending = docs.filter((r) => r.status === 'pending');
+      const blockedOut = new Set(ownBlockedUids());
+      const pending = docs.filter((r) => r.status === 'pending' && !blockedOut.has(r.to));
       if (firstOutgoing) {
         firstOutgoing = false;
       } else {
@@ -860,6 +878,34 @@ const Friends = (() => {
       console.warn('[Friends] outgoing request listener failed:', err);
       emit();
     });
+  }
+
+  // A request must be noticeable from every screen, not only the dashboard.
+  // The in-app toast is the reliable path; a system notification is raised
+  // only when the tab is hidden AND the user already granted permission for
+  // chat notifications. We never ask for permission from here.
+  function announceRequest(req) {
+    if (!req) return;
+    const who = req.fromName || 'Someone';
+    const handle = req.fromHandle ? ` (@${req.fromHandle})` : '';
+    try {
+      if (window.UI && typeof UI.toast === 'function') {
+        UI.toast('info', 'New friend request', `${who}${handle} wants to be friends.`, 7000);
+      }
+    } catch { /* non-fatal */ }
+    try {
+      if (typeof document !== 'undefined'
+        && document.visibilityState === 'hidden'
+        && typeof Notification !== 'undefined'
+        && Notification.permission === 'granted') {
+        const n = new Notification('New friend request', {
+          body: `${who}${handle} wants to be friends.`,
+          icon: 'assets/icons/icon.png',
+          tag: 'friend-request-' + (req.id || ''),
+        });
+        n.onclick = () => { try { window.focus(); } catch { /* ignore */ } };
+      }
+    } catch { /* notifications are optional */ }
   }
 
   function detachListeners() {
@@ -949,6 +995,21 @@ const Friends = (() => {
     return handle;
   }
 
+  async function checkHandle(raw) {
+    if (status !== 'ready' || !profile) {
+      throw makeError('friends/not-ready', 'Friends are still connecting.');
+    }
+    const handle = normalizeHandle(raw);
+    if (!HANDLE_RE.test(handle)) {
+      throw makeError('friends/handle-invalid', 'Invalid handle.');
+    }
+
+    const snap = await fsMod.getDoc(fsMod.doc(db, 'usernames', handle));
+    if (!snap.exists()) return { handle, available: true, isSelf: false };
+    const data = snap.data() || {};
+    return { handle, available: false, isSelf: data.uid === uid };
+  }
+
   async function search(raw) {
     if (status !== 'ready' || !profile) {
       throw makeError('friends/not-ready', 'Friends are still connecting.');
@@ -974,6 +1035,7 @@ const Friends = (() => {
       uid: targetUid,
       isSelf: targetUid === uid,
       isFriend: ownFriendUids().includes(targetUid),
+      blocked: isBlocked(targetUid),
       outgoing: !!outgoingRequest,
       incoming: !!incomingRequest,
       incomingRequest: incomingRequest || null,
@@ -989,6 +1051,7 @@ const Friends = (() => {
       throw makeError('friends/not-found', 'No user selected.');
     }
     if (target.uid === uid) throw makeError('friends/self', 'That is you.');
+    if (isBlocked(target.uid)) throw makeError('friends/blocked', 'Unblock this user first.');
     if (ownFriendUids().includes(target.uid)) {
       throw makeError('friends/already-friends', 'Already friends.');
     }
@@ -1153,6 +1216,67 @@ const Friends = (() => {
     return true;
   }
 
+  // ── Block / unblock ───────────────────────────────────────────
+  // Blocking is local-first: the uid goes on our own profile, so the other
+  // side cannot keep a connection we no longer want. Rules also refuse new
+  // friend requests and invites from a blocked account.
+  async function block(friendUid, meta = {}) {
+    if (status !== 'ready' || !profile || !fsMod || !db) {
+      throw makeError('friends/not-ready', 'Friends are still connecting.');
+    }
+    if (!friendUid || friendUid === uid) throw makeError('friends/not-friends', 'Invalid user.');
+    if (isBlocked(friendUid)) return true;
+
+    const wasFriend = ownFriendUids().includes(friendUid);
+    if (wasFriend) await unfriend(friendUid);
+
+    const info = {
+      name: String(meta.name || (wasFriend && friends.find((f) => f.uid === friendUid)?.name) || '').slice(0, 80),
+      handle: String(meta.handle || (wasFriend && friends.find((f) => f.uid === friendUid)?.handle) || '').slice(0, 20),
+      at: Date.now(),
+    };
+    await fsMod.updateDoc(fsMod.doc(db, 'users', uid), {
+      blockedUids: fsMod.arrayUnion(friendUid),
+      ['blockedInfo.' + friendUid]: info,
+    });
+
+    if (!profile.blockedUids) profile.blockedUids = [];
+    if (!profile.blockedUids.includes(friendUid)) profile.blockedUids.push(friendUid);
+    if (!profile.blockedInfo) profile.blockedInfo = {};
+    profile.blockedInfo[friendUid] = info;
+
+    // Pending requests between us are now noise; remove what this account is
+    // allowed to delete (sender side or recipient side).
+    const stale = [
+      ...incoming.filter((r) => r.from === friendUid),
+      ...outgoing.filter((r) => r.to === friendUid),
+    ];
+    for (const req of stale) {
+      try { await fsMod.deleteDoc(fsMod.doc(db, 'friendRequests', req.id)); } catch { /* best effort */ }
+    }
+    incoming = incoming.filter((r) => r.from !== friendUid);
+    outgoing = outgoing.filter((r) => r.to !== friendUid);
+    friends = friends.filter((f) => f.uid !== friendUid);
+    writeFriendsCache();
+    emit();
+    return true;
+  }
+
+  async function unblock(friendUid) {
+    if (status !== 'ready' || !profile || !fsMod || !db) {
+      throw makeError('friends/not-ready', 'Friends are still connecting.');
+    }
+    if (!friendUid) return false;
+    await fsMod.updateDoc(fsMod.doc(db, 'users', uid), {
+      blockedUids: fsMod.arrayRemove(friendUid),
+      ['blockedInfo.' + friendUid]: fsMod.deleteField(),
+    });
+    profile.blockedUids = (profile.blockedUids || []).filter((id) => id !== friendUid);
+    if (profile.blockedInfo) delete profile.blockedInfo[friendUid];
+    emit();
+    return true;
+  }
+
   // ── Reset / debug ──────────────────────────────────────────────
   function reset() {
     detachListeners();
@@ -1192,6 +1316,7 @@ const Friends = (() => {
       handle: (profile && profile.handle) || '',
       friends: friends.length,
       totalFriends: ownFriendUids().length,
+      blocked: ownBlockedUids().length,
       incoming: incoming.length,
       outgoing: outgoing.length,
       gate: gate ? gate.kind : null,
@@ -1247,7 +1372,16 @@ const Friends = (() => {
 
     await batch.commit();
 
-    // Delete friend requests (both sides) — run after batch to avoid rule conflicts
+    // Delete received invites and friend requests (both sides) — run after
+    // the profile batch to avoid rule conflicts.
+    try {
+      const invitesSnap = await fsMod.getDocs(fsMod.collection(db, 'users', uid, 'invites'));
+      if (invitesSnap.size) {
+        const inviteBatch = fsMod.writeBatch(db);
+        invitesSnap.forEach((d) => inviteBatch.delete(d.ref));
+        await inviteBatch.commit();
+      }
+    } catch { /* non-critical */ }
     try {
       const [sentSnap, recvSnap] = await Promise.all([
         fsMod.getDocs(fsMod.query(
@@ -1285,12 +1419,15 @@ const Friends = (() => {
     subscribe,
     onEvent,
     claimHandle,
+    checkHandle,
     search,
     sendRequest,
     acceptRequest,
     declineRequest,
     cancelRequest,
     unfriend,
+    block,
+    unblock,
     reset,
     debug,
     normalizeHandle,

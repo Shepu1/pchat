@@ -44,12 +44,14 @@ const DOC = {
   pages: {
     'index.html':     { title: 'Chats',        blurb: 'Your dashboard — every room you own and every room you have joined, plus the buttons to create or join one.' },
     'login.html':     { title: 'Sign in',      blurb: 'Sign in with Google, use an email name, or continue as a guest. Nothing here is required to use a quick room.' },
+    'setup-handle.html': { title: 'Choose your @handle', blurb: 'The one-time step after Google sign-in: pick the permanent @handle friends will use to find you. You can skip it and set one later from Settings.' },
     'create.html':    { title: 'Create a room', blurb: 'Name your room, pick a wallpaper and a kind, and get a shareable link and QR code.' },
     'join.html':      { title: 'Join a room',  blurb: 'Open a shared link, choose a nickname, and enter. A room password is asked for here if the room needs one.' },
     'room.html':      { title: 'Chat room',    blurb: 'The room itself — messages, calls, the member list, the bot, the music player and the room settings.' },
     'owner.html':     { title: 'Owner panel',  blurb: 'Everything only the owner can do: statistics, moderation, renaming, locking, backups and link tools.' },
     'settings.html':  { title: 'Settings',     blurb: 'Your account, privacy tools, notifications, relay servers, and the way into the help and about pages.' },
     'privacy.html':   { title: 'Privacy Policy', blurb: 'Plain-language description of what the app stores on your device, what is saved in the room owner’s Drive, and what the public relay can see.' },
+    'terms.html':     { title: 'Terms of Service', blurb: 'The plain-language terms for using this copy of the app: what the service is, who owns your messages, acceptable use, third-party services, availability with no uptime promise, how to leave, and liability.' },
     'about.html':     { title: 'About',        blurb: 'What Pchat is, why it works the way it does, and what the project is built on.' },
     'help.html':      { title: 'Help',         blurb: 'Every feature of the app, in detail — this page, generated from the app itself.' },
   },
@@ -135,6 +137,15 @@ const DOC = {
       { title: 'Join',          blurb: 'Paste an invite code, or open a shared link.' },
       { title: 'Share',         blurb: 'Generate a QR code for a room, or copy a link. The QR is drawn in the page, so the link never leaves your device.' },
     ],
+    friends: [
+      { title: 'Your @handle', blurb: 'Choose a handle once, then copy it from the Friends footer (or Settings → Friends) and send it to someone. People find you by this exact handle, not by name or email.' },
+      { title: 'Friend requests', blurb: 'Open Friends → Add Friend, type an exact @handle and send a request. The other person sees it in Friends → Friend Requests and can accept or decline. On the dashboard the Friends button shows a red count for pending requests.' },
+      { title: 'Your friends', blurb: 'The Your Friends tab shows your list, who was active in the last 15 minutes, and three actions per person: invite them to a room, block them, or unfriend them. Unfriending removes the connection on both sides.' },
+      { title: 'Blocking', blurb: 'Blocking removes the friendship and stops that account from sending you new friend requests or room invites. Manage blocked people in Settings → Friends → Blocked users, where you can unblock them. Blocking does not remove them from a room you both already share.' },
+      { title: 'Invite a friend to a room', blurb: 'Press the paper-plane button next to a friend, choose one of your rooms, and send. The room link is encrypted on your device for that friend only — the server never sees it. You can revoke an invite from the same picker.' },
+      { title: 'Private by design', blurb: 'Friends only sees a name, @handle, optional picture and a coarse active timestamp. It never receives room links in readable form, messages, emails, or room passwords. Turning Friends off or deleting social data does not affect your rooms.' },
+      { title: 'New device?', blurb: 'Encrypted invites are tied to a key on one browser. If a new device cannot open them, use Settings → Friends → Reset invite key on this device, then ask the friend to send the invite again. Resetting the key does not touch rooms or messages.' },
+    ],
     owner: [
       { title: 'Statistics',    blurb: 'Member count, message count, creation date and how many people are online right now.' },
       { title: 'Members',       blurb: 'The full roster with roles and last-seen times, plus ban and remove.' },
@@ -145,8 +156,10 @@ const DOC = {
     settings: [
       { title: 'Account',       blurb: 'Your Google sign-in, your display name, your profile picture, and the OAuth client setup if you host the app yourself.' },
       { title: 'Notifications', blurb: 'Ask the browser for permission and see whether notifications are on.' },
+      { title: 'Friends & social', blurb: 'Your @handle and a copy button, active-status toggle, the invite-key status with a reset button, and the option to delete all social data. Rooms and messages are not affected.' },
       { title: 'Relay',         blurb: 'Choose which public relay servers carry cross-device messages, test them, and see their live health. If chat only works on your own device, a relay is probably blocked on your network.' },
       { title: 'Privacy',       blurb: 'Where your data is stored, plus buttons to clear the message cache or wipe all local data.' },
+      { title: 'Terms',         blurb: 'A three-line summary of the terms, plus links to the full terms of service page and the privacy policy — both written in plain language.' },
       { title: 'Help',          blurb: 'Opens the help centre — every feature of the app, generated from the app itself.' },
       { title: 'About',         blurb: 'What the app is, how it is built, and what it is made of.' },
     ],
@@ -176,6 +189,9 @@ const DOC = {
     { q: 'The phone layout looks out of date', a: 'The browser is using a cached stylesheet. The assets are versioned, so a single hard refresh picks up the current one.' },
     { q: 'A message says "Failed"', a: 'It could not be delivered. The bubble stays in the chat with a Retry button — tap it and it sends again. The text is never lost silently.' },
     { q: 'I forgot the room password', a: 'It cannot be recovered. The owner can set a new one, which invalidates the old link.' },
+    { q: 'I cannot find a friend', a: 'Friend search needs the exact @handle, not a display name or email. Ask them for their handle, or use their copied handle text.' },
+    { q: 'A friend request never arrived', a: 'Both people need a Google sign-in for Friends. Ask the sender to check the Sent list, and open Friends once on the receiving device so it can connect.' },
+    { q: 'An invite will not open on my new phone', a: 'Encrypted invites use a key stored on one browser. In Settings → Friends, reset the invite key on the new device, then ask your friend to send the room invite again. A copy-link invite also works.' },
   ],
 };
 

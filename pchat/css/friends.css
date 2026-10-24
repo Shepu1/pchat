@@ -351,7 +351,21 @@
   font-weight: 800;
   letter-spacing: 0.01em;
   position: relative;
+  overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.friends-avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.friends-avatar-initials {
+  line-height: 1;
 }
 
 .friends-active-dot {
@@ -661,6 +675,20 @@
   text-overflow: ellipsis;
 }
 
+.friends-footer-handle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+#friends-copy-handle {
+  font-size: 0.62rem;
+  padding: 1px 5px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
 /* ── Spinner / skeleton ────────────────────────────────────────── */
 .friends-spinner {
   width: 17px;
@@ -702,6 +730,81 @@
 
 body.friends-modal-open {
   overflow: hidden;
+}
+
+/* ── Choose a room (invite a friend) ───────────────────────────── */
+.friends-room-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(3, 7, 14, 0.66);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.friends-room-picker-card {
+  width: min(390px, 100%);
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0f1526;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+}
+
+.friends-room-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.friends-room-picker-title {
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+
+.friends-room-picker-sub {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.friends-room-picker-list {
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.friends-room-choice {
+  width: 100%;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.friends-room-choice:hover,
+.friends-room-choice:focus-visible {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(96, 165, 250, 0.5);
+  outline: none;
 }
 
 /* ── Phone ─────────────────────────────────────────────────────── */

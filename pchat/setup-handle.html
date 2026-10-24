@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss: https://*.googleapis.com https://*.firebaseio.com; frame-src 'self' https://pchat-shepu.firebaseapp.com https://accounts.google.com http://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Choose your @handle — Pchat shepu</title>
+  <meta name="description" content="Choose a unique @handle so friends can find and add you on Pchat shepu." />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261022b" type="image/png" />
+  <link rel="stylesheet" href="css/base.css?v=20261022b" />
+  <link rel="stylesheet" href="css/layout.css?v=20261022b" />
+  <link rel="stylesheet" href="css/components.css?v=20261022b" />
+  <link rel="stylesheet" href="css/responsive.css?v=20261022b" />
+  <style>
+    /* ── Page layout ────────────────────────────────────────── */
+    body {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: var(--bg-base);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animated gradient orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+      animation: orbFloat 12s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 420px; height: 420px; background: radial-gradient(circle, #6c63ff, #00d2ff); top: -120px; left: -80px; animation-duration: 13s; }
+    .orb-2 { width: 320px; height: 320px; background: radial-gradient(circle, #f093fb, #f5576c); bottom: -80px; right: -60px; animation-duration: 10s; animation-delay: -4s; }
+    @keyframes orbFloat {
+      from { transform: translateY(0) scale(1); }
+      to   { transform: translateY(30px) scale(1.08); }
+    }
+
+    /* ── Card ───────────────────────────────────────────────── */
+    .setup-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface-1, rgba(255,255,255,0.05));
+      border: 1px solid var(--border, rgba(255,255,255,0.1));
+      border-radius: 1.5rem;
+      padding: 2.5rem 2rem;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+      animation: cardIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(32px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Avatar / greeting ──────────────────────────────────── */
+    .setup-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid var(--primary, #6c63ff);
+      display: block;
+      margin: 0 auto 1rem;
+      box-shadow: 0 0 0 6px rgba(108,99,255,0.15);
+      background: var(--surface-2, #1e2130);
+    }
+    .setup-avatar-placeholder {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6c63ff, #00d2ff);
+      color: #fff;
+      margin: 0 auto 1rem;
+      box-shadow: 0 0 0 6px rgba(108,99,255,0.15);
+    }
+
+    .setup-greeting {
+      font-size: 0.85rem;
+      color: var(--text-2, #9ca3af);
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+    .setup-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      text-align: center;
+      color: var(--text-1, #f1f5f9);
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.5px;
+    }
+    .setup-subtitle {
+      font-size: 0.82rem;
+      color: var(--text-2, #9ca3af);
+      text-align: center;
+      line-height: 1.55;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Handle input ───────────────────────────────────────── */
+    .handle-field {
+      position: relative;
+      margin-bottom: 0.75rem;
+    }
+    .handle-at {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary, #6c63ff);
+      pointer-events: none;
+      z-index: 1;
+    }
+    .handle-input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.85rem 1rem 0.85rem 2.2rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      border-radius: 0.75rem;
+      border: 2px solid var(--border, rgba(255,255,255,0.12));
+      background: var(--surface-2, rgba(255,255,255,0.06));
+      color: var(--text-1, #f1f5f9);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      caret-color: var(--primary, #6c63ff);
+    }
+    .handle-input:focus {
+      border-color: var(--primary, #6c63ff);
+      box-shadow: 0 0 0 4px rgba(108,99,255,0.18);
+    }
+    .handle-input.is-valid   { border-color: var(--success, #22c55e); }
+    .handle-input.is-invalid { border-color: var(--error,   #ef4444); }
+
+    /* live hint row */
+    .handle-hint {
+      font-size: 0.78rem;
+      min-height: 1.3em;
+      padding: 0 0.25rem;
+      color: var(--text-2, #9ca3af);
+      transition: color 0.2s;
+    }
+    .handle-hint.ok  { color: var(--success, #22c55e); }
+    .handle-hint.err { color: var(--error,   #ef4444); }
+
+    /* ── Claim button ───────────────────────────────────────── */
+    .btn-claim {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.9rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 0.75rem;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #6c63ff 0%, #00d2ff 100%);
+      color: #fff;
+      letter-spacing: 0.03em;
+      box-shadow: 0 4px 20px rgba(108,99,255,0.38);
+      transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-claim:hover:not(:disabled) {
+      opacity: 0.92;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(108,99,255,0.45);
+    }
+    .btn-claim:active:not(:disabled) { transform: translateY(0); }
+    .btn-claim:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .btn-claim .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+    .btn-claim.loading .btn-label { display: none; }
+    .btn-claim.loading .spinner   { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Skip link ──────────────────────────────────────────── */
+    .skip-link {
+      display: block;
+      text-align: center;
+      margin-top: 1.25rem;
+      font-size: 0.82rem;
+      color: var(--text-2, #9ca3af);
+    }
+    .skip-link a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .skip-link a:hover { color: var(--text-1, #f1f5f9); }
+
+    /* ── Rules strip ────────────────────────────────────────── */
+    .rules-strip {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 1.5rem 0 0;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+    }
+    .rule-pill {
+      font-size: 0.72rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(108,99,255,0.12);
+      color: var(--text-2, #9ca3af);
+      white-space: nowrap;
+    }
+
+    /* ── Success state ──────────────────────────────────────── */
+    .success-overlay {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.75rem;
+      padding: 1rem 0;
+    }
+    .success-overlay.visible { display: flex; }
+    .success-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      box-shadow: 0 0 0 10px rgba(34,197,94,0.12);
+      animation: pop 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes pop {
+      from { transform: scale(0.4); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .success-handle {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text-1, #f1f5f9);
+    }
+    .success-msg {
+      font-size: 0.85rem;
+      color: var(--text-2, #9ca3af);
+    }
+  </style>
+</head>
+<body>
+<div class="orb orb-1" aria-hidden="true"></div>
+<div class="orb orb-2" aria-hidden="true"></div>
+
+<div class="setup-card" role="main">
+
+  <!-- ── Form view ──────────────────────────────────── -->
+  <div id="form-view">
+    <div id="avatar-wrap">
+      <!-- filled by JS -->
+      <div class="setup-avatar-placeholder" id="avatar-placeholder" aria-hidden="true">?</div>
+    </div>
+
+    <p class="setup-greeting" id="greeting-text">Welcome!</p>
+    <h1 class="setup-title">Choose your @handle</h1>
+    <p class="setup-subtitle">
+      Friends use this handle to find you and send a friend request.<br>
+      <strong>It is permanent in v1 — choose carefully.</strong>
+    </p>
+
+    <div class="handle-field">
+      <span class="handle-at" aria-hidden="true">@</span>
+      <input
+        id="handle-input"
+        class="handle-input"
+        type="text"
+        maxlength="20"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder="your_handle"
+        aria-label="Choose your @handle"
+        aria-describedby="handle-hint"
+      />
+    </div>
+    <p class="handle-hint" id="handle-hint">3–20 characters: a–z, 0–9, underscore (_)</p>
+
+    <button class="btn-claim" id="btn-claim" disabled>
+      <span class="btn-label">Claim @handle</span>
+      <span class="spinner" aria-hidden="true"></span>
+    </button>
+
+    <p class="skip-link">
+      Not now, <a id="skip-link" href="index.html">do it later →</a>
+    </p>
+
+    <div class="rules-strip" aria-label="Handle rules">
+      <span class="rule-pill">3–20 characters</span>
+      <span class="rule-pill">a–z · 0–9 · _</span>
+      <span class="rule-pill">permanent in v1</span>
+      <span class="rule-pill">case-insensitive</span>
+    </div>
+  </div>
+
+  <!-- ── Success view ────────────────────────────────── -->
+  <div class="success-overlay" id="success-view" aria-live="polite">
+    <div class="success-icon" aria-hidden="true">✓</div>
+    <p class="success-handle" id="success-handle-text"></p>
+    <p class="success-msg">Handle set! Copy it to share, then redirecting…</p>
+    <button type="button" class="btn-claim" id="copy-handle-btn" style="max-width:220px;margin-top:0.35rem;">
+      <span class="btn-label">Copy @handle</span>
+    </button>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="js/config.js?v=20261022b"></script>
+<script src="js/storage.js?v=20261022b"></script>
+<script src="js/ui.js?v=20261022b"></script>
+<script src="js/auth.js?v=20261022b"></script>
+<script src="js/firebase-config.js?v=20261024d"></script>
+<script src="js/firebase.js?v=20261024d"></script>
+<script src="js/friends.js?v=20261024g"></script>
+<script>
+(function () {
+  'use strict';
+
+  const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+
+  function safeRedirect(raw, fallback) {
+    fallback = fallback || 'index.html';
+    const val = String(raw == null ? '' : raw).trim();
+    if (!val) return fallback;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(val)) return fallback;
+    if (val.startsWith('//') || val.startsWith('\\')) return fallback;
+    try {
+      const u = new URL(val, location.href);
+      if (u.origin !== location.origin) return fallback;
+      return u.pathname + u.search + u.hash;
+    } catch { return fallback; }
+  }
+
+  const params   = new URLSearchParams(location.search);
+  const redirect = safeRedirect(params.get('redirect'), 'index.html');
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // ── Guard: must be logged in ──────────────────────────────
+    if (!Auth.isAuthenticated()) {
+      window.location.replace('login.html?redirect=' + encodeURIComponent(location.href));
+      return;
+    }
+
+    const authData = Storage.getAuth() || {};
+    const user     = authData.user || {};
+    const name     = user.name || localStorage.getItem('shepu_display_name') || '';
+    const pic      = localStorage.getItem('shepu_profile_pic') || user.picture || '';
+
+    // ── Avatar / greeting ─────────────────────────────────────
+    const avatarWrap = document.getElementById('avatar-wrap');
+    if (pic) {
+      const img = document.createElement('img');
+      img.src       = pic;
+      img.alt       = name || 'You';
+      img.className = 'setup-avatar';
+      img.onerror   = () => { img.replaceWith(makePlaceholder(name)); };
+      avatarWrap.innerHTML = '';
+      avatarWrap.appendChild(img);
+    } else {
+      const ph = document.getElementById('avatar-placeholder');
+      if (ph) ph.textContent = (name || '?')[0].toUpperCase();
+    }
+
+    if (name) {
+      document.getElementById('greeting-text').textContent =
+        'Welcome, ' + name.split(' ')[0] + '!';
+    }
+
+    function makePlaceholder(n) {
+      const el = document.createElement('div');
+      el.className = 'setup-avatar-placeholder';
+      el.textContent = (n || '?')[0].toUpperCase();
+      return el;
+    }
+
+    // ── Elements ──────────────────────────────────────────────
+    const input    = document.getElementById('handle-input');
+    const hint     = document.getElementById('handle-hint');
+    const btn      = document.getElementById('btn-claim');
+    const skipLink = document.getElementById('skip-link');
+    const formView = document.getElementById('form-view');
+    const successView = document.getElementById('success-view');
+
+    skipLink.href   = redirect;
+    skipLink.onclick = null; // plain href navigation is fine
+
+    // ── Friends init (background, non-blocking) ───────────────
+    let friendsReady = false;
+    let friendsUsable = true;
+    Friends.init().then(() => {
+      friendsReady = true;
+
+      // If handle already set, skip this page
+      const state = Friends.getState();
+      if (state.profile && state.profile.handle) {
+        window.location.replace(redirect);
+      }
+      if (state.status === 'gate') {
+        friendsUsable = false;
+        setHint('Sign in with Google to choose a handle. You can skip this and keep chatting.', 'err');
+        btn.disabled = true;
+        return;
+      }
+      if (state.status === 'error') {
+        friendsUsable = false;
+        setHint((state.error && state.error.message) || 'Friends are unavailable right now. You can set a handle later in Settings.', 'err');
+        btn.disabled = true;
+        return;
+      }
+      // Re-run the availability check if the user typed before Friends
+      // finished connecting; never leave a stale "looks good" claimable.
+      const pending = input.value.trim().toLowerCase().replace(/^@+/, '');
+      if (HANDLE_RE.test(pending)) input.dispatchEvent(new Event('input'));
+    }).catch(() => {
+      // Firebase unavailable → show "skip" only mode
+      friendsUsable = false;
+      hint.textContent = 'Friends unavailable right now — you can set a handle later from Settings.';
+      hint.className   = 'handle-hint err';
+      btn.disabled     = true;
+    });
+
+    // ── Live validation + availability ────────────────────────
+    let debounceTimer = null;
+    let checkSeq = 0;
+    let availableFor = '';
+    let available = null;
+    let lastHandle = '';
+    let redirectTimer = null;
+
+    function setHint(text, type) {
+      hint.textContent = text || '';
+      hint.className = 'handle-hint' + (type ? ' ' + type : '');
+    }
+
+    function scheduleCheck(handle) {
+      clearTimeout(debounceTimer);
+      availableFor = '';
+      available = null;
+      if (!handle || !HANDLE_RE.test(handle)) return;
+      if (!friendsReady) {
+        setHint('@' + handle + ' looks good!', 'ok');
+        btn.disabled = false;
+        return;
+      }
+
+      const seq = ++checkSeq;
+      setHint('Checking availability…', '');
+      btn.disabled = true;
+      debounceTimer = setTimeout(async () => {
+        try {
+          const result = await Friends.checkHandle(handle);
+          if (seq !== checkSeq) return;
+          availableFor = handle;
+          available = !!(result && result.available);
+          if (available) {
+            setHint('@' + handle + ' is available', 'ok');
+            btn.disabled = false;
+          } else {
+            setHint('@' + handle + ' is already taken. Try another one.', 'err');
+            input.classList.remove('is-valid');
+            input.classList.add('is-invalid');
+            btn.disabled = true;
+          }
+        } catch (err) {
+          if (seq !== checkSeq) return;
+          // A failed pre-check must not trap the user: let submit surface the
+          // real result, with the button enabled.
+          available = null;
+          availableFor = '';
+          setHint('@' + handle + ' looks good!', 'ok');
+          btn.disabled = false;
+        }
+      }, 420);
+    }
+
+    input.addEventListener('input', () => {
+      if (!friendsUsable) return;
+      const raw = input.value.trim().toLowerCase();
+      input.classList.remove('is-valid', 'is-invalid');
+      btn.disabled = true;
+
+      if (!raw) {
+        setHint('3–20 characters: a–z, 0–9, underscore (_)', '');
+        scheduleCheck('');
+        return;
+      }
+
+      const stripped = raw.replace(/^@+/, '');
+      if (!HANDLE_RE.test(stripped)) {
+        input.classList.add('is-invalid');
+        if (stripped.length < 3) setHint('Too short — minimum 3 characters.', 'err');
+        else if (stripped.length > 20) setHint('Too long — maximum 20 characters.', 'err');
+        else setHint('Only letters (a–z), numbers and _ allowed.', 'err');
+        scheduleCheck('');
+        return;
+      }
+
+      input.classList.add('is-valid');
+      input.dataset.clean = stripped;
+      scheduleCheck(stripped);
+    });
+
+    // ── Submit ────────────────────────────────────────────────
+    async function doSubmit() {
+      if (btn.classList.contains('loading')) return;
+      const handle = (input.dataset.clean || input.value.trim().toLowerCase().replace(/^@+/, ''));
+      if (!HANDLE_RE.test(handle)) return;
+
+      btn.classList.add('loading');
+      btn.disabled = true;
+      setHint('Checking availability…', '');
+
+      try {
+        if (!friendsReady) {
+          // Wait up to 6 s for Friends to become ready
+          await new Promise((res, rej) => {
+            let waited = 0;
+            const iv = setInterval(() => {
+              waited += 200;
+              if (friendsReady) { clearInterval(iv); res(); return; }
+              if (waited > 6000) { clearInterval(iv); rej(new Error('Friends are still connecting. Try again in a moment.')); }
+            }, 200);
+          });
+        }
+
+        const result = await Friends.checkHandle(handle);
+        if (!result || !result.available) {
+          availableFor = handle;
+          available = false;
+          btn.classList.remove('loading');
+          btn.disabled = true;
+          input.classList.remove('is-valid');
+          input.classList.add('is-invalid');
+          setHint('@' + handle + ' is already taken. Try another one.', 'err');
+          return;
+        }
+
+        const ok = (typeof UI !== 'undefined' && typeof UI.confirmDialog === 'function')
+          ? await UI.confirmDialog({
+            title: 'Claim @' + handle + '?',
+            message: 'Friends will find you by this handle. It is permanent in v1 and cannot be changed later.',
+            confirmText: 'Claim handle',
+            cancelText: 'Choose another',
+          })
+          : true;
+        if (!ok) {
+          btn.classList.remove('loading');
+          btn.disabled = false;
+          input.focus();
+          return;
+        }
+
+        await Friends.claimHandle(handle);
+        lastHandle = handle;
+
+        // Mark handle as set so login.html skips this page next time
+        try { localStorage.setItem('shepu_handle_set', '1'); } catch { /**/ }
+
+        // ── Success ─────────────────────────────────────────
+        formView.style.display = 'none';
+        successView.classList.add('visible');
+        document.getElementById('success-handle-text').textContent = '@' + handle;
+
+        redirectTimer = setTimeout(() => {
+          window.location.replace(redirect);
+        }, 5000);
+
+      } catch (err) {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+
+        const msg = err && err.message ? err.message : 'Something went wrong.';
+        if (err && err.code === 'friends/handle-taken') {
+          setHint('@' + handle + ' is already taken. Try another one.', 'err');
+          input.classList.remove('is-valid');
+          input.classList.add('is-invalid');
+          btn.disabled = true;
+        } else if (err && err.code === 'friends/handle-set') {
+          // Already set — just go
+          window.location.replace(redirect);
+        } else {
+          setHint(msg, 'err');
+        }
+      }
+    }
+
+    btn.addEventListener('click', doSubmit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !btn.disabled) doSubmit();
+    });
+
+    const copyBtn = document.getElementById('copy-handle-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        if (!lastHandle) return;
+        let ok = false;
+        try { ok = await UI.copyText('@' + lastHandle); } catch { ok = false; }
+        if (ok) {
+          if (redirectTimer) { clearTimeout(redirectTimer); redirectTimer = null; }
+          copyBtn.querySelector('.btn-label').textContent = 'Copied ✓';
+          setTimeout(() => {
+            copyBtn.querySelector('.btn-label').textContent = 'Copy @handle';
+          }, 1600);
+        }
+      });
+    }
+
+    // Auto-focus
+    setTimeout(() => input.focus(), 400);
+  });
+})();
+</script>
+</body>
+</html>

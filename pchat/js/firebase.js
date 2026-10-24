@@ -56,23 +56,23 @@ const Firebase = (() => {
   function friendlyError(err) {
     const code = (err && (err.code || err.name)) || '';
     const map = {
-      'firebase/not-configured': 'Firebase config is missing. Fill js/firebase-config.js.',
-      'firebase/not-google': 'Friends need a real Google sign-in. Demo/email sessions cannot use the social layer.',
-      'firebase/not-signed-in': 'Not signed in to Firebase.',
-      'auth/invalid-credential': 'Firebase rejected this Google session. If the GIS client is in another Google Cloud project, add its client ID under Authentication → Google → "Safelist client IDs from external projects".',
-      'auth/invalid-api-key': 'The Firebase API key is invalid. Check js/firebase-config.js.',
-      'auth/operation-not-allowed': 'Google sign-in is not enabled. Firebase Console → Authentication → Sign-in method → Google.',
-      'auth/unauthorized-domain': 'This domain is not authorized. Firebase Console → Authentication → Settings → Authorized domains.',
-      'auth/popup-blocked': 'The browser blocked the Google popup. Allow popups for this site and retry.',
+      'firebase/not-configured': 'Friends are not available in this build yet.',
+      'firebase/not-google': 'Friends need a Google sign-in. Chat keeps working without it.',
+      'firebase/not-signed-in': 'Sign in to use Friends.',
+      'auth/invalid-credential': 'Google sign-in could not be verified. Please sign in again.',
+      'auth/invalid-api-key': 'Friends are unavailable right now. Chat still works.',
+      'auth/operation-not-allowed': 'Google sign-in is not available. Chat still works.',
+      'auth/unauthorized-domain': 'This site is not allowed to use Google sign-in yet.',
+      'auth/popup-blocked': 'The browser blocked the Google popup. Allow popups for this site and try again.',
       'auth/popup-closed-by-user': 'The Google popup was closed before finishing.',
       'auth/cancelled-popup-request': 'Another Google popup is already open.',
-      'auth/network-request-failed': 'Network error while reaching Firebase.',
-      'auth/web-storage-unsupported': 'This browser blocks the storage Firebase Auth needs (private mode?).',
-      'auth/account-exists-with-different-credential': 'This email already has a Firebase account with a different sign-in method.',
-      'permission-denied': 'Firestore rules rejected this operation. Deploy the latest firestore.rules.',
-      'failed-precondition': 'Firestore needs an index. Deploy firestore.indexes.json.',
-      'resource-exhausted': 'Firebase free-tier quota reached. Social features are paused until the quota resets.',
-      'unavailable': 'Firestore is unreachable right now.',
+      'auth/network-request-failed': 'Network error while reaching Google. Check your connection.',
+      'auth/web-storage-unsupported': 'This browser blocks the storage sign-in needs (private mode?).',
+      'auth/account-exists-with-different-credential': 'This email already has a different sign-in method.',
+      'permission-denied': 'Friends could not complete that just now. Please try again.',
+      'failed-precondition': 'Friends are temporarily unavailable. Please try again.',
+      'resource-exhausted': 'Friends are paused for a little while. Chat still works.',
+      'unavailable': 'Friends are offline right now.',
     };
     return map[code] || (err && err.message) || String(err);
   }
@@ -81,7 +81,7 @@ const Firebase = (() => {
   async function load() {
     if (loadPromise) return loadPromise;
     if (!isConfigured()) {
-      const e = new Error('Firebase config is missing. Fill js/firebase-config.js.');
+      const e = new Error('Friends are not available in this build yet.');
       e.code = 'firebase/not-configured';
       throw e;
     }

@@ -1104,18 +1104,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       shareModal.classList.remove('hidden');
     });
 
-    // Encrypted friend invite button (inside the share modal)
+    // invites.js already owns this button's click handler (it binds in its
+    // boot). This listener only closes the share modal behind the picker, so
+    // the picker is not opened twice.
     const inviteFriendsBtn = document.getElementById('room-invite-friends-btn');
     if (inviteFriendsBtn) {
       inviteFriendsBtn.addEventListener('click', () => {
-        shareModal.classList.add('hidden');
-        if (typeof Invites !== 'undefined' && Invites.openPicker) {
-          Invites.openPicker().catch((err) => {
-            UI.toast('error', 'Invite failed', err.message || String(err));
-          });
-        } else {
+        if (typeof Invites === 'undefined' || !Invites.openPicker) {
           UI.toast('info', 'Not available', 'Sign in with Google to invite friends.');
+          return;
         }
+        shareModal.classList.add('hidden');
       });
     }
 

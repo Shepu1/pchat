@@ -290,6 +290,7 @@
     'room': buildGroupList.bind(null, 'room'),
     'room-controls': (r) => buildInventory('room.html'),
     'dashboard': buildGroupList.bind(null, 'dashboard'),
+    'friends': buildGroupList.bind(null, 'friends'),
     'owner': buildGroupList.bind(null, 'owner'),
     'owner-controls': (r) => buildInventory('owner.html'),
     'settings': buildGroupList.bind(null, 'settings'),

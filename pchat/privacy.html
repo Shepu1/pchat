@@ -259,6 +259,7 @@
           <li>Your <strong>display name</strong> and chosen <strong>@handle</strong> (permanent in v1).</li>
           <li>An <strong>emoji avatar or initial</strong> — never a photo.</li>
           <li>Your <strong>friend list</strong> (UIDs only).</li>
+          <li>Your <strong>blocked list</strong> — the UIDs you blocked, plus the name/handle you saved for your own reference. Only you can read it.</li>
           <li>A <strong>last-active timestamp</strong> — updated at most once every 12 minutes while the app is open, only while your active-status toggle is on.</li>
           <li><strong>Friend requests</strong> (sender UID, recipient UID, status).</li>
           <li><strong>Encrypted room invites</strong> — an opaque ciphertext. Firestore never sees the room link, room name, or encryption key.</li>
@@ -273,7 +274,7 @@
         <h3 style="font-size:1rem;margin:1rem 0 0.5rem;">Your choices</h3>
         <ul>
           <li><strong>Active status:</strong> turn off in <em>Settings → Friends → Active status</em>. Presence writes stop immediately.</li>
-          <li><strong>Delete all social data:</strong> <em>Settings → Friends → Delete social data</em> removes your Firestore profile, handle, friend list, requests, and invites. Your rooms are unaffected.</li>
+          <li><strong>Delete all social data:</strong> <em>Settings → Friends → Delete social data</em> removes your Firestore profile, handle, friend list, blocked list, requests, and invites. Your rooms are unaffected.</li>
           <li><strong>Never use Friends:</strong> guests and email-only users are never enrolled.</li>
         </ul>
         <p>
