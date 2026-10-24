@@ -226,6 +226,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rtP = params.get('rt');
     if (rtP === 'saved' || rtP === 'quick') urlRoomKind = rtP;
   } catch { urlRoomKind = null; }
+  // Quick-room profile image (?img=) — validated against the bundled list.
+  let urlQuickIcon = null;
+  try {
+    const imP = params.get('img');
+    if (imP && typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(imP)) {
+      urlQuickIcon = imP;
+    }
+  } catch { urlQuickIcon = null; }
 
   if (!roomId) {
     window.location.href = 'index.html';
@@ -260,6 +268,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         roomName:     myRoom.name,
         roomDesc:     myRoom.description,
         roomSecret:   myRoom.secret || '',
+        roomKind:     urlRoomKind || (myRoom.spreadsheetId ? 'saved' : 'quick'),
+        quickIcon:    myRoom.quickIcon || undefined,
       };
       Storage.setSession(session);
       Storage.setCurrentRoom(roomId);
@@ -285,6 +295,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           roomName:     joinedRoom.name,
           roomDesc:     joinedRoom.description,
           roomSecret:   urlRoomSecret || joinedRoom.secret || '',
+          roomKind:     joinedRoom.kind || urlRoomKind || 'quick',
+          quickIcon:    joinedRoom.quickIcon || urlQuickIcon || undefined,
         };
         Storage.setSession(session);
         Storage.setCurrentRoom(roomId);
@@ -317,6 +329,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       if (urlRoomKind && session.roomKind !== urlRoomKind) {
         session.roomKind = urlRoomKind;
+        patched = true;
+      }
+      if (urlQuickIcon && session.quickIcon !== urlQuickIcon) {
+        session.quickIcon = urlQuickIcon;
         patched = true;
       }
       if (urlTheme && !session.theme) {
@@ -372,7 +388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       secret:        session.roomSecret || urlRoomSecret || '',
       theme:         session.theme || urlTheme || 1,
       kind:          session.roomKind || urlRoomKind || 'quick',
-      quickIcon:     session.quickIcon || undefined,
+      quickIcon:     session.quickIcon || urlQuickIcon || undefined,
     };
     // Save back to registry so future loads don't have to rebuild
     if (session.role === 'owner') {
@@ -411,6 +427,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (betterKind && !room.kind) {
       room.kind = betterKind;
       try { Rooms.updateRoom(roomId, { kind: betterKind }); } catch {}
+    }
+    const betterIcon = (typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(urlQuickIcon))
+      ? urlQuickIcon
+      : ((typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(session.quickIcon)) ? session.quickIcon : null);
+    if (betterIcon && room.quickIcon !== betterIcon) {
+      room.quickIcon = betterIcon;
+      try { Rooms.updateRoom(roomId, { quickIcon: betterIcon }); } catch {}
     }
     // Adopt the link's lock flag when the registry doesn't know yet.
     if (urlPwFlag && !room.passwordLocked) {

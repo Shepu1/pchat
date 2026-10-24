@@ -93,6 +93,17 @@ function renderRoomHeader(roomInfo, room) {
   // Code-point aware initial (emoji-leading names don't split surrogates)
   const firstCp = Array.from(roomInfo.name || 'R')[0] || 'R';
   document.getElementById('room-initial').innerHTML    = emoName(firstCp);
+  // Room profile: the same quick/saved image the chat header uses. The
+  // letter stays behind as a fallback if the image cannot load.
+  try {
+    const wrap = document.getElementById('owner-room-avatar');
+    const img  = document.getElementById('owner-room-avatar-img');
+    if (wrap && img && typeof Rooms !== 'undefined' && Rooms.roomIcon) {
+      img.onload  = () => { img.style.display = 'block'; wrap.style.fontSize = '0'; };
+      img.onerror = () => { img.remove(); };
+      img.src = Rooms.roomIcon(room, room.kind);
+    }
+  } catch { /* keep the letter fallback */ }
   document.getElementById('owner-room-name').innerHTML = emoName(roomInfo.name || '—');
   document.getElementById('owner-room-desc').textContent = roomInfo.description || '';
 
@@ -183,8 +194,8 @@ async function loadMembers(room, session, roomInfo) {
         </div>
         ${!isMe ? `
           <div style="display:flex;gap:0.5rem;">
-            <button class="btn btn-ghost btn-sm member-ban-btn" data-id="${m.memberId}" data-name="${escapeHtmlLocal(m.displayName)}" title="Ban member" aria-label="Ban member"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></button>
-            <button class="btn btn-ghost btn-sm member-remove-btn" data-id="${m.memberId}" data-name="${escapeHtmlLocal(m.displayName)}" title="Remove member" aria-label="Remove member"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            <button class="btn btn-ghost btn-sm member-ban-btn" data-id="${escapeHtmlLocal(m.memberId)}" data-name="${escapeHtmlLocal(m.displayName)}" title="Ban member" aria-label="Ban member"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg></button>
+            <button class="btn btn-ghost btn-sm member-remove-btn" data-id="${escapeHtmlLocal(m.memberId)}" data-name="${escapeHtmlLocal(m.displayName)}" title="Remove member" aria-label="Remove member"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
           </div>
         ` : ''}
       `;

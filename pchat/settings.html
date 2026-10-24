@@ -7,12 +7,12 @@
   <title>Settings — Pchat shepu</title>
   <meta name="description" content="Pchat shepu account and application preferences." />
   <meta name="theme-color" content="#090d16" />
-  <link rel="icon" href="assets/icons/icon.png?v=20261022b" type="image/png" />
-  <link rel="stylesheet" href="css/base.css?v=20261022b" />
-  <link rel="stylesheet" href="css/layout.css?v=20261022b" />
-  <link rel="stylesheet" href="css/components.css?v=20261022b" />
-  <link rel="stylesheet" href="css/invites.css?v=20261024g" />
-  <link rel="stylesheet" href="css/responsive.css?v=20261022b" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
+  <link rel="stylesheet" href="css/base.css?v=20261025b" />
+  <link rel="stylesheet" href="css/layout.css?v=20261025b" />
+  <link rel="stylesheet" href="css/components.css?v=20261025b" />
+  <link rel="stylesheet" href="css/invites.css?v=20261025b" />
+  <link rel="stylesheet" href="css/responsive.css?v=20261025b" />
 </head>
 <body>
 <div class="bg-mesh" aria-hidden="true"></div>
@@ -20,7 +20,7 @@
 <nav class="navbar">
   <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
     <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-weight:800;font-size:1.25rem;">
-      <img src="assets/icons/icon.png?v=20261022b" alt="Pchat shepu" class="app-logo-img" />
+      <img src="assets/icons/icon.png?v=20261025b" alt="Pchat shepu" class="app-logo-img" />
       Pchat shepu
     </a>
     <div class="navbar-actions">
@@ -403,17 +403,43 @@
             <div class="panel" id="settings-friends-handle-card" style="margin-bottom:1rem;">
               <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                Your handle
+                Your username
               </h4>
               <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
-                Friends find you by @handle. It is permanent in v1.
+                Friends find you by @username. You can change it once every 30 days.
               </p>
               <div id="settings-friends-status" style="font-size:0.875rem;color:var(--muted);">
                 Sign in with Google to use Friends.
               </div>
-              <div id="settings-friends-handle-row" style="display:none;margin-top:0.5rem;align-items:center;gap:0.6rem;flex-wrap:wrap;">
-                <span style="font-size:1.1rem;font-weight:700;color:var(--accent);" id="settings-friends-handle-val">—</span>
-                <button type="button" class="btn btn-ghost btn-sm" id="settings-copy-handle">Copy handle</button>
+              <div id="settings-friends-handle-row" style="display:none;margin-top:0.5rem;flex-direction:column;gap:0.6rem;">
+                <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                  <span style="font-size:1.1rem;font-weight:700;color:var(--accent);" id="settings-friends-handle-val">—</span>
+                  <button type="button" class="btn btn-ghost btn-sm" id="settings-copy-handle">Copy</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="settings-change-handle-btn" style="display:none;">Change username</button>
+                  <span id="settings-handle-cooldown-msg" style="font-size:0.78rem;color:var(--muted);display:none;"></span>
+                </div>
+                <!-- Change handle inline form -->
+                <div id="settings-change-handle-form" style="display:none;margin-top:0.5rem;">
+                  <div style="position:relative;margin-bottom:0.4rem;">
+                    <span style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);font-weight:700;color:var(--accent);pointer-events:none;">@</span>
+                    <input
+                      id="settings-new-handle-input"
+                      type="text"
+                      maxlength="20"
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="off"
+                      spellcheck="false"
+                      placeholder="new_username"
+                      style="width:100%;box-sizing:border-box;padding:0.7rem 0.75rem 0.7rem 2rem;font-size:0.95rem;font-weight:600;border-radius:0.6rem;border:2px solid var(--border);background:var(--surface-2);color:var(--text-1);outline:none;caret-color:var(--accent);"
+                    />
+                  </div>
+                  <p id="settings-new-handle-hint" style="font-size:0.78rem;color:var(--muted);min-height:1.2em;margin:0 0 0.5rem;">3–20 characters: a–z, 0–9, underscore</p>
+                  <div style="display:flex;gap:0.5rem;">
+                    <button type="button" class="btn btn-primary btn-sm" id="settings-confirm-handle-btn" disabled>Save username</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="settings-cancel-handle-btn">Cancel</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -470,7 +496,7 @@
                 Delete my social data
               </h4>
               <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
-                Removes your Friends profile, handle, friend list, and pending requests.
+                Removes your Friends profile, username, friend list, and pending requests.
                 Your rooms and chat history are not affected.
               </p>
               <button class="btn btn-danger btn-sm" id="settings-delete-social-btn"
@@ -489,17 +515,17 @@
 
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-<script src="js/config.js?v=20261022b"></script>
-<script src="js/storage.js?v=20261022b"></script>
-<script src="js/ui.js?v=20261022b"></script>
-<script src="js/auth.js?v=20261022b"></script>
-<script src="js/firebase-config.js?v=20261024d"></script>
-<script src="js/firebase.js?v=20261024d"></script>
-<script src="js/friends.js?v=20261024g"></script>
-<script src="js/invites.js?v=20261024g"></script>
-<script src="js/instant-security.js?v=20261022b"></script>
-<script src="js/ntfy-sync.js?v=20261022b"></script>
-<script src="js/rooms.js?v=20261022b"></script>
+<script src="js/config.js?v=20261025b"></script>
+<script src="js/storage.js?v=20261025b"></script>
+<script src="js/ui.js?v=20261025b"></script>
+<script src="js/auth.js?v=20261025b"></script>
+<script src="js/firebase-config.js?v=20261025b"></script>
+<script src="js/firebase.js?v=20261025b"></script>
+<script src="js/friends.js?v=20261025b"></script>
+<script src="js/invites.js?v=20261025b"></script>
+<script src="js/instant-security.js?v=20261025b"></script>
+<script src="js/ntfy-sync.js?v=20261025b"></script>
+<script src="js/rooms.js?v=20261025b"></script>
 <style>
   /* The global .btn display rule would otherwise defeat the hidden attribute. */
   #settings-copy-handle[hidden] { display: none !important; }
@@ -648,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function registerNotifySW() {
     try {
-      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20261021a').catch(() => {});
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=20261025b').catch(() => {});
     } catch {}
   }
 
@@ -865,8 +891,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (s.status === 'ready' && s.profile) {
         if (statusEl) { statusEl.style.display = 'none'; }
         if (handleRow) { handleRow.style.display = 'flex'; }
-        if (handleVal) { handleVal.textContent = s.profile.handle ? '@' + s.profile.handle : '(no handle yet)'; }
+        if (handleVal) { handleVal.textContent = s.profile.handle ? '@' + s.profile.handle : '(no username yet)'; }
         if (copyHandle) copyHandle.hidden = !s.profile.handle;
+
+        // Handle change button + cooldown
+        const changeBtn = document.getElementById('settings-change-handle-btn');
+        const cooldownMsg = document.getElementById('settings-handle-cooldown-msg');
+        if (changeBtn && cooldownMsg) {
+          const cooldownLeft = (typeof Friends.handleChangeCooldownMs === 'function')
+            ? Friends.handleChangeCooldownMs() : 0;
+          if (cooldownLeft > 0) {
+            const days = Math.ceil(cooldownLeft / (24 * 60 * 60 * 1000));
+            changeBtn.style.display = 'none';
+            cooldownMsg.style.display = '';
+            cooldownMsg.textContent = `\uD83D\uDD52 Can change again in ${days} day${days === 1 ? '' : 's'}`;
+          } else {
+            changeBtn.style.display = '';
+            cooldownMsg.style.display = 'none';
+          }
+        }
+
         if (presToggle) { presToggle.checked = s.profile.showPresence !== false; }
         renderBlockedUsers(s);
       } else if (s.status === 'loading') {
@@ -917,6 +961,111 @@ document.addEventListener('DOMContentLoaded', () => {
         const ok = await UI.copyText('@' + handle);
         if (ok) UI.toast('success', 'Handle copied', `Send @${handle} to a friend so they can add you.`);
         else UI.toast('error', 'Copy failed', 'Your browser blocked clipboard access.');
+      });
+    }
+
+    // ── Change handle inline flow ──────────────────────────────────
+    const HANDLE_RE_SETTINGS = /^[a-z0-9_]{3,20}$/;
+    const changeHandleBtn   = document.getElementById('settings-change-handle-btn');
+    const changeHandleForm  = document.getElementById('settings-change-handle-form');
+    const newHandleInput    = document.getElementById('settings-new-handle-input');
+    const newHandleHint     = document.getElementById('settings-new-handle-hint');
+    const confirmHandleBtn  = document.getElementById('settings-confirm-handle-btn');
+    const cancelHandleBtn   = document.getElementById('settings-cancel-handle-btn');
+
+    function setHandleHint(text, ok) {
+      if (!newHandleHint) return;
+      newHandleHint.textContent = text;
+      newHandleHint.style.color = ok === true ? 'var(--success,#22c55e)'
+        : ok === false ? 'var(--danger,#ef4444)'
+        : 'var(--muted)';
+    }
+
+    if (changeHandleBtn && changeHandleForm) {
+      changeHandleBtn.addEventListener('click', () => {
+        changeHandleForm.style.display = 'block';
+        changeHandleBtn.style.display = 'none';
+        if (newHandleInput) { newHandleInput.value = ''; newHandleInput.focus(); }
+        setHandleHint('3–20 characters: a–z, 0–9, underscore', null);
+        if (confirmHandleBtn) confirmHandleBtn.disabled = true;
+      });
+    }
+
+    if (cancelHandleBtn) {
+      cancelHandleBtn.addEventListener('click', () => {
+        if (changeHandleForm) changeHandleForm.style.display = 'none';
+        if (changeHandleBtn) changeHandleBtn.style.display = '';
+        setHandleHint('3–20 characters: a–z, 0–9, underscore', null);
+      });
+    }
+
+    let handleCheckTimer = null;
+    let handleCheckSeq   = 0;
+    if (newHandleInput) {
+      newHandleInput.addEventListener('input', () => {
+        clearTimeout(handleCheckTimer);
+        if (confirmHandleBtn) confirmHandleBtn.disabled = true;
+        const raw = newHandleInput.value.trim().toLowerCase().replace(/^@+/, '');
+        if (!raw) { setHandleHint('3–20 characters: a–z, 0–9, underscore', null); return; }
+        if (!HANDLE_RE_SETTINGS.test(raw)) {
+          setHandleHint(raw.length < 3 ? 'Too short — min 3 characters.'
+            : raw.length > 20 ? 'Too long — max 20 characters.'
+            : 'Only a–z, 0–9, _ allowed.', false);
+          return;
+        }
+        const currentHandle = (typeof Friends !== 'undefined' && Friends.getState().profile)
+          ? Friends.getState().profile.handle : '';
+        if (raw === currentHandle) {
+          setHandleHint('This is already your handle.', false);
+          return;
+        }
+        const seq = ++handleCheckSeq;
+        setHandleHint('Checking availability…', null);
+        handleCheckTimer = setTimeout(async () => {
+          try {
+            const result = await Friends.checkHandle(raw);
+            if (seq !== handleCheckSeq) return;
+            if (result && result.available) {
+              setHandleHint('@' + raw + ' is available ✔', true);
+              if (confirmHandleBtn) confirmHandleBtn.disabled = false;
+            } else {
+              setHandleHint('@' + raw + ' is already taken.', false);
+            }
+          } catch {
+            if (seq !== handleCheckSeq) return;
+            setHandleHint('@' + raw + ' — could not check, try saving anyway.', null);
+            if (confirmHandleBtn) confirmHandleBtn.disabled = false;
+          }
+        }, 450);
+      });
+    }
+
+    if (confirmHandleBtn) {
+      confirmHandleBtn.addEventListener('click', async () => {
+        const raw = (newHandleInput ? newHandleInput.value.trim().toLowerCase().replace(/^@+/, '') : '');
+        if (!HANDLE_RE_SETTINGS.test(raw)) return;
+        confirmHandleBtn.disabled = true;
+        confirmHandleBtn.textContent = 'Saving…';
+        try {
+          const ok = await UI.confirmDialog({
+            title: 'Change username to @' + raw + '?',
+            message: 'Your old username will be released. Friends will need to use your new username to find you. You won\'t be able to change again for 30 days.',
+            confirmText: 'Change username',
+            cancelText: 'Keep current',
+          });
+          if (!ok) { confirmHandleBtn.disabled = false; confirmHandleBtn.textContent = 'Save username'; return; }
+          await Friends.changeHandle(raw);
+          if (changeHandleForm) changeHandleForm.style.display = 'none';
+          updateFriendsUI();
+          UI.toast('success', 'Username changed', `Your username is now @${raw}`);
+        } catch (err) {
+          const msg = (err && err.message) || 'Could not change username.';
+          setHandleHint(msg, false);
+          UI.toast('error', 'Could not change username', msg);
+        } finally {
+          confirmHandleBtn.disabled = false;
+          confirmHandleBtn.textContent = 'Save username';
+        }
       });
     }
 

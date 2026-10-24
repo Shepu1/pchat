@@ -146,34 +146,25 @@ const Rooms = {
     const list = this.QUICK_ROOM_ICONS;
     return list[Math.floor(Math.random() * list.length)];
   },
+  // Only the four bundled room images are valid — an invite link's &img=
+  // value is untrusted input and must never become an arbitrary src.
+  isQuickIcon(value) {
+    return typeof value === 'string' && this.QUICK_ROOM_ICONS.indexOf(value) !== -1;
+  },
   // Stored pick when available, otherwise a stable hash of the room id
   // (older rooms have no stored icon yet).
   quickIconFor(room) {
     const stored = room && room.quickIcon;
-    if (stored && this.QUICK_ROOM_ICONS.indexOf(stored) !== -1) return stored;
+    if (this.isQuickIcon(stored)) return stored;
     const id = String((room && (room.id || room.roomId)) || '');
     let hash = 0;
     for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
     return this.QUICK_ROOM_ICONS[hash % this.QUICK_ROOM_ICONS.length];
   },
-  // The icon the owner picked in the create form (chat/trend/rocket/…).
-  // Rendered as an SVG data URI so every consumer can keep using <img src>.
-  roomIconDataUri(room) {
-    const key = room && (room.icon || room.roomIcon);
-    if (!key || typeof key !== 'string') return '';
-    try {
-      if (typeof Icons === 'undefined' || !Icons || typeof Icons[key] !== 'function') return '';
-      let markup = Icons[key](64);
-      if (typeof markup !== 'string' || !markup) return '';
-      // currentColor has no meaning inside a data URI — use a concrete colour.
-      markup = markup.replace(/currentColor/g, '#ffffff');
-      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
-    } catch { return ''; }
-  },
+  // The room profile is one of the image files in assets/icons — never an
+  // SVG glyph. Quick rooms use their stored (random) quick image, saved
+  // rooms use saved.webp.
   roomIcon(room, kindHint) {
-    // The owner's pick wins — it used to be stored and then never read.
-    const picked = this.roomIconDataUri(room);
-    if (picked) return picked;
     return this.roomKind(room, kindHint) === 'saved'
       ? 'assets/icons/saved.webp'
       : this.quickIconFor(room);
@@ -240,6 +231,9 @@ const Rooms = {
       status: 'active',
       created_at: now,
       theme,
+      // The chosen room image travels with the room metadata so every device
+      // that learns about the room can show the same picture.
+      quickIcon: room.quickIcon,
       members: [{ id: memberId, name: resolvedOwner, role: 'owner', status: 'online', lastActive: Date.now() }],
       messages: []
     };
@@ -568,9 +562,14 @@ const Rooms = {
       } catch {}
     }
     const themeParam = `&th=${RoomTheme.normalize(theme || 1)}`;
+    // Quick rooms carry their profile image in the link so the guest sees
+    // the SAME picture as the owner; saved rooms always use saved.webp.
+    const kind = this.roomKind(room);
+    const quickIcon = (kind === 'quick' && room) ? this.quickIconFor(room) : '';
+    const iconParam = quickIcon ? `&img=${encodeURIComponent(quickIcon)}` : '';
 
-    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}&rt=${this.roomKind(room)}${roomLocked ? '&pw=1' : ''}${keyFrag}`;
-    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}&rt=${this.roomKind(room)}${roomLocked ? '&pw=1' : ''}${keyFrag}`;
+    let phoneUrl = `${phoneOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}&rt=${kind}${roomLocked ? '&pw=1' : ''}${iconParam}${keyFrag}`;
+    let localUrl = `${localOrigin}${basePath}/join.html?r=${roomId}&ep=${encodedEp}&n=${encodedName}${themeParam}&rt=${kind}${roomLocked ? '&pw=1' : ''}${iconParam}${keyFrag}`;
     // No hardcoded host path anymore: on GitHub Pages (any repo/subfolder)
     // the link is built from the live origin + base path, so moving hosting
     // (e.g. /s/index/pchat → /pchat/pchat) never produces stale links.
@@ -856,10 +855,12 @@ const RoomAPI = {
       // registry/session name before surrendering to 'Private Room'.
       let fallbackName = '';
       let fallbackLocked = false;
+      let fallbackQuickIcon = '';
       try {
         const reg = (typeof Rooms !== 'undefined' && Rooms.getRoom) ? Rooms.getRoom(roomId) : null;
         if (reg && reg.name && reg.name !== 'Private Room') fallbackName = reg.name;
         if (reg && reg.passwordLocked === true) fallbackLocked = true;
+        if (reg && reg.quickIcon) fallbackQuickIcon = reg.quickIcon;
         if (!fallbackName) {
           const sess = (typeof Storage !== 'undefined' && Storage.getSession) ? Storage.getSession() : null;
           if (sess && sess.roomId === roomId && sess.roomName && sess.roomName !== 'Private Room') fallbackName = sess.roomName;
@@ -875,6 +876,7 @@ const RoomAPI = {
         status: roomStatus,
         created_at: roomData.created_at || new Date().toISOString(),
         passwordLocked: !!(roomData.passwordLocked || fallbackLocked),
+        quickIcon: roomData.quickIcon || fallbackQuickIcon || undefined,
       };
       return {
         success: true,

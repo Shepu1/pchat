@@ -81,11 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // The room icon is a monochrome SVG choice — it is stored as room
-    // metadata instead of being mixed into the room name, so every room
-    // name stays clean and professional.
-    const roomIcon = (window.__pchatRoomIcon) || 'chat';
-
     // Show progress
     document.getElementById('step-form').style.display     = 'none';
     document.getElementById('step-progress').style.display = '';
@@ -100,11 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('step-form').style.display     = '';
         return;
       }
-      try {
-        if (typeof Rooms !== 'undefined' && typeof Rooms.updateRoom === 'function') {
-          Rooms.updateRoom(createdRoom.id, { icon: roomIcon });
-        }
-      } catch (e) { /* non-fatal */ }
       showSuccess(createdRoom);
     } catch (err) {
       console.error('Room creation failed:', err);

@@ -132,6 +132,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const pwParam = params.get('pw') === '1';
   // Room kind (?rt=saved|quick) tells the join card which profile icon to show.
   const kindParam = params.get('rt') === 'saved' ? 'saved' : (params.get('rt') === 'quick' ? 'quick' : null);
+  // The owner's quick-room image (?img=) travels with the invite so every
+  // device shows the same picture. Validate against the bundled image list.
+  let imgParam = null;
+  try {
+    const raw = params.get('img');
+    if (raw && typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(raw)) {
+      imgParam = raw;
+    }
+  } catch { imgParam = null; }
 
   // Update local room record with deployment URL if we just learned it
   if (room && !room.deploymentUrl && deploymentUrl) {
@@ -187,6 +196,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     || (roomInfo.spreadsheetId ? 'saved' : null)
     || ((room && room.spreadsheetId) ? 'saved' : null)
     || 'quick';
+  if (roomInfo.kind === 'quick') {
+    // Invite link wins; then the backend/registry value; then the stable
+    // hash fallback used by Rooms.roomIcon().
+    const nextIcon = imgParam
+      || ((typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(roomInfo.quickIcon)) ? roomInfo.quickIcon : null)
+      || ((room && typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(room.quickIcon)) ? room.quickIcon : null);
+    if (nextIcon) roomInfo.quickIcon = nextIcon;
+  }
   // Password lock: server flag is authoritative; `&pw=1` covers quick rooms
   // whose backend (guest's own mock row) cannot know the lock state.
   roomInfo.passwordLocked = roomInfo.passwordLocked === true || pwParam === true;
@@ -317,6 +334,7 @@ function bindJoinForm() {
         roomName:     roomInfo.name || 'Private Room',
         roomDesc:     roomInfo.description || '',
         roomKind:     roomInfo.kind || kindParam || 'quick',
+        quickIcon:    roomInfo.quickIcon || undefined,
         passwordLocked: roomInfo.passwordLocked === true,
         roomSecret:   roomSecret || (room && room.secret) || undefined,
         theme:        inviteTheme || (room && room.theme) || 1,
@@ -335,6 +353,7 @@ function bindJoinForm() {
         joinedAt:    sessionData.joinedAt,
         isOwner:     false,
         kind:        roomInfo.kind || kindParam || 'quick',
+        quickIcon:   roomInfo.quickIcon || undefined,
         passwordLocked: roomInfo.passwordLocked === true,
         secret:      roomSecret || (room && room.secret) || undefined,
         theme:       inviteTheme || (room && room.theme) || 1,
@@ -538,6 +557,13 @@ function showRejoin(roomInfo, session) {
         if (roomInfo) roomInfo.kind = rtP;
         touched = true;
       }
+      const imgP = qp.get('img');
+      if (imgP && typeof Rooms !== 'undefined' && Rooms.isQuickIcon && Rooms.isQuickIcon(imgP)
+        && session.quickIcon !== imgP) {
+        session.quickIcon = imgP;
+        if (roomInfo) roomInfo.quickIcon = imgP;
+        touched = true;
+      }
     } catch {}
     try {
       const thP = qp.get('th');
@@ -558,6 +584,7 @@ function showRejoin(roomInfo, session) {
       if (freshDep && reg.deploymentUrl !== freshDep) patch.deploymentUrl = freshDep;
       if ((!reg.name || reg.name === 'Private Room') && session.roomName && session.roomName !== 'Private Room') patch.name = session.roomName;
       if (!reg.kind && session.roomKind) patch.kind = session.roomKind;
+      if (session.quickIcon && reg.quickIcon !== session.quickIcon) patch.quickIcon = session.quickIcon;
       // Owner may have removed the password: clear the stale flag so rejoin
       // stops prompting forever. Uses all four signals (link/backend/trust).
       const desiredLocked = passwordLockPatch(
@@ -590,6 +617,8 @@ function showRejoin(roomInfo, session) {
         deploymentUrl: session.deploymentUrl || `mock://local/${session.roomId}`,
         joinedAt:     session.joinedAt || new Date().toISOString(),
         isOwner:      session.role === 'owner',
+        kind:         session.roomKind || 'quick',
+        quickIcon:    session.quickIcon || undefined,
         secret:       session.roomSecret || '',
         theme:        session.theme || 1,
       };

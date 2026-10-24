@@ -52,7 +52,7 @@ const Notify = (() => {
     if (typeof navigator === 'undefined' || !navigator.serviceWorker) return null;
     try {
       let reg = await navigator.serviceWorker.getRegistration();
-      if (!reg) reg = await navigator.serviceWorker.register('sw.js?v=20261021a');
+      if (!reg) reg = await navigator.serviceWorker.register('sw.js?v=20261025b');
       // `ready` can stay pending while a new worker activates; never let a
       // chat alert wait forever on it.
       try {

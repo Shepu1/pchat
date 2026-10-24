@@ -110,12 +110,14 @@ const Friends = (() => {
     if (!err) return 'Something went wrong.';
     const custom = {
       'friends/not-ready': 'Friends are still connecting. Try again in a moment.',
-      'friends/no-handle': 'Choose your @handle first, then send the request.',
-      'friends/handle-invalid': 'Handle must be 3–20 characters: a–z, 0–9, or _.',
-      'friends/handle-taken': 'That handle is already taken. Try another one.',
-      'friends/handle-set': 'Your handle is already set. It cannot be changed in v1.',
-      'friends/self': 'That is your own handle.',
-      'friends/not-found': 'No user found with that handle.',
+      'friends/no-handle': 'Choose your @username first, then send the request.',
+      'friends/handle-invalid': 'Username must be 3–20 characters: a–z, 0–9, or _.',
+      'friends/handle-taken': 'That username is already taken. Try another one.',
+      'friends/handle-set': 'Your username is already set.',
+      'friends/handle-same': 'That is already your username.',
+      'friends/handle-cooldown': 'You can change your username again after the cooldown period.',
+      'friends/self': 'That is your own username.',
+      'friends/not-found': 'No user found with that username.',
       'friends/already-friends': 'You are already friends.',
       'friends/already-pending': 'A friend request is already pending.',
       'friends/not-friends': 'You are not friends with this user.',
@@ -145,12 +147,15 @@ const Friends = (() => {
     return String(raw == null ? '' : raw).trim().replace(/^@+/, '').toLowerCase();
   }
 
+  const HANDLE_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
   function normalizeProfile(data) {
     const d = data || {};
     const list = Array.isArray(d.friendUids) ? d.friendUids : [];
     return {
       name: d.name || '',
       handle: d.handle || '',
+      handleChangedAt: d.handleChangedAt || null,
       avatar: d.avatar || '',
       pubKey: d.pubKey || null,
       friendUids: [...new Set(list.filter((x) => typeof x === 'string' && x))],
@@ -946,7 +951,7 @@ const Friends = (() => {
     }, 800);
   }
 
-  // ── Handle claim / search ──────────────────────────────────────
+  // ── Handle claim / change / search ────────────────────────────
   async function claimHandle(raw) {
     if (status !== 'ready' || !profile) {
       throw makeError('friends/not-ready', 'Friends are still connecting.');
@@ -982,7 +987,10 @@ const Friends = (() => {
     }
 
     try {
-      await fsMod.updateDoc(fsMod.doc(db, 'users', uid), { handle });
+      await fsMod.updateDoc(fsMod.doc(db, 'users', uid), {
+        handle,
+        handleChangedAt: fsMod.serverTimestamp(),
+      });
     } catch (err) {
       if (created) {
         try { await fsMod.deleteDoc(handleRef); } catch { /* best effort */ }
@@ -991,6 +999,89 @@ const Friends = (() => {
     }
 
     profile.handle = handle;
+    profile.handleChangedAt = { seconds: Math.floor(Date.now() / 1000) };
+    emit();
+    return handle;
+  }
+
+  // Returns ms remaining until handle can be changed, or 0 if change is allowed.
+  function handleChangeCooldownMs() {
+    if (!profile || !profile.handle) return 0; // no handle yet → always allowed
+    if (!profile.handleChangedAt) return 0;    // never changed → allowed
+    const changedMs = tsToMillis(profile.handleChangedAt);
+    if (!changedMs) return 0;
+    const remaining = changedMs + HANDLE_CHANGE_COOLDOWN_MS - Date.now();
+    return remaining > 0 ? remaining : 0;
+  }
+
+  async function changeHandle(raw) {
+    if (status !== 'ready' || !profile) {
+      throw makeError('friends/not-ready', 'Friends are still connecting.');
+    }
+    const handle = normalizeHandle(raw);
+    if (!HANDLE_RE.test(handle)) {
+      throw makeError('friends/handle-invalid', 'Invalid handle.');
+    }
+    if (handle === profile.handle) {
+      throw makeError('friends/handle-same', 'This is already your handle.');
+    }
+
+    // Check cooldown
+    const cooldownLeft = handleChangeCooldownMs();
+    if (cooldownLeft > 0) {
+      const days = Math.ceil(cooldownLeft / (24 * 60 * 60 * 1000));
+      throw makeError(
+        'friends/handle-cooldown',
+        `You can change your handle again in ${days} day${days === 1 ? '' : 's'}.`
+      );
+    }
+
+    // Claim new handle slot
+    const newHandleRef = fsMod.doc(db, 'usernames', handle);
+    const snap = await fsMod.getDoc(newHandleRef);
+    let created = false;
+
+    if (snap.exists()) {
+      const data = snap.data() || {};
+      if (data.uid !== uid) throw makeError('friends/handle-taken', 'Handle taken.');
+    } else {
+      try {
+        await fsMod.setDoc(newHandleRef, {
+          uid,
+          createdAt: fsMod.serverTimestamp(),
+        });
+        created = true;
+      } catch (err) {
+        if (err && (err.code === 'permission-denied' || err.code === 'already-exists')) {
+          throw makeError('friends/handle-taken', 'Handle taken.');
+        }
+        throw err;
+      }
+    }
+
+    const oldHandle = profile.handle;
+
+    try {
+      await fsMod.updateDoc(fsMod.doc(db, 'users', uid), {
+        handle,
+        handleChangedAt: fsMod.serverTimestamp(),
+      });
+    } catch (err) {
+      if (created) {
+        try { await fsMod.deleteDoc(newHandleRef); } catch { /* best effort */ }
+      }
+      throw err;
+    }
+
+    // Release old handle slot (best effort — not critical)
+    if (oldHandle) {
+      try { await fsMod.deleteDoc(fsMod.doc(db, 'usernames', oldHandle)); } catch { /* ignore */ }
+    }
+
+    profile.handle = handle;
+    profile.handleChangedAt = { seconds: Math.floor(Date.now() / 1000) };
+    // Update the localStorage handle-set flag
+    try { localStorage.setItem('shepu_handle_set', '1'); } catch { /* ignore */ }
     emit();
     return handle;
   }
@@ -1419,6 +1510,8 @@ const Friends = (() => {
     subscribe,
     onEvent,
     claimHandle,
+    changeHandle,
+    handleChangeCooldownMs,
     checkHandle,
     search,
     sendRequest,
