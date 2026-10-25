@@ -63,11 +63,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Regenerate button is not implemented yet — explain instead of dead click
+  // ── Regenerate invite link ────────────────────────────────────
   const regenBtn = document.getElementById('regen-link-btn');
   if (regenBtn) {
-    regenBtn.addEventListener('click', () => {
-      UI.toast('info', 'Coming soon', 'Link regeneration is not available yet. Your current invite link keeps working.');
+    regenBtn.addEventListener('click', async () => {
+      const ok = await UI.confirm(
+        'Regenerate Link',
+        'Are you sure you want to regenerate the invite link? Previous invite links will stop working for new joins.'
+      );
+      if (!ok) return;
+      try {
+        const fresh = Rooms.rotateRoomSecret(room.id);
+        if (fresh) {
+          room.secret = fresh;
+          const urls = Rooms.getShareUrls(room.id, room.deploymentUrl, room.name);
+          const disp = document.getElementById('room-link-display');
+          if (disp) disp.textContent = urls.defaultUrl;
+          UI.toast('success', 'Link regenerated', 'A new invite link has been created.');
+        } else {
+          UI.toast('error', 'Failed', 'Could not regenerate link.');
+        }
+      } catch (err) {
+        UI.toast('error', 'Failed', err && err.message ? err.message : 'Could not regenerate link.');
+      }
     });
   }
 

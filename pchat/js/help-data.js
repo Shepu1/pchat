@@ -6,10 +6,10 @@
  * Re-run that script after changing a feature; it refuses to write
  * until every change in the code is described.
  *
- * Generated: 2026-10-24T15:29:39.758Z
+ * Generated: 2026-10-25T18:11:56.673Z
  */
 window.HelpData = {
-  "generatedAt": "2026-10-24T15:29:39.758Z",
+  "generatedAt": "2026-10-25T18:11:56.673Z",
   "app": {
     "name": "Pchat shepu",
     "aka": "SHEPU ROOMS",
@@ -23,6 +23,13 @@ window.HelpData = {
       "pageTitle": "About",
       "description": "Pchat shepu — create a room, own the data. What the app is, why it works this way, and what it is built on.",
       "blurb": "What Pchat is, why it works the way it does, and what the project is built on."
+    },
+    {
+      "file": "app-login.html",
+      "title": "App Google Sign In",
+      "pageTitle": "PCHAT — Google লগইন",
+      "description": "PCHAT অ্যাপের জন্য ব্রাউজারে Google লগইন সম্পন্ন করুন।",
+      "blurb": "Companion page used by the Flutter app wrapper to complete Google Sign-In securely in the system browser."
     },
     {
       "file": "create.html",
@@ -41,7 +48,7 @@ window.HelpData = {
     {
       "file": "index.html",
       "title": "Chats",
-      "pageTitle": "Pchat shepu — Fast & Private Messaging",
+      "pageTitle": "Pchat — Fast & Private Messaging",
       "description": "",
       "blurb": "Your dashboard — every room you own and every room you have joined, plus the buttons to create or join one."
     },
@@ -90,8 +97,8 @@ window.HelpData = {
     {
       "file": "setup-handle.html",
       "title": "Choose your @handle",
-      "pageTitle": "Choose your @handle",
-      "description": "Choose a unique @handle so friends can find and add you on Pchat shepu.",
+      "pageTitle": "Choose your username",
+      "description": "Choose a unique @username so friends can find and add you on Pchat shepu.",
       "blurb": "The one-time step after Google sign-in: pick the permanent @handle friends will use to find you. You can skip it and set one later from Settings."
     },
     {
@@ -104,6 +111,7 @@ window.HelpData = {
   ],
   "controls": {
     "about.html": [],
+    "app-login.html": [],
     "create.html": [
       {
         "id": "btn-copy-apps-script-code",
@@ -148,6 +156,10 @@ window.HelpData = {
       {
         "id": "btn-desktop-submit-join",
         "label": "Join Room Now"
+      },
+      {
+        "id": "modal-tab-create",
+        "label": "Create"
       },
       {
         "id": "sheet-pw-toggle",
@@ -215,7 +227,7 @@ window.HelpData = {
     "login.html": [
       {
         "id": "demo-signin-btn",
-        "label": "Or continue as Quick Test User (Shepu)"
+        "label": "Quick Guest Sign-in"
       },
       {
         "id": "btn-copy-origin",
@@ -355,8 +367,28 @@ window.HelpData = {
         "label": "Unlock"
       },
       {
+        "id": "notify-soft-enable",
+        "label": "Enable"
+      },
+      {
+        "id": "notify-soft-dismiss",
+        "label": "Dismiss"
+      },
+      {
         "id": "scroll-to-bottom-btn",
         "label": "Scroll to latest messages"
+      },
+      {
+        "id": "voice-rec-cancel",
+        "label": "Discard recording"
+      },
+      {
+        "id": "voice-rec-send",
+        "label": "Send voice message"
+      },
+      {
+        "id": "voice-rec-stop",
+        "label": "Stop recording"
       },
       {
         "id": "cancel-attachment-btn",
@@ -482,7 +514,15 @@ window.HelpData = {
       },
       {
         "id": "settings-copy-handle",
-        "label": "Copy handle"
+        "label": "Copy"
+      },
+      {
+        "id": "settings-change-handle-btn",
+        "label": "Change username"
+      },
+      {
+        "id": "settings-confirm-handle-btn",
+        "label": "Save username"
       },
       {
         "id": "settings-repair-invite-key",
@@ -496,7 +536,7 @@ window.HelpData = {
     "setup-handle.html": [
       {
         "id": "btn-claim",
-        "label": "Claim @handle"
+        "label": "Claim username"
       },
       {
         "id": "skip-link",
@@ -504,7 +544,7 @@ window.HelpData = {
       },
       {
         "id": "copy-handle-btn",
-        "label": "Copy @handle"
+        "label": "Copy @username"
       }
     ],
     "terms.html": []
@@ -919,6 +959,7 @@ window.HelpData = {
       "shepu_insecure_ack",
       "shepu_lan_ip",
       "shepu_music_vol",
+      "shepu_notify_banner_dismissed",
       "shepu_notify_pref",
       "shepu_pic_custom",
       "shepu_profile_pic",
@@ -1132,7 +1173,6 @@ window.HelpData = {
   },
   "roomKinds": {
     "kinds": [
-      "saved",
       "quick"
     ],
     "quickIcons": 4

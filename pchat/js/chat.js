@@ -2344,12 +2344,72 @@ const Chat = (() => {
 
     attachBtn.addEventListener('click', () => fileInput.click());
 
-    fileInput.addEventListener('change', () => {
+    async function _compressImageFile(file, maxDim = 1600, quality = 0.82) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          let w = img.naturalWidth || img.width;
+          let h = img.naturalHeight || img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const head = 'data:image/jpeg;base64,';
+          const approxBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
+          resolve({
+            name: file.name.replace(/\.[^.]+$/, '') + '.jpg',
+            type: 'image/jpeg',
+            size: approxBytes,
+            dataUrl,
+          });
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('Image decode error'));
+        };
+        img.src = url;
+      });
+    }
+
+    fileInput.addEventListener('change', async () => {
       const file = fileInput.files[0];
       if (!file) return;
 
+      // Images: automatic client-side compression to prevent payload failure
+      if (file.type && file.type.startsWith('image/')) {
+        try {
+          if (file.size > 2 * 1024 * 1024) {
+            UI.toast('info', 'Optimizing Image', 'Compressing high-resolution photo for fast encrypted delivery...');
+          }
+          const compressed = await _compressImageFile(file);
+          _showAttachmentPreview({
+            name: compressed.name,
+            size: compressed.size,
+            type: compressed.type,
+            dataUrl: compressed.dataUrl,
+          });
+          return;
+        } catch (err) {
+          console.warn('Canvas compression fallback to raw file', err);
+        }
+      }
+
+      // Non-image files: check maximum limit
       if (file.size > 5 * 1024 * 1024) {
-        UI.toast('error', 'File Too Large', 'Maximum attachment size is 5MB.');
+        UI.toast('warning', 'File Too Large', 'Maximum file attachment size is 5MB. Please choose a smaller document or share via cloud link.');
         fileInput.value = '';
         return;
       }
@@ -3285,6 +3345,38 @@ const Chat = (() => {
       } catch {}
       UI.toast('success', 'Notifications On', 'Sounds and background alerts are enabled.');
     });
+
+    // Soft in-line banner: shown only when system notification permission is 'default' and not dismissed
+    const softBanner = document.getElementById('notify-soft-banner');
+    const softEnable = document.getElementById('notify-soft-enable');
+    const softDismiss = document.getElementById('notify-soft-dismiss');
+    if (softBanner && typeof Notification !== 'undefined') {
+      try {
+        const dismissed = localStorage.getItem('shepu_notify_banner_dismissed') === '1';
+        if (Notification.permission === 'default' && !dismissed && Notify.isSoundOn()) {
+          softBanner.classList.remove('hidden');
+        }
+      } catch {}
+
+      if (softEnable) {
+        softEnable.onclick = async () => {
+          softBanner.classList.add('hidden');
+          try {
+            const res = await Notify.requestPermission();
+            if (res === 'granted') {
+              paint();
+              UI.toast('success', 'Notifications Enabled', 'You will receive desktop alerts for new messages.');
+            }
+          } catch {}
+        };
+      }
+      if (softDismiss) {
+        softDismiss.onclick = () => {
+          softBanner.classList.add('hidden');
+          try { localStorage.setItem('shepu_notify_banner_dismissed', '1'); } catch {}
+        };
+      }
+    }
   }
 
   function _bindEncryption() {
@@ -3670,6 +3762,126 @@ const Chat = (() => {
     setTimeout(() => wrap.classList.add('loaded'), Math.max(0, delay || 0));
   }
 
+  // ── Pollinations watermark cleanup ───────────────────────────────
+  // Anonymous image.pollinations.ai requests burn a small "pollinations.ai"
+  // logo into the bottom-right corner (the nologo flag is only honoured for
+  // paid keys). The host answers with Access-Control-Allow-Origin: *, so the
+  // corner can be repainted from mirrored content in a canvas and the <img>
+  // swapped for a cleaned blob URL — the wire format (a plain https URL) is
+  // unchanged, so both sender and receiver render it without the logo.
+  const _wmCleaned = new Map(); // original url -> cleaned blob url | null (failed)
+  const _wmBusy    = new Map(); // original url -> in-flight promise
+
+  function _isWatermarkedSrc(src) {
+    if (!src || typeof src !== 'string') return false;
+    try {
+      const u = new URL(src, location.href);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+      return /(^|\.)pollinations\.ai$/i.test(u.hostname);
+    } catch (e) { return false; }
+  }
+
+  function _repaintWatermark(img, done) {
+    const W = img.naturalWidth;
+    const H = img.naturalHeight;
+    if (!W || !H || W < 64 || H < 64) { done(null); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) { done(null); return; }
+    try {
+      ctx.drawImage(img, 0, 0, W, H);
+      // Only touch the corner when the logo is actually there: a clean image
+      // (paid key, different provider build) keeps its original pixels.
+      const probeX = Math.floor(W * 0.745);
+      const probeY = Math.floor(H * 0.950);
+      const probeW = Math.floor(W * 0.995) - probeX;
+      const probeH = Math.floor(H * 0.995) - probeY;
+      if (probeW < 4 || probeH < 4) { done(null); return; }
+      const probe = ctx.getImageData(probeX, probeY, probeW, probeH).data;
+      let white = 0;
+      for (let i = 0; i < probe.length; i += 4) {
+        if (probe[i] >= 232 && probe[i + 1] >= 232 && probe[i + 2] >= 232) white++;
+      }
+      if (white < Math.max(24, probeW * probeH * 0.006)) { done(null); return; }
+      // Measured on 512/768/1024 renders: the logo starts around x = 0.74W,
+      // y = 0.95H and stops ~2% before each edge. The patch box begins a bit
+      // earlier and is feathered inside that gap, so no logo pixel survives
+      // and the seam is not visible.
+      const boxX = Math.floor(W * 0.70);
+      const boxY = Math.floor(H * 0.935);
+      const bw = W - boxX;
+      const bh = H - boxY;
+      if (boxX < 16 || boxY < 16 || bw < 8 || bh < 4) { done(null); return; }
+      const patch  = ctx.getImageData(boxX, boxY, bw, bh);      // throws if the canvas is tainted
+      const mirror = ctx.getImageData(boxX - bw, boxY, bw, bh);
+      const featherX = Math.max(6, Math.round(W * 0.025));
+      const featherY = Math.max(5, Math.round(H * 0.010));
+      for (let y = 0; y < bh; y++) {
+        for (let x = 0; x < bw; x++) {
+          const s = (y * bw + (bw - 1 - x)) * 4;  // mirrored across the box's left edge
+          const d = (y * bw + x) * 4;
+          let a = 1;
+          if (x < featherX) a = Math.min(a, x / featherX);
+          if (y < featherY) a = Math.min(a, y / featherY);
+          patch.data[d]     = Math.round(mirror.data[s]     * a + patch.data[d]     * (1 - a));
+          patch.data[d + 1] = Math.round(mirror.data[s + 1] * a + patch.data[d + 1] * (1 - a));
+          patch.data[d + 2] = Math.round(mirror.data[s + 2] * a + patch.data[d + 2] * (1 - a));
+          patch.data[d + 3] = 255;
+        }
+      }
+      ctx.putImageData(patch, boxX, boxY);
+      canvas.toBlob((blob) => {
+        if (!blob) { done(null); return; }
+        try { done(URL.createObjectURL(blob)); } catch (e) { done(null); }
+      }, 'image/jpeg', 0.94);
+    } catch (e) {
+      // Tainted canvas (CORS) or any other failure: keep the original image.
+      done(null);
+    }
+  }
+
+  function _cleanWatermark(src) {
+    if (_wmCleaned.has(src)) return Promise.resolve(_wmCleaned.get(src));
+    if (_wmBusy.has(src)) return _wmBusy.get(src);
+    const job = new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.decoding = 'async';
+      const finish = (url, cacheable) => {
+        _wmBusy.delete(src);
+        // null means "show the original": no logo found, tainted canvas, or an
+        // unusable image. A plain load failure is not cached, so a later render
+        // can try again once the host is reachable.
+        if (cacheable !== false) _wmCleaned.set(src, url);
+        resolve(url);
+      };
+      img.onload = () => _repaintWatermark(img, finish);
+      img.onerror = () => finish(null, false);
+      img.src = src;
+    });
+    _wmBusy.set(src, job);
+    return job;
+  }
+
+  function _applyWatermarkCleanup(wrap, img) {
+    if (!img || typeof img.getAttribute !== 'function') return;
+    const src = img.getAttribute('src') || '';
+    if (!_isWatermarkedSrc(src)) return;
+    _cleanWatermark(src).then((url) => {
+      try {
+        if (!url || !img.isConnected) return;
+        // The turbo fallback may have taken over while we were working.
+        if (img.getAttribute('src') !== src) return;
+        img.src = url;
+        if (wrap && wrap.querySelector) {
+          wrap.querySelector('[data-act="download"]')?.setAttribute('href', url);
+        }
+      } catch (e) { /* the original stays visible */ }
+    });
+  }
+
   // Fade-in on load, turbo-model fallback, error state, overlay buttons.
   function _bindMediaWraps(container) {
     try {
@@ -3711,6 +3923,7 @@ const Chat = (() => {
                 img.addEventListener('error', onError, { once: true });
               }
               img.src = fallback;
+              _applyWatermarkCleanup(wrap, img);
               return;
             }
             // Official local photo or remote Shepu-AI image failed twice:
@@ -3737,6 +3950,7 @@ const Chat = (() => {
             e.stopPropagation();
             openLightbox(img.src, wrap.dataset.filename || img.alt || 'Image');
           });
+          _applyWatermarkCleanup(wrap, img);
         }
         wrap.querySelectorAll('[data-act="view"]').forEach(b => {
           b.addEventListener('click', (e) => {
@@ -3765,6 +3979,15 @@ const Chat = (() => {
       if (dl) { dl.href = src; dl.setAttribute('download', name || 'image'); }
       box.classList.remove('hidden');
       try { document.body.style.overflow = 'hidden'; } catch {}
+      // Show the logo-free copy in the lightbox too (and for its download).
+      if (_isWatermarkedSrc(src)) {
+        _cleanWatermark(src).then((url) => {
+          if (!url) return;
+          if (img.getAttribute('src') !== src) return;
+          img.src = url;
+          if (dl) dl.href = url;
+        });
+      }
     } catch {}
   }
 

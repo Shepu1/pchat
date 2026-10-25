@@ -118,6 +118,14 @@ const FriendUI = (() => {
     els.footerHandle = $('friends-footer-handle');
     els.footerCopyHandle = $('friends-copy-handle');
     els.footerPresence = $('friends-footer-presence');
+    els.inviteCard = $('friends-invite-card');
+    els.inviteUrl = $('friends-invite-url');
+    els.copyInviteBtn = $('friends-copy-invite-btn');
+    els.shareInviteBtn = $('friends-share-invite-btn');
+    els.qrInviteBtn = $('friends-qr-invite-btn');
+    els.qrWrap = $('friends-qr-wrap');
+    els.qrBox = $('friends-qr-box');
+    els.addDivider = $('friends-or-divider');
   }
 
   function bind() {
@@ -177,7 +185,53 @@ const FriendUI = (() => {
       els.footerCopyHandle.addEventListener('click', copyOwnHandle);
     }
 
+    if (els.copyInviteBtn) {
+      els.copyInviteBtn.addEventListener('click', () => copyInviteLink());
+    }
+
+    if (els.shareInviteBtn) {
+      els.shareInviteBtn.addEventListener('click', () => shareInviteLink());
+    }
+
+    if (els.qrInviteBtn) {
+      els.qrInviteBtn.addEventListener('click', toggleInviteQr);
+    }
+
+    if (els.inviteUrl) {
+      els.inviteUrl.addEventListener('click', () => {
+        try { els.inviteUrl.select(); } catch {}
+      });
+    }
+
     if (els.modal) els.modal.addEventListener('keydown', trapFocus);
+
+    let searchDebounceTimer = null;
+    if (els.searchInput) {
+      els.searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        const raw = els.searchInput.value.trim();
+        if (raw.startsWith('http') || raw.startsWith('@')) {
+          els.searchInput.value = extractHandle(raw);
+        }
+        const cleaned = extractHandle(els.searchInput.value);
+        if (cleaned.length >= 3) {
+          searchDebounceTimer = setTimeout(() => {
+            runSearch();
+          }, 380);
+        }
+      });
+
+      els.searchInput.addEventListener('paste', () => {
+        setTimeout(() => {
+          const raw = els.searchInput.value.trim();
+          const cleaned = extractHandle(raw);
+          if (cleaned) {
+            els.searchInput.value = cleaned;
+            runSearch();
+          }
+        }, 20);
+      });
+    }
 
     if (els.searchForm) {
       els.searchForm.addEventListener('submit', (e) => {
@@ -537,7 +591,18 @@ const FriendUI = (() => {
       if (state.totalFriends > 0) {
         parts.push(`<div class="friends-empty">${icon('users', 30)}<div class="friends-empty-title">Couldn't load your friends</div><div>Try refreshing. Your friend list is only read when this panel is open.</div><button type="button" class="friends-btn primary small" data-action="refresh">${SVG.refresh} Refresh</button></div>`);
       } else {
-        parts.push(`<div class="friends-empty">${icon('users', 30)}<div class="friends-empty-title">No friends yet</div><div>Find people by their exact @handle. They never see your email or rooms.</div><button type="button" class="friends-btn primary small" data-action="go-add">Find friends</button></div>`);
+        const hasHandle = !!(state.profile && state.profile.handle);
+        parts.push(`
+          <div class="friends-empty">
+            ${icon('users', 32)}
+            <div class="friends-empty-title">No friends yet</div>
+            <div>Invite your friends with your personal 1-tap invite link, or search by their @handle.</div>
+            <div class="friends-empty-actions">
+              ${hasHandle ? `<button type="button" class="friends-btn primary small" data-action="copy-invite">${SVG.send || ''} Copy Invite Link</button>` : ''}
+              ${hasHandle ? `<button type="button" class="friends-btn ghost small" data-action="share-invite">📲 Share Invite</button>` : ''}
+              <button type="button" class="friends-btn ghost small" data-action="go-add">🔍 Add by Handle</button>
+            </div>
+          </div>`);
       }
     } else {
       friends.forEach((friend) => {
@@ -631,8 +696,18 @@ const FriendUI = (() => {
     els.searchForm.hidden = !hasHandle;
     if (els.addNote) els.addNote.hidden = true;
 
+    if (els.inviteCard) {
+      els.inviteCard.hidden = !hasHandle;
+      if (hasHandle && els.inviteUrl) {
+        els.inviteUrl.value = getInviteLink(state.profile.handle);
+      }
+    }
+    if (els.addDivider) {
+      els.addDivider.hidden = !hasHandle;
+    }
+
     if (!hasHandle) {
-      els.searchResult.innerHTML = `<div class="friends-empty small">${icon('lock', 24)}<div>Claim your handle above, then search for friends.</div></div>`;
+      els.searchResult.innerHTML = `<div class="friends-empty small">${icon('lock', 24)}<div>Claim your handle above to get your 1-tap invite link and search for friends.</div></div>`;
       return;
     }
 
@@ -830,6 +905,96 @@ const FriendUI = (() => {
     }
   }
 
+  function extractHandle(raw) {
+    if (!raw) return '';
+    raw = String(raw).trim();
+    try {
+      if (raw.includes('?') || raw.includes('/')) {
+        const u = new URL(raw, window.location.origin);
+        const p = u.searchParams.get('friend') || u.searchParams.get('add') || u.searchParams.get('user');
+        if (p) return Friends.normalizeHandle(p);
+      }
+    } catch { /* ignore */ }
+    return Friends.normalizeHandle(raw);
+  }
+
+  function getInviteLink(handle) {
+    const h = handle || (Friends.getState().profile && Friends.getState().profile.handle) || '';
+    if (!h) return '';
+    const base = window.location.origin + window.location.pathname;
+    return `${base}?friend=${encodeURIComponent(h)}`;
+  }
+
+  async function copyInviteLink(handle) {
+    const link = getInviteLink(handle);
+    if (!link) {
+      UI.toast('info', 'No handle yet', 'Choose your @handle first to share an invite link.');
+      return;
+    }
+    let ok = false;
+    try { ok = await UI.copyText(link); } catch { ok = false; }
+    if (ok) {
+      UI.toast('success', 'Invite link copied!', 'Send it to your friend so they can add you with 1 tap.');
+    } else {
+      UI.toast('error', 'Copy failed', 'Your browser blocked clipboard access.');
+    }
+  }
+
+  async function shareInviteLink(handle) {
+    const h = handle || (Friends.getState().profile && Friends.getState().profile.handle) || '';
+    const link = getInviteLink(h);
+    if (!link) {
+      UI.toast('info', 'No handle yet', 'Choose your @handle first to share an invite link.');
+      return;
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Add @${h} on Pchat`,
+          text: `Chat with me privately on Pchat! Tap here to add me:`,
+          url: link,
+        });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    await copyInviteLink(h);
+  }
+
+  function toggleInviteQr() {
+    if (!els.qrWrap) return;
+    const isHidden = els.qrWrap.classList.contains('hidden');
+    if (!isHidden) {
+      els.qrWrap.classList.add('hidden');
+      return;
+    }
+    const link = getInviteLink();
+    if (!link) return;
+    els.qrWrap.classList.remove('hidden');
+    renderInviteQr(link);
+  }
+
+  function renderInviteQr(link) {
+    if (!els.qrBox) return;
+    els.qrBox.innerHTML = '';
+    try {
+      if (typeof qrcode !== 'undefined') {
+        const qr = qrcode(0, 'M');
+        qr.addData(link);
+        qr.make();
+        els.qrBox.innerHTML = qr.createImgTag(4, 8);
+        return;
+      }
+    } catch (e) {
+      console.warn('[Friends] QR generation error:', e);
+    }
+    const img = document.createElement('img');
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(link)}`;
+    img.alt = 'Invite QR Code';
+    els.qrBox.appendChild(img);
+  }
+
   async function copyOwnHandle() {
     const handle = (Friends.getState().profile && Friends.getState().profile.handle) || '';
     if (!handle) return;
@@ -847,7 +1012,7 @@ const FriendUI = (() => {
       render(state);
       return;
     }
-    const handle = Friends.normalizeHandle(els.searchInput.value);
+    const handle = extractHandle(els.searchInput.value);
     if (!Friends.HANDLE_RE.test(handle)) {
       searchError = 'Use an exact handle: 3–20 characters (a–z, 0–9, _).';
       searchResult = null;
@@ -995,6 +1160,14 @@ const FriendUI = (() => {
     if (action === 'go-add') {
       setTab('add', true);
       if (state.profile && !state.profile.handle && els.handleInput) els.handleInput.focus();
+      return;
+    }
+    if (action === 'copy-invite') {
+      copyInviteLink();
+      return;
+    }
+    if (action === 'share-invite') {
+      shareInviteLink();
       return;
     }
     if (action === 'refresh') {
@@ -1177,6 +1350,46 @@ const FriendUI = (() => {
     }
   }
 
+  function checkUrlFriendParam() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const target = params.get('friend') || params.get('add') || params.get('user');
+      if (!target) return;
+      const handle = extractHandle(target);
+      if (!handle) return;
+
+      open('add');
+
+      const state = Friends.getState();
+      if (state.status === 'ready' && state.profile && state.profile.handle) {
+        if (els.searchInput) els.searchInput.value = handle;
+        setTimeout(() => runSearch(), 100);
+      } else {
+        if (els.searchInput) els.searchInput.value = handle;
+        if (els.gateTitle) els.gateTitle.textContent = `Connect with @${handle}`;
+        if (els.gateMessage) els.gateMessage.textContent = `Sign in with Google to add @${handle} as a friend with 1 tap.`;
+
+        const unsub = Friends.subscribe((st) => {
+          if (st.status === 'ready' && st.profile && st.profile.handle) {
+            unsub();
+            setTab('add', false);
+            if (els.searchInput) els.searchInput.value = handle;
+            setTimeout(() => runSearch(), 100);
+          }
+        });
+      }
+
+      params.delete('friend');
+      params.delete('add');
+      params.delete('user');
+      const rem = params.toString();
+      const newUrl = window.location.pathname + (rem ? '?' + rem : '') + window.location.hash;
+      window.history.replaceState({}, document.title, newUrl);
+    } catch (err) {
+      console.warn('[Friends] checkUrlFriendParam failed:', err);
+    }
+  }
+
   function init() {
     cacheEls();
     if (!els.modal) return;
@@ -1192,6 +1405,7 @@ const FriendUI = (() => {
     Friends.onEvent(onEvent);
     maybeBackgroundInit();
     render(Friends.getState());
+    checkUrlFriendParam();
   }
 
   if (document.readyState === 'loading') {

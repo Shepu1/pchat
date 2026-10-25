@@ -44,6 +44,7 @@ const DOC = {
   pages: {
     'index.html':     { title: 'Chats',        blurb: 'Your dashboard — every room you own and every room you have joined, plus the buttons to create or join one.' },
     'login.html':     { title: 'Sign in',      blurb: 'Sign in with Google, use an email name, or continue as a guest. Nothing here is required to use a quick room.' },
+    'app-login.html': { title: 'App Google Sign In', blurb: 'Companion page used by the Flutter app wrapper to complete Google Sign-In securely in the system browser.' },
     'setup-handle.html': { title: 'Choose your @handle', blurb: 'The one-time step after Google sign-in: pick the permanent @handle friends will use to find you. You can skip it and set one later from Settings.' },
     'create.html':    { title: 'Create a room', blurb: 'Name your room, pick a wallpaper and a kind, and get a shareable link and QR code.' },
     'join.html':      { title: 'Join a room',  blurb: 'Open a shared link, choose a nickname, and enter. A room password is asked for here if the room needs one.' },
@@ -220,7 +221,7 @@ function evalInSandbox(files, expression, extra = {}) {
  * ------------------------------------------------------------------ */
 function scanPages() {
   const out = [];
-  for (const file of fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).sort()) {
+  for (const file of fs.readdirSync(ROOT).filter((f) => f.endsWith('.html') && !f.startsWith('tmp-')).sort()) {
     const src = read(file);
     const title = (src.match(/<title>([^<]*)<\/title>/i) || [, file])[1]
       .replace(/[—–-]\s*Pchat shepu.*$/i, '').trim();
@@ -251,7 +252,7 @@ function scanPages() {
  * ------------------------------------------------------------------ */
 function scanControls() {
   const out = {};
-  for (const file of fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).sort()) {
+  for (const file of fs.readdirSync(ROOT).filter((f) => f.endsWith('.html') && !f.startsWith('tmp-')).sort()) {
     const src = read(file);
     const list = [];
     const re = /<(button|a)\b([^>]*)>([\s\S]{0,300}?)<\/\1>/g;

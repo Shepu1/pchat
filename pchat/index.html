@@ -5,11 +5,11 @@
   <script src="js/firebase-config.js?v=20261025c"></script>
   <script src="js/analytics.js?v=20261025c"></script>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss: http://localhost:* ws://localhost:*; frame-src 'self' https://pchat-shepu.firebaseapp.com https://accounts.google.com http://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://apis.google.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss: http://localhost:* ws://localhost:*; frame-src 'self' https://pchat-shepu.firebaseapp.com https://accounts.google.com http://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Pchat shepu — Fast & Private Messaging</title>
+  <title>Pchat — Fast & Private Messaging</title>
   <meta name="description"
-    content="Pchat shepu: Next-gen responsive web & mobile chat app. Real-time multi-device sync with Google Sheets & Apps Script." />
+    content="Pchat: Next-gen responsive web & mobile chat app. Real-time multi-device sync with Google Sheets & Apps Script." />
   <meta name="theme-color" content="#090d16" />
   <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
   <link rel="manifest" href="manifest.json?v=20261025b" />
@@ -1532,12 +1532,12 @@
       <!-- Top App Bar (Vercel layout discipline & Lookscout glass) -->
       <header class="app-topbar">
         <div class="app-brand-lockup">
-          <img src="assets/icons/icon.png?v=20261025b" alt="Pchat shepu" class="app-brand-logo" />
+          <img src="assets/icons/icon.png?v=20261025b" alt="Pchat" class="app-brand-logo" />
           <div>
-            <div class="app-brand-title font-brand">Pchat shepu</div>
+            <div class="app-brand-title font-brand">Pchat</div>
             <div class="live-status-pill">
               <span class="live-pulse-dot"></span>
-              <span>Real-time Active</span>
+              <span>by Shepu</span>
             </div>
           </div>
         </div>
@@ -1653,9 +1653,9 @@
             Create a private room in 1 tap or join with an invite code from your peer.
           </p>
           <button class="btn btn-primary" id="empty-create-btn"
-            style="padding:0.75rem 1.4rem;font-size:0.88rem;margin:0 auto 1.5rem;box-shadow:0 6px 20px rgba(37,99,235,0.4);">
+            style="padding:0.75rem 1.4rem;font-size:0.88rem;margin:0 auto 1.5rem;box-shadow:0 6px 20px rgba(37,99,235,0.4);display:inline-flex;align-items:center;justify-content:center;gap:6px;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px">
+              stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg> Start New Chat
           </button>
@@ -1688,14 +1688,24 @@
           </svg>
           <span>Chats</span>
         </button>
-        <button class="nav-item" id="nav-tab-new">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
+        <button class="nav-item" id="nav-tab-action" title="Create or Join Room" type="button">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="16"></line>
             <line x1="8" y1="12" x2="16" y2="12"></line>
           </svg>
           <span>New</span>
+        </button>
+        <button class="nav-item" id="nav-tab-friends" title="Friends" type="button">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Friends</span>
         </button>
         <button class="nav-item" id="nav-tab-settings" onclick="window.location.href='settings.html'">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -1718,27 +1728,16 @@
         <!-- Header Banner (2026 Executive Standard) -->
         <div class="hub-hero">
           <div class="hub-hero-header">
-            <img src="assets/icons/icon.png?v=20261025b" alt="Pchat shepu" class="hub-hero-logo" />
+            <img src="assets/icons/icon.png?v=20261025b" alt="Pchat" class="hub-hero-logo" />
             <div>
               <div class="hub-hero-badge">
                 <span class="hub-meta-dot"></span>
                 <span>WebRTC P2P &middot; On-Device Encryption &middot; Ephemeral</span>
               </div>
-              <h1 class="hub-hero-title">Pchat shepu</h1>
+              <h1 class="hub-hero-title">Pchat</h1>
               <p class="hub-hero-subtitle">
                 High-speed private messaging with on-device encryption. Create an instant room in one click or join an active session with code.
               </p>
-            </div>
-          </div>
-
-          <div class="hub-hero-meta">
-            <div class="hub-meta-chip">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <span>Zero Knowledge</span>
-            </div>
-            <div class="hub-meta-chip">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-              <span>Sub-50ms P2P</span>
             </div>
           </div>
         </div>
@@ -1931,97 +1930,24 @@
   </div>
 
   <!-- ── Fast Create Bottom Sheet (Mobile) ─────────────────────── -->
+  <!-- ── Fast Create & Join Bottom Sheet (Mobile & Actions) ────── -->
   <div class="bottom-sheet-overlay" id="create-sheet">
     <div class="bottom-sheet-card">
       <div class="sheet-handle"></div>
+
+      <!-- Top Segmented Tabs: [ Create Room ] [ Join with Code ] -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
-        <h3 style="font-size:1.25rem;font-weight:700;">New Chat Room</h3>
-        <button class="modal-close" id="close-create-sheet" aria-label="Close"><svg width="18" height="18"
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-            stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg></button>
-      </div>
-
-
-      <form id="fast-create-form" style="display:flex;flex-direction:column;gap:1.25rem;">
-        <div class="form-group">
-          <label class="form-label" style="font-size:0.85rem;font-weight:600;">Connection Mode</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;" id="sheet-mode-picker">
-            <button type="button" class="hub-mode-btn active" data-mode="instant">
-              <span class="hub-mode-title" style="color:var(--accent);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Quick
-              </span>
-              <span class="hub-mode-desc">Peer-to-peer · no login</span>
-            </button>
-            <button type="button" class="hub-mode-btn" data-mode="secure">
-              <span class="hub-mode-title" style="color:#10b981;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Saved
-              </span>
-              <span class="hub-mode-desc">Google Sheet backup</span>
-            </button>
-          </div>
-          <p id="sheet-mode-hint" style="margin-top:0.45rem;font-size:0.75rem;color:var(--text-2);">Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.</p>
-        </div>
-
-        <div class="form-group">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
-            <label class="form-label" for="sheet-room-name"
-              style="margin-bottom:0;font-size:0.85rem;font-weight:600;">Room Name</label>
-            <button type="button" id="btn-sheet-random"
-              style="font-size:0.75rem;color:var(--accent-2);background:none;border:none;cursor:pointer;font-weight:600;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-1px">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <circle cx="15.5" cy="8.5" r="1.5"></circle>
-                <circle cx="15.5" cy="15.5" r="1.5"></circle>
-                <circle cx="8.5" cy="15.5" r="1.5"></circle>
-              </svg> Random Name
-            </button>
-          </div>
-          <input type="text" id="sheet-room-name" class="form-input" placeholder="e.g. Midnight Hangout" maxlength="80"
-            required autocomplete="off" style="font-size:1rem;padding:0.75rem 1rem;" />
-          <div class="quick-presets-row" style="margin-top:0.4rem;">
-            <span style="font-size:0.7rem;color:var(--hub-text-muted);font-weight:600;margin-right:2px;">Ideas:</span>
-            <button type="button" class="quick-preset-chip" data-name="Midnight Hangout" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> Midnight</button>
-            <button type="button" class="quick-preset-chip" data-name="Coffee Chill" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path></svg> Chill</button>
-            <button type="button" class="quick-preset-chip" data-name="Game Squad" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line></svg> Gaming</button>
-            <button type="button" class="quick-preset-chip" data-name="Tech Talk" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> Tech</button>
-          </div>
-        </div>
-
-        <div class="pw-opt">
-          <button type="button" class="pw-toggle" id="sheet-pw-toggle" aria-expanded="false" aria-controls="sheet-pw-box">
-            <span class="pw-track" aria-hidden="true"><span class="pw-knob"></span></span>
-            <span style="font-size:0.85rem;">Password</span><span class="pw-opt-tag">optional</span>
+        <div class="sheet-action-tabs" style="display:inline-flex;background:rgba(255,255,255,0.06);padding:3px;border-radius:12px;gap:4px;">
+          <button type="button" class="sheet-action-tab active" id="modal-tab-create" style="padding:0.45rem 1.15rem;border-radius:9px;font-weight:700;font-size:0.875rem;border:none;cursor:pointer;background:var(--accent);color:#fff;transition:all var(--t-fast);display:inline-flex;align-items:center;gap:6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+            Create
           </button>
-          <div class="hidden" id="sheet-pw-box" style="margin-top:0.5rem;">
-            <input type="password" id="sheet-room-password" class="form-input" placeholder="Encrypted from the start" maxlength="128"
-              autocomplete="one-time-code" style="font-size:1rem;padding:0.75rem 1rem;" />
-          </div>
+          <button type="button" class="sheet-action-tab" id="modal-tab-join" style="padding:0.45rem 1.15rem;border-radius:9px;font-weight:600;font-size:0.875rem;border:none;cursor:pointer;background:transparent;color:var(--text-2);transition:all var(--t-fast);display:inline-flex;align-items:center;gap:6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            Join
+          </button>
         </div>
-
-        <button type="submit" class="btn btn-primary btn-full btn-lg"
-          style="padding:0.85rem;font-size:1rem;font-weight:700;">
-          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px">
-              <path d="M12 5v14"></path>
-              <path d="M5 12h14"></path>
-            </svg> Create Room Now</span>
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ── Fast Join Modal ────────────────────────────────────────── -->
-  <div class="bottom-sheet-overlay" id="join-sheet">
-    <div class="bottom-sheet-card">
-      <div class="sheet-handle"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
-        <h3 style="font-size:1.25rem;font-weight:700;">Join a Room</h3>
-        <button class="modal-close" id="close-join-sheet" aria-label="Close"><svg width="18" height="18"
+        <button class="modal-close" id="close-create-sheet" aria-label="Close" type="button"><svg width="18" height="18"
             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
             stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -2029,31 +1955,105 @@
           </svg></button>
       </div>
 
-      <form id="fast-join-form" style="display:flex;flex-direction:column;gap:1.25rem;">
-        <div class="form-group">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
-            <label class="form-label" for="join-code-input" style="margin-bottom:0;font-size:0.85rem;font-weight:600;">Room Code or Invite
-              Link</label>
-            <button type="button" id="btn-join-paste"
-              style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--accent);font-size:0.75rem;font-weight:700;cursor:pointer;padding:0.2rem;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg> Paste
-            </button>
+      <!-- Panel 1: Create Room (Default) -->
+      <div id="sheet-panel-create">
+        <form id="fast-create-form" style="display:flex;flex-direction:column;gap:1.25rem;">
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.85rem;font-weight:600;">Connection Mode</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;" id="sheet-mode-picker">
+              <button type="button" class="hub-mode-btn active" data-mode="instant">
+                <span class="hub-mode-title" style="color:var(--accent);">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Quick
+                </span>
+                <span class="hub-mode-desc">Peer-to-peer · no login</span>
+              </button>
+              <button type="button" class="hub-mode-btn" data-mode="secure">
+                <span class="hub-mode-title" style="color:#10b981;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Saved
+                </span>
+                <span class="hub-mode-desc">Google Sheet backup</span>
+              </button>
+            </div>
+            <p id="sheet-mode-hint" style="margin-top:0.45rem;font-size:0.75rem;color:var(--text-2);">Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.</p>
           </div>
-          <input type="text" id="join-code-input" class="form-input" placeholder="e.g. ABCD1234 or paste link" required
-            autocomplete="off" style="font-size:1rem;padding:0.75rem 1rem;" />
-          <p class="form-hint" style="margin-top:0.45rem;font-size:0.72rem;line-height:1.4;">
-            Paste the invite link you received — or type the 12-character room code.
-          </p>
-        </div>
 
-        <button type="submit" class="btn btn-primary btn-full btn-lg" style="padding:0.85rem;font-size:1rem;">
-          Join Room &rarr;
-        </button>
-      </form>
+          <div class="form-group">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+              <label class="form-label" for="sheet-room-name"
+                style="margin-bottom:0;font-size:0.85rem;font-weight:600;">Room Name</label>
+              <button type="button" id="btn-sheet-random"
+                style="font-size:0.75rem;color:var(--accent-2);background:none;border:none;cursor:pointer;font-weight:600;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-1px">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <circle cx="15.5" cy="8.5" r="1.5"></circle>
+                  <circle cx="15.5" cy="15.5" r="1.5"></circle>
+                  <circle cx="8.5" cy="15.5" r="1.5"></circle>
+                </svg> Random Name
+              </button>
+            </div>
+            <input type="text" id="sheet-room-name" class="form-input" placeholder="e.g. Midnight Hangout" maxlength="80"
+              required autocomplete="off" style="font-size:1rem;padding:0.75rem 1rem;" />
+            <div class="quick-presets-row" style="margin-top:0.4rem;">
+              <span style="font-size:0.7rem;color:var(--hub-text-muted);font-weight:600;margin-right:2px;">Ideas:</span>
+              <button type="button" class="quick-preset-chip" data-name="Midnight Hangout" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg> Midnight</button>
+              <button type="button" class="quick-preset-chip" data-name="Coffee Chill" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"></path><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path></svg> Chill</button>
+              <button type="button" class="quick-preset-chip" data-name="Game Squad" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line></svg> Gaming</button>
+              <button type="button" class="quick-preset-chip" data-name="Tech Talk" data-target="sheet-room-name"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> Tech</button>
+            </div>
+          </div>
+
+          <div class="pw-opt">
+            <button type="button" class="pw-toggle" id="sheet-pw-toggle" aria-expanded="false" aria-controls="sheet-pw-box">
+              <span class="pw-track" aria-hidden="true"><span class="pw-knob"></span></span>
+              <span style="font-size:0.85rem;">Password</span><span class="pw-opt-tag">optional</span>
+            </button>
+            <div class="hidden" id="sheet-pw-box" style="margin-top:0.5rem;">
+              <input type="password" id="sheet-room-password" class="form-input" placeholder="Encrypted from the start" maxlength="128"
+                autocomplete="one-time-code" style="font-size:1rem;padding:0.75rem 1rem;" />
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg"
+            style="padding:0.85rem;font-size:1rem;font-weight:700;">
+            <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px">
+                <path d="M12 5v14"></path>
+                <path d="M5 12h14"></path>
+              </svg> Create Room Now</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Panel 2: Join Room -->
+      <div id="sheet-panel-join" style="display:none;">
+        <form id="fast-join-form" style="display:flex;flex-direction:column;gap:1.25rem;">
+          <div class="form-group">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
+              <label class="form-label" for="join-code-input" style="margin-bottom:0;font-size:0.85rem;font-weight:600;">Room Code or Invite Link</label>
+              <button type="button" id="btn-join-paste"
+                style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:var(--accent);font-size:0.75rem;font-weight:700;cursor:pointer;padding:0.2rem;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg> Paste
+              </button>
+            </div>
+            <input type="text" id="join-code-input" class="form-input" placeholder="e.g. ABCD1234 or paste link" required
+              autocomplete="off" style="font-size:1rem;padding:0.75rem 1rem;" />
+            <p class="form-hint" style="margin-top:0.45rem;font-size:0.72rem;line-height:1.4;">
+              Paste the invite link you received — or type the 12-character room code.
+            </p>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" style="padding:0.85rem;font-size:1rem;font-weight:700;">
+            Join Room &rarr;
+          </button>
+        </form>
+      </div>
+
     </div>
   </div>
 
@@ -2267,10 +2267,51 @@
             </section>
 
             <section class="friends-panel" id="friends-panel-add" role="tabpanel" aria-labelledby="friends-tab-add" hidden>
+              <!-- 1-Tap Invite Link & QR Section -->
+              <div class="friends-invite-card" id="friends-invite-card" hidden>
+                <div class="friends-invite-header">
+                  <div class="friends-invite-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="8.5" cy="7" r="4"></circle>
+                      <line x1="20" y1="8" x2="20" y2="14"></line>
+                      <line x1="23" y1="11" x2="17" y2="11"></line>
+                    </svg>
+                  </div>
+                  <div class="friends-invite-text">
+                    <div class="friends-invite-title">Your 1-Tap Invite Link</div>
+                    <div class="friends-invite-sub">Friends who open your link can add you with 1 tap.</div>
+                  </div>
+                </div>
+                <div class="friends-invite-box">
+                  <input type="text" class="friends-invite-url" id="friends-invite-url" readonly />
+                  <button type="button" class="friends-btn primary small" id="friends-copy-invite-btn" title="Copy friend invite link">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy</span>
+                  </button>
+                  <button type="button" class="friends-btn ghost small" id="friends-share-invite-btn" title="Share via WhatsApp, Telegram, etc.">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                    <span>Share</span>
+                  </button>
+                  <button type="button" class="friends-btn ghost small" id="friends-qr-invite-btn" title="Show QR code for in-person scanning">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>QR</span>
+                  </button>
+                </div>
+                <div class="friends-qr-wrap hidden" id="friends-qr-wrap">
+                  <div class="friends-qr-box" id="friends-qr-box"></div>
+                  <div class="friends-qr-note">Scan with any phone camera to add on Pchat</div>
+                </div>
+              </div>
+
+              <div class="friends-or-divider" id="friends-or-divider" hidden>
+                <span>or add by handle or link</span>
+              </div>
+
               <form class="friends-search-form" id="friends-search-form" autocomplete="off">
                 <span class="friends-at">@</span>
-                <input class="friends-input" id="friends-search-input" type="text" maxlength="20"
-                  placeholder="search_handle" autocapitalize="none" autocorrect="off" spellcheck="false" />
+                <input class="friends-input" id="friends-search-input" type="text" maxlength="120"
+                  placeholder="Enter handle or paste friend link" autocapitalize="none" autocorrect="off" spellcheck="false" />
                 <button type="submit" class="friends-btn primary small" id="friends-search-btn">Search</button>
               </form>
               <div class="friends-hint" id="friends-add-note" hidden>Claim your handle above to search and send
@@ -2369,7 +2410,7 @@
         const clearBtn = document.getElementById('search-clear-btn');
 
         const fabCreate = document.getElementById('fab-create-btn');
-        const navTabNew = document.getElementById('nav-tab-new');
+        const navTabFriends = document.getElementById('nav-tab-friends');
         const emptyCreate = document.getElementById('empty-create-btn');
         const createSheet = document.getElementById('create-sheet');
         const closeCreate = document.getElementById('close-create-sheet');
@@ -2492,6 +2533,7 @@
             joined.forEach(r => { if (!map.has(r.id)) map.set(r.id, { ...r, isOwner: false }); });
 
             allRooms = Array.from(map.values()).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+            updateDesktopHubMeta();
             applyFilterAndRender();
           } catch (e) {
             console.error(e);
@@ -2635,14 +2677,86 @@
           applyFilterAndRender();
         };
 
-        // Open Create Sheet
-        const openCreateSheet = () => {
-          createSheet.classList.add('active');
-          setTimeout(() => roomNameInput.focus(), 150);
+        // Action Sheet Tab Switcher (Create vs Join, Create default)
+        const setActionSheetTab = (tab) => {
+          const tabCreate = document.getElementById('modal-tab-create');
+          const tabJoin = document.getElementById('modal-tab-join');
+          const panelCreate = document.getElementById('sheet-panel-create');
+          const panelJoin = document.getElementById('sheet-panel-join');
+          if (tab === 'join') {
+            if (tabJoin) {
+              tabJoin.style.background = 'var(--accent)';
+              tabJoin.style.color = '#fff';
+              tabJoin.classList.add('active');
+            }
+            if (tabCreate) {
+              tabCreate.style.background = 'transparent';
+              tabCreate.style.color = 'var(--text-2)';
+              tabCreate.classList.remove('active');
+            }
+            if (panelCreate) panelCreate.style.display = 'none';
+            if (panelJoin) panelJoin.style.display = 'block';
+            setTimeout(() => { try { joinCodeInput?.focus(); } catch {} }, 120);
+          } else {
+            if (tabCreate) {
+              tabCreate.style.background = 'var(--accent)';
+              tabCreate.style.color = '#fff';
+              tabCreate.classList.add('active');
+            }
+            if (tabJoin) {
+              tabJoin.style.background = 'transparent';
+              tabJoin.style.color = 'var(--text-2)';
+              tabJoin.classList.remove('active');
+            }
+            if (panelJoin) panelJoin.style.display = 'none';
+            if (panelCreate) panelCreate.style.display = 'block';
+            setTimeout(() => { try { roomNameInput?.focus(); } catch {} }, 120);
+          }
         };
-        if (fabCreate) fabCreate.onclick = openCreateSheet;
-        if (navTabNew) navTabNew.onclick = openCreateSheet;
-        if (emptyCreate) emptyCreate.onclick = openCreateSheet;
+
+        const modalTabCreate = document.getElementById('modal-tab-create');
+        if (modalTabCreate) modalTabCreate.onclick = () => setActionSheetTab('create');
+        const modalTabJoin = document.getElementById('modal-tab-join');
+        if (modalTabJoin) modalTabJoin.onclick = () => setActionSheetTab('join');
+
+        // Open Sheet (Create active by default)
+        const openActionSheet = (defaultTab = 'create') => {
+          setActionSheetTab(defaultTab);
+          createSheet.classList.add('active');
+        };
+
+        const openCreateSheet = () => openActionSheet('create');
+
+        const navTabAction = document.getElementById('nav-tab-action');
+        if (navTabAction) navTabAction.onclick = () => openActionSheet('create');
+        if (fabCreate) fabCreate.onclick = () => openActionSheet('create');
+        if (emptyCreate) emptyCreate.onclick = () => openActionSheet('create');
+
+
+        function updateDesktopHubMeta() {
+          try {
+            const userNameEl = document.getElementById('desktop-user-name');
+            if (userNameEl) {
+              const name = (typeof Storage !== 'undefined' && Storage.getAuth()?.user?.name) || localStorage.getItem('shepu_display_name') || 'Guest';
+              userNameEl.textContent = name;
+            }
+            const roomsCountEl = document.getElementById('desktop-rooms-count');
+            if (roomsCountEl) {
+              const count = (allRooms || []).length;
+              roomsCountEl.textContent = `${count} Active Room${count === 1 ? '' : 's'}`;
+            }
+          } catch {}
+        }
+        if (navTabFriends) {
+          navTabFriends.onclick = () => {
+            if (window.FriendUI && typeof window.FriendUI.open === 'function') {
+              window.FriendUI.open();
+            } else {
+              const btn = document.getElementById('friends-open-btn');
+              if (btn) btn.click();
+            }
+          };
+        }
 
         if (closeCreate) closeCreate.onclick = () => createSheet.classList.remove('active');
         createSheet.onclick = (e) => { if (e.target === createSheet) createSheet.classList.remove('active'); };
@@ -2789,14 +2903,15 @@
           };
         }
 
-        // Join Sheet
+        // Join Sheet (switches to Join tab)
         const openJoinSheet = () => {
-          joinSheet.classList.add('active');
-          setTimeout(() => joinCodeInput.focus(), 150);
+          openActionSheet('join');
         };
         if (topJoin) topJoin.onclick = openJoinSheet;
-        if (closeJoin) closeJoin.onclick = () => joinSheet.classList.remove('active');
-        joinSheet.onclick = (e) => { if (e.target === joinSheet) joinSheet.classList.remove('active'); };
+        if (closeJoin) closeJoin.onclick = () => createSheet.classList.remove('active');
+        if (joinSheet && joinSheet !== createSheet) {
+          joinSheet.onclick = (e) => { if (e.target === joinSheet) joinSheet.classList.remove('active'); };
+        }
 
         const handleJoin = (val) => {
           if (!val) return;

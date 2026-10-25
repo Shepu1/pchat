@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Room — Pchat shepu</title>
   <meta name="description" content="Create a private chat room backed by your Google Sheet. Share via link or QR code." />
@@ -52,8 +52,8 @@
 <nav class="navbar">
   <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
     <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-family:var(--font-display);font-weight:800;font-size:1.25rem;">
-      <img src="assets/icons/icon.png?v=20261025b" alt="Pchat shepu" class="app-logo-img" />
-      Pchat shepu
+      <img src="assets/icons/icon.png?v=20261025b" alt="Pchat" class="app-logo-img" />
+      Pchat
     </a>
     <div class="navbar-actions">
       <a href="index.html" class="btn btn-ghost btn-sm">← Back to Chats</a>
@@ -141,35 +141,43 @@
           />
         </div>
 
-        <!-- Google Sheet & Apps Script Integration -->
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:1.1rem;">
+        <!-- Google Sheet & Apps Script Integration (Saved mode only) -->
+        <div id="sheet-integration-card" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:1.1rem;margin-bottom:1rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem;">
             <label style="font-size:0.85rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:0.4rem;">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg>
-              <span>Google Sheet & Apps Script Backend</span>
+              <span>Google Drive &amp; Sheet Storage</span>
             </label>
             <span style="font-size:0.75rem;color:var(--success);font-weight:600;" id="auth-status-indicator">
               ● Google Cloud Ready
             </span>
           </div>
-          <p style="font-size:0.8rem;color:var(--text-2);margin:0 0 0.75rem;line-height:1.4;">
-            Messages are stored in your Google Sheet. If you already have an Apps Script Web App URL, paste it below, or leave blank to auto-create with your Google account.
+          <p style="font-size:0.8rem;color:var(--text-2);margin:0 0 0.5rem;line-height:1.4;">
+            Messages are automatically saved to a private Google Sheet in your Google Drive.
           </p>
-          <input
-            type="url"
-            class="form-input"
-            id="custom-script-url"
-            placeholder="e.g. https://script.google.com/macros/s/.../exec (optional)"
-            style="font-size:0.82rem;padding:0.6rem 0.85rem;"
-          />
-          <div class="apps-script-row" style="display:flex;justify-content:space-between;align-items:center;margin-top:0.6rem;font-size:0.75rem;">
-            <a href="https://docs.google.com/spreadsheets/create" target="_blank" rel="noopener" style="color:var(--accent-2);text-decoration:none;font-weight:600;">
-              ↗ Open New Google Sheet
-            </a>
-            <button type="button" id="btn-copy-apps-script-code" class="btn btn-ghost btn-sm" style="font-size:0.75rem;padding:0.2rem 0.6rem;display:inline-flex;align-items:center;gap:4px;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Apps Script Code
-            </button>
-          </div>
+
+          <details class="advanced-script-details" style="margin-top:0.6rem;font-size:0.78rem;">
+            <summary style="cursor:pointer;color:var(--muted);font-weight:600;user-select:none;padding:0.25rem 0;">
+              ⚙️ Advanced: Custom Apps Script Web App (optional)
+            </summary>
+            <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.5rem;">
+              <input
+                type="url"
+                class="form-input"
+                id="custom-script-url"
+                placeholder="e.g. https://script.google.com/macros/s/.../exec (optional)"
+                style="font-size:0.82rem;padding:0.6rem 0.85rem;"
+              />
+              <div class="apps-script-row" style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;">
+                <a href="https://docs.google.com/spreadsheets/create" target="_blank" rel="noopener" style="color:var(--accent-2);text-decoration:none;font-weight:600;">
+                  ↗ Open New Google Sheet
+                </a>
+                <button type="button" id="btn-copy-apps-script-code" class="btn btn-ghost btn-sm" style="font-size:0.75rem;padding:0.2rem 0.6rem;display:inline-flex;align-items:center;gap:4px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Apps Script Code
+                </button>
+              </div>
+            </div>
+          </details>
         </div>
 
         <div id="create-error" class="panel" style="background:var(--danger-dim);border-color:var(--danger);padding:0.875rem;display:none;" role="alert">

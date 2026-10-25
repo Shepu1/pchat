@@ -31,6 +31,12 @@ document.addEventListener('DOMContentLoaded', () => {
     instant: 'Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.',
     secure:  'Saved rooms auto-save every message to a Google Sheet in your Drive. Google sign-in required.',
   };
+  const sheetCard = document.getElementById('sheet-integration-card');
+  const syncSheetCard = () => {
+    if (sheetCard) sheetCard.style.display = (roomMode === 'secure') ? 'block' : 'none';
+  };
+  syncSheetCard();
+
   modeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       roomMode = btn.dataset.mode;
@@ -42,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         b.style.borderColor = isActive ? 'rgba(99,102,241,0.45)' : 'var(--border)';
       });
       if (modeHint) modeHint.textContent = MODE_HINTS[roomMode] || '';
+      syncSheetCard();
     });
   });
 

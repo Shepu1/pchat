@@ -292,6 +292,14 @@
   gap: 0.375rem;
 }
 
+/* Secondary controls live cleanly inside the ⋮ menu */
+.chat-header #header-sheet-btn,
+.chat-header #room-theme-btn,
+.chat-header #notify-toggle-btn,
+.chat-header #e2ee-toggle-btn {
+  display: none !important;
+}
+
 /* ── Sync / Status Bar (fixed overlay — NEVER in layout flow) ───── */
 .sync-bar {
   position: fixed;

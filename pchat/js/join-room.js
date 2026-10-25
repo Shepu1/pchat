@@ -461,12 +461,25 @@ function showJoinForm(roomInfo) {
   document.getElementById('join-room-name').innerHTML      = emoName(roomInfo.name || 'Room');
   document.getElementById('join-room-desc').textContent      = roomInfo.description || 'Private chat room';
 
+  // Apply theme background preview if invite carries a theme
+  try {
+    const t = _joinCtx.inviteTheme || roomInfo.theme;
+    if (t && Number(t) >= 1 && Number(t) <= 12) {
+      document.body.style.backgroundImage = `url(assets/themes/theme${t}.webp)`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundAttachment = 'fixed';
+    }
+  } catch {}
+
   // Status badge
   const badges = document.getElementById('join-room-badges');
   if (roomInfo.status === 'locked') {
     badges.innerHTML = '<span class="badge badge-warning" style="display:inline-flex;align-items:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Locked (read-only)</span>';
   } else {
-    badges.innerHTML = '<span class="badge badge-success">● Active</span>';
+    const count = roomInfo.memberCount || roomInfo.membersCount;
+    const memberTxt = count ? ` &middot; ${count} member${count > 1 ? 's' : ''}` : '';
+    badges.innerHTML = `<span class="badge badge-success" style="display:inline-flex;align-items:center;gap:5px;"><span class="live-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;"></span> Active Room${memberTxt}</span>`;
   }
   // Early warning: this invite carries NO room key (fragment stripped or
   // partial link). Joining anyway means locked messages — tell them now.

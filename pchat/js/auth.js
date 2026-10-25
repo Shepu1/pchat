@@ -203,8 +203,8 @@ const Auth = (() => {
     });
   }
 
-  // ── Sign In with Demo / Developer Account ─────────────────────
-  function signInAsDemo(name = 'Developer (Shepu)', email = 'shepu@rooms.local') {
+  // ── Sign In with Guest / Local Account ────────────────────────
+  function signInAsDemo(name = 'Guest', email = 'guest@pchat.local') {
     const demoAuth = {
       accessToken: 'demo_token_' + Date.now(),
       expiresAt: Date.now() + 365 * 24 * 3600 * 1000,

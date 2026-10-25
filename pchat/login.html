@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Sign in — Pchat shepu</title>
   <meta name="description" content="Sign in with your Google account to create and manage private chat rooms stored in your Google Drive." />
@@ -124,10 +124,13 @@
 
     <!-- Brand Header -->
     <div style="text-align:center;margin-bottom:2rem;">
-      <img src="assets/icons/icon.png?v=20261025b" alt="Pchat shepu" class="brand-logo-hero" />
-      <h1 style="font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;margin:0 0 0.35rem;">
-        Pchat shepu
+      <img src="assets/icons/icon.png?v=20261025b" alt="Pchat" class="brand-logo-hero" />
+      <h1 style="font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;margin:0 0 0.25rem;">
+        Pchat
       </h1>
+      <p style="font-size:0.75rem;color:var(--accent-2);margin:0 0 0.5rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">
+        Private &amp; On-Device Encrypted
+      </p>
       <p style="font-size:0.875rem;color:var(--text-2);margin:0 0 0.5rem;line-height:1.4;">
         Choose how to continue. Google login unlocks saving rooms in your Drive & Sheets.
       </p>
@@ -156,37 +159,36 @@
         <span>Continue with Google</span>
       </button>
       <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin:0.75rem 0 0;line-height:1.4;">
-        Android অ্যাপে ফোনের Google অ্যাকাউন্ট পিকার খুলবে। ডেস্কটপ অ্যাপে ডিফল্ট ব্রাউজারে লগইন পেজ খুলবে।
+        Sign in to sync your rooms and friends across devices.
       </p>
 
-      <div class="divider-text">or continue with an email address (local only)</div>
+      <div class="divider-text">or continue with a nickname / email</div>
 
-      <!-- Direct Email / Gmail Form -->
+      <!-- Direct Nickname / Email Form -->
       <form id="email-signin-form" style="display:flex;flex-direction:column;gap:0.75rem;">
         <div>
           <input 
-            type="email" 
+            type="text" 
             id="user-gmail-input" 
             class="form-input" 
-            placeholder="yourname@gmail.com" 
+            placeholder="Your nickname or email (e.g. Alex)" 
             required 
-            autocomplete="email" 
+            autocomplete="username" 
             style="font-size:0.95rem;padding:0.75rem 1rem;" 
           />
         </div>
         <button type="submit" class="btn btn-primary btn-full" style="padding:0.75rem;font-weight:700;font-size:0.95rem;">
-          Continue with email address &rarr;
+          Continue without Google &rarr;
         </button>
         <p style="font-size:0.74rem;color:var(--muted);text-align:center;margin:0;line-height:1.4;">
-          এটি শুধু এই ব্রাউজারে আপনার পরিচয় তৈরি করে — Google Drive/Sheets ব্যবহার করতে উপরের
-          “Continue with Google” লাগবে।
+          Creates a local profile on this device. Google sign-in is required only if you want to save rooms to your Drive.
         </p>
       </form>
 
-      <!-- 1-Click Guest / Test user -->
+      <!-- 1-Click Guest sign in -->
       <div style="margin-top:1rem;text-align:center;">
-        <button type="button" class="btn btn-ghost btn-sm" id="demo-signin-btn" style="color:var(--text-2);font-size:0.8rem;display:inline-flex;align-items:center;gap:4px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--warning);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Or continue as Quick Test User (Shepu)
+        <button type="button" class="btn btn-ghost btn-sm" id="demo-signin-btn" style="color:var(--text-2);font-size:0.8rem;display:inline-flex;align-items:center;gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);"><circle cx="12" cy="12" r="10"></circle><path d="m10 15 5-3-5-3v6z"></path></svg> Quick Guest Sign-in
         </button>
       </div>
 
@@ -352,26 +354,28 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Gmail / Email direct sign-in
+  // Nickname / Email local sign-in
   if (emailForm && gmailInput) {
     emailForm.onsubmit = (e) => {
       e.preventDefault();
-      const email = gmailInput.value.trim();
-      if (!email || !email.includes('@')) {
-        UI.toast('error', 'Invalid Email', 'Please enter a valid Gmail / Email address.');
+      const raw = gmailInput.value.trim();
+      if (!raw) {
+        UI.toast('error', 'Name Required', 'Please enter a nickname or email.');
         return;
       }
-      Auth.signInWithEmail(email);
-      UI.toast('success', 'Welcome!', `Signed in as ${email}`);
+      const email = raw.includes('@') ? raw : (raw.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'guest') + '@pchat.local';
+      const name = raw.includes('@') ? raw.split('@')[0] : raw;
+      Auth.signInWithEmail(email, name);
+      UI.toast('success', 'Welcome!', `Continuing as ${name}`);
       setTimeout(() => { afterLogin(redirect); }, 350);
     };
   }
 
-  // Quick Demo user
+  // Quick Guest user
   if (demoBtn) {
     demoBtn.onclick = () => {
-      Auth.signInAsDemo('Owner (Shepu)', 'shepu@gmail.com');
-      UI.toast('success', 'Signed In', 'Logged in as Owner (shepu@gmail.com)');
+      Auth.signInAsDemo('Guest', 'guest@pchat.local');
+      UI.toast('success', 'Welcome!', 'Continuing as Guest');
       setTimeout(() => { afterLogin(redirect); }, 300);
     };
   }

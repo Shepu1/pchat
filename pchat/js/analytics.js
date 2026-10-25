@@ -25,12 +25,29 @@
     const app = appMod.getApps().length
       ? appMod.getApp()
       : appMod.initializeApp(config);
-    analyticsMod.getAnalytics(app);
+    const analytics = analyticsMod.getAnalytics(app);
+
+    window.PchatAnalytics = {
+      instance: analytics,
+      isReady: true,
+      logEvent: (name, params = {}) => {
+        try {
+          analyticsMod.logEvent(analytics, name, params);
+        } catch (e) {
+          console.warn('[Analytics] logEvent error:', e);
+        }
+      },
+    };
+
+    try {
+      console.log('[Pchat Analytics] Google Analytics active (Measurement ID: ' + config.measurementId + ')');
+    } catch {}
   }
 
   startAnalytics().catch((error) => {
     // Analytics must never prevent the app from loading. Keep a diagnostic for
     // developers without exposing it to visitors in the UI.
     window.__PCHAT_ANALYTICS_ERROR__ = error;
+    console.warn('[Pchat Analytics] Initialization info:', (error && error.message) || error);
   });
 })();
