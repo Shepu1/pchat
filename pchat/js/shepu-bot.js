@@ -252,7 +252,10 @@ const ShepuBot = (() => {
           Chat.endImageGeneration(genId);
         }
         if (image && image.url) {
-          const caption = _hideProvider(image.caption || 'আপনার ছবিটি তৈরি করা হচ্ছে... 🎨');
+          // The image loader already communicates work in progress. Keep the
+          // final generated-image message clean instead of persisting a
+          // status sentence below the image.
+          const caption = _hideProvider(image.caption || '');
           await sendBotMessage(caption, {
             imageUrl: image.url,
             fallbackUrl: image.fallbackUrl || '',
@@ -529,25 +532,62 @@ const ShepuBot = (() => {
     _items = items;
     _activeIdx = -1;
     _pop.innerHTML = '';
+    _pop.setAttribute('role', 'presentation');
+
+    // Small header so the popup reads as a bot card rather than a bare row.
+    const head = document.createElement('div');
+    head.className = 'shepu-suggest-head';
+    const anyMention = items.some(it => it._mention);
+    head.innerHTML = `
+      <span class="shepu-suggest-head-title">${anyMention ? 'Mention' : 'Ask'}</span>
+      <span class="shepu-suggest-head-pill">${escapeAttr(BOT_DISPLAY)}</span>
+    `;
+    _pop.appendChild(head);
+
+    const list = document.createElement('div');
+    list.className = 'shepu-suggest-list';
+    list.setAttribute('role', 'listbox');
+    list.setAttribute('aria-label', 'Shepu-AI suggestions');
     items.forEach((it, i) => {
       const row = document.createElement('div');
       row.className = 'shepu-suggest-item';
       if (it._mention) row.classList.add('mention');
-      row.innerHTML = `<span class="shepu-suggest-label">${escapeAttr(it.label)}</span>` +
-                      (it.desc ? `<span class="shepu-suggest-desc">${escapeAttr(it.desc)}</span>` : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', 'false');
+      row.innerHTML = `
+        <span class="shepu-suggest-avatar" aria-hidden="true">
+          <img src="${escapeAttr(BOT_PIC)}" alt="" />
+        </span>
+        <span class="shepu-suggest-text">
+          <span class="shepu-suggest-label">${escapeAttr(it.title)}</span>
+          ${it.sub ? `<span class="shepu-suggest-desc">${escapeAttr(it.sub)}</span>` : ''}
+        </span>
+        <span class="shepu-suggest-enter" aria-hidden="true">↵</span>
+      `;
       row.addEventListener('mouseenter', () => { _setActive(i); });
       row.addEventListener('click', () => _apply(i, replaceFromAt));
-      _pop.appendChild(row);
+      list.appendChild(row);
     });
+    _pop.appendChild(list);
+
     // Select the first row by default. With no row selected, Enter merely
     // closed the popup and sent the raw text ("@sh") to the room — the
     // autocomplete looked like it worked but never applied anything.
     try { _setActive(0); } catch { /* no rows */ }
     _pop.classList.remove('hidden');
+    // Fade the bottom edge only when more rows are scrolled out of view, so a
+    // half-cut row never sits at the bottom of the popup. This is measured
+    // after the popup is visible, while it still has a layout box.
+    list.classList.toggle('scrollable', list.scrollHeight > list.clientHeight + 1);
   }
 
   function showMentionSuggestion() {
-    const items = [{ label: '@shepu-ai', desc: 'Shepu-AI 4.1 Ultra bot', _mention: true, insert: '@shepu-ai ' }];
+    const items = [{
+      title: 'Shepu-AI',
+      sub: '@shepu-ai · Mention to start a chat',
+      _mention: true,
+      insert: '@shepu-ai ',
+    }];
     _renderPopup(items, true);
   }
 
@@ -557,16 +597,25 @@ const ShepuBot = (() => {
     // never addressed to @shepu-ai and the bot never answered.
     const items = questions.map(q => {
       const label = /^@shepu-ai\b/i.test(q) ? q : '@shepu-ai ' + q;
-      return { label, desc: '', _mention: false, insert: label };
+      return {
+        title: label.replace(/^@shepu-ai\s*/i, ''),
+        sub: '',
+        _mention: false,
+        insert: label,
+      };
     });
     _renderPopup(items, true);
   }
 
   function _setActive(i) {
     const rows = _pop.querySelectorAll('.shepu-suggest-item');
-    rows.forEach(r => r.classList.remove('active'));
+    rows.forEach(r => {
+      r.classList.remove('active');
+      r.setAttribute('aria-selected', 'false');
+    });
     if (i >= 0 && rows[i]) {
       rows[i].classList.add('active');
+      rows[i].setAttribute('aria-selected', 'true');
       _activeIdx = i;
     } else {
       _activeIdx = -1;

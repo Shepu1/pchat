@@ -43,10 +43,12 @@ const Shepu = (() => {
   const MAX_ANSWER_CHARS = 4000;
   const MAX_HISTORY_MESSAGES = 6;
   const MAX_HISTORY_CHARS = 800;
-  const IMAGE_PROMPT_CACHE_KEY = 'shepu_image_prompt_cache_v2';
+  // Bump when prompt construction changes, so older, less descriptive
+  // locally cached prompts are not reused for new generations.
+  const IMAGE_PROMPT_CACHE_KEY = 'shepu_image_prompt_cache_v4';
   const DATA_VERSION = '4.1-ultra-20261020b1';
-  const IMAGE_PROMPT_BOOSTERS = 'highly detailed, cinematic composition, soft natural lighting, rich textures, sharp focus';
-  const IMAGE_STYLE = 'masterpiece, highly detailed, cinematic lighting, photorealistic, sharp focus, 8k';
+  const IMAGE_PROMPT_BOOSTERS = 'carefully composed, clear focal subject, natural depth, refined lighting, rich material detail, sharp focus';
+  const IMAGE_STYLE = 'carefully composed, realistic lighting, natural depth, rich detail, sharp focus';
   // Older local rows may still identify the underlying model vendor. The
   // product speaks as Shepu-AI only, so rewrite those self-descriptions at
   // render time instead of exposing an internal provider to the room.
@@ -66,10 +68,82 @@ const Shepu = (() => {
   // hint above so the common prompt path stays easy to read.
   const BANGLISH_IMAGE_EXTRA = /\b(jolpori|pori|rajkonna|rajputro|pakhi|bagh|singho|hati|ghora|horin|mach|gari|bagan|gram|mahakash|surjasto|surjodoy|bristi|vristi|megh|nouka|nouko|boi|gach|gaach|joddha|manush)\b/i;
 
+  // Romanized-Bengali glossary. The text model on the other end does not know
+  // words such as "biraler" or "meyeder" and invents a different subject, so
+  // the prompt-repair layer is handed the words that actually appear in the
+  // request. The same table drives the offline translator below.
+  const BANGLISH_GLOSSARY = [
+    ['biral', 'cat'], ['kukur', 'dog'], ['pakhi', 'bird'], ['bagh', 'tiger'],
+    ['singho', 'lion'], ['hati', 'elephant'], ['ghora', 'horse'], ['horin', 'deer'],
+    ['mach', 'fish'], ['projapoti', 'butterfly'], ['meye', 'young woman'],
+    ['chele', 'young man'], ['manush', 'person'], ['baba', 'father'],
+    ['maa', 'mother'], ['raja', 'king'], ['rani', 'queen'],
+    ['rajkonna', 'princess'], ['rajputro', 'prince'], ['joddha', 'warrior'],
+    ['jolpori', 'water fairy'], ['pori', 'fairy'], ['nodi', 'river'],
+    ['pahar', 'mountain'], ['ful', 'flower'], ['golap', 'rose'], ['gach', 'tree'],
+    ['bagan', 'garden'], ['gram', 'village'], ['shohor', 'city'], ['chad', 'moon'],
+    ['surjo', 'sun'], ['samudro', 'sea'], ['bristi', 'rain'], ['vristi', 'rain'],
+    ['megh', 'cloud'], ['tara', 'star'], ['akash', 'sky'], ['mahakash', 'space'],
+    ['surjasto', 'sunset'], ['surjodoy', 'sunrise'], ['raat', 'night'],
+    ['alo', 'light'], ['andhar', 'darkness'], ['pani', 'water'],
+    ['batash', 'wind'], ['agun', 'fire'], ['nouka', 'boat'], ['boi', 'book'],
+    ['bari', 'house'], ['gari', 'car'], ['lal', 'red'], ['kalo', 'black'],
+    ['shada', 'white'], ['shobuj', 'green'], ['nil', 'blue'], ['holud', 'yellow'],
+    ['golapi', 'pink'], ['rongin', 'colorful'], ['sundor', 'beautiful'],
+    ['shundor', 'beautiful'], ['sundar', 'beautiful'], ['choto', 'small'],
+    ['boro', 'big'], ['notun', 'new'], ['purono', 'old'], ['bhalo', 'good'],
+  ];
+
+  function _glossaryRegex(stem, flags) {
+    return new RegExp('\\b' + stem + '(?:er|der|r|e|ke|ta|ti|gulo|guli)?\\b', flags || 'i');
+  }
+
+  // Near-miss spelling of a glossary word ("bidal" for "biral"). Only stems
+  // of five letters or more take part, so short English words stay untouched.
+  function _fuzzyGlossaryEntry(token) {
+    const t = String(token || '').toLowerCase();
+    if (t.length < 4) return null;
+    for (const entry of BANGLISH_GLOSSARY) {
+      const stem = entry[0];
+      if (stem.length < 5 || Math.abs(t.length - stem.length) > 1) continue;
+      if (_editDistance(t, stem) <= 1) return entry;
+    }
+    return null;
+  }
+
+  // Which glossary words actually appear in this text?
+  function _glossaryHits(text) {
+    const s = String(text || '');
+    if (!s) return [];
+    const hits = [];
+    for (const entry of BANGLISH_GLOSSARY) {
+      if (_glossaryRegex(entry[0]).test(s)) hits.push(entry);
+    }
+    const tokens = s.toLowerCase().match(/[a-z]+/g) || [];
+    for (const token of tokens) {
+      const entry = _fuzzyGlossaryEntry(token);
+      if (entry && !hits.some(h => h[0] === entry[0])) hits.push(entry);
+    }
+    return hits;
+  }
+
+  function _glossaryReplace(text) {
+    let out = String(text || '');
+    for (const entry of BANGLISH_GLOSSARY) {
+      out = out.replace(_glossaryRegex(entry[0], 'gi'), entry[1]);
+    }
+    out = out.replace(/\S+/g, (token) => {
+      const entry = _fuzzyGlossaryEntry(token.replace(/[^A-Za-z]/g, ''));
+      return entry ? entry[1] : token;
+    });
+    return out;
+  }
+
   function _looksBanglishImagePrompt(text) {
     const s = String(text || '');
     return BANGLISH_IMAGE_HINT.test(s) ||
       BANGLISH_IMAGE_EXTRA.test(s) ||
+      _glossaryHits(s).length > 0 ||
       /\b(?:er|ke|re|ta|ti|gulo|guli)\b/i.test(s);
   }
 
@@ -650,9 +724,10 @@ ${refs}`;
     }
   }
 
-  async function _postTextModel(messages, maxTokens) {
+  async function _postTextModel(messages, maxTokens, timeoutMs) {
+    const budget = Number(timeoutMs) > 0 ? Number(timeoutMs) : REQUEST_TIMEOUT_MS;
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS) : null;
+    const timer = controller ? setTimeout(() => controller.abort(), budget) : null;
 
     let res;
     try {
@@ -812,8 +887,11 @@ ${refs}`;
     if (creatorPhoto.test(t) || photoCreator.test(t)) return true;
 
     const name = '(?:shepu(?:[\\s\\-]?ai)?|শেপু(?:[\\s\\-]?এআই)?|শিপু|shahri?ar\\s*j[ao]n(?:\\s*shepu)?|শাহরি[য়য়]ার\\s*জান(?:\\s*(?:শিপু|শেপু))?)';
-    const nameThenPhoto = new RegExp(name + '.{0,16}(?:er|r|\'s|এর)?\\s*' + photo, 'i');
-    const photoThenName = new RegExp(photo + '.{0,20}' + name, 'i');
+    // The name must sit directly next to the photo word ("shepu er chobi").
+    // A looser gap made "shepu ekta biraler chobi banao" return the official
+    // portrait instead of the cat the user asked for.
+    const nameThenPhoto = new RegExp(name + '\\s*(?:er|r|\'s|এর)?\\s*(?:ekta|akta|একটা|একটি)?\\s*' + photo, 'i');
+    const photoThenName = new RegExp(photo + '\\s*(?:of|er|r)?\\s*' + name, 'i');
     if (nameThenPhoto.test(t) || photoThenName.test(t)) return true;
 
     const core = extractImagePrompt(raw)
@@ -823,6 +901,30 @@ ${refs}`;
       .trim();
     const onlySubject = new RegExp('^(?:' + name + '|creator|creater|স্রষ্টা|ক্রিয়েটর|ক্রিয়েটর|' + you + ')$', 'i');
     return onlySubject.test(core);
+  }
+
+  // Levenshtein distance with an early size check — only used for near-miss
+  // spellings of short image words such as "cchobi" or "photto".
+  function _editDistance(a, b) {
+    if (a === b) return 0;
+    if (Math.abs(a.length - b.length) > 2) return 3;
+    let prev = [];
+    for (let j = 0; j <= b.length; j++) prev.push(j);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) {
+        cur.push(Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)));
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  const IMAGE_WORD_TOKENS = ['chobi', 'cobi', 'sobi', 'cbobi', 'image', 'photo', 'picture', 'pic'];
+
+  function _hasNearImageWord(text) {
+    const tokens = String(text || '').toLowerCase().match(/[a-z\u0980-\u09ff]+/g) || [];
+    return tokens.some(t => t.length >= 3 && IMAGE_WORD_TOKENS.some(w => _editDistance(t, w) <= 1));
   }
 
   function isImageRequest(text) {
@@ -852,9 +954,25 @@ ${refs}`;
     ];
     if (triggers.some(trig => lower.includes(trig))) return true;
 
-    const hasImageWord = /(ছবি|ইমেজ|image|picture|photo|pic|art)/i.test(lower);
-    const hasCreateVerb = /(বানাও|বানান|আঁকো|আঁক|আঁকুন|তৈরি|দাও|দিন|দেখাও|দেখান|দে|দেই|এঁকে|একে|জেনারেট|করো|চাই|লাগবে|দরকার|draw|paint|create|generate|make|sketch|show|\bde\b|\bdey\b|\bdau\b|\bdao\b)/i.test(lower);
-    return hasImageWord && hasCreateVerb && lower.length < 100;
+    // Loose path: an image word plus a create verb, whatever the spelling.
+    // The exact trigger list above cannot cover Banglish typos and polite
+    // forms ("chobi banaiya dao", "ছবি বানাবেন"), so the roots below carry
+    // the detection and the prompt layer fixes the spelling afterwards.
+    const hasImageWord = /(ছবি|ছিবি|ইমেজ|চিত্র|আঁকো|আঁকতে|একে|এঁকে|image|picture|photo|pic|art|sketch|\bdraw|\bpaint)/i.test(lower) ||
+      _hasNearImageWord(lower);
+    const hasCreateVerb = /(বানা|বানাই|বানায়|বানিয়ে|বানাবেন|বানাতে|আঁক|একে|এঁকে|তৈরি|তাইরি|জেনারেট|দাও|দে[ওন]?|দিন|দেন|দিবেন|চাই|লাগবে|দরকার|\b(?:bana\w*|bnana\w*|toiri|tairi|generate|create|draw|paint|make|sketch|show|de|dey|dao|dau|den|diben|din|chai|lage|lagbe|koro|kor)\b)/i.test(lower);
+    if (hasImageWord && hasCreateVerb && lower.length < 120) return true;
+
+    // A bare noun phrase such as "বিড়ালের ছবি" / "biral er chobi" asks for that
+    // picture even without a command verb — as long as something is actually
+    // described before the image word ("ei chobi" is a follow-up, not a request).
+    const endsWithImageWord = /(?:ছবি|ছিবি|ইমেজ|চিত্র|chobi|cobi|cbobi|sobi|pic|photo|image)\s*$/i.test(lower);
+    if (!hasImageWord || !endsWithImageWord || lower.length > 60 || /\?/.test(lower)) return false;
+    const before = lower
+      .replace(/(?:ছবি|ছিবি|ইমেজ|চিত্র|chobi|cobi|cbobi|sobi|pic|photo|image)\s*$/i, '')
+      .trim();
+    const beforeWords = before ? before.split(/\s+/).filter(Boolean) : [];
+    return beforeWords.length >= 2 || _glossaryHits(before).length > 0 || /[\u0980-\u09ff]/.test(before);
   }
 
   function extractImagePrompt(text) {
@@ -867,6 +985,24 @@ ${refs}`;
     for (const pat of patterns) p = p.replace(pat, '').trim();
     p = p.replace(/^(can you|could you|please|kindly)\s+(draw|create|generate|make|paint)\s+(an?\s+)?(image|picture|photo)?\s*(of)?\s*/i, '').trim();
     p = p.replace(/^(of|er|a|an|একটি|একটা|ekta|akti)\s+/i, '').trim();
+
+    // Generic cleanup for spellings the fixed patterns above cannot know
+    // ("banaiya", "banawo", "bnanao", "বানাবেন", "একে", "আঁকতে"…). Command
+    // words are removed wherever they sit, so the subject is what remains and
+    // the prompt-repair layer receives clean input.
+    p = p.normalize('NFC').replace(/^@shepu-ai\s*/i, '');
+    // Remove the image word itself token by token, including near-miss
+    // spellings such as "cchobi" or "chobir".
+    p = p.replace(/\S+/g, (token) => (_hasNearImageWord(token) ? ' ' : token));
+    p = p.replace(/\b(?:chobi|cobi|cbobi|chhobi|sobi|picture|image|photo|img|pic|sketch)\b/gi, ' ');
+    p = p.replace(/(ছবি|ছিবি|ইমেজ|চিত্র)/g, ' ');
+    p = p.replace(/\b(?:banao|banawo|banai|banaiya|banay|banaba|banabo|banan|banaben|banate|baniye|banie|bana|bnanao|toiri|tairi|akbo|akte|ako|ake|eke|draw|paint|create|generate|make|sketch|dekhaw|dekhao|de|dey|dao|dau|den|diben|din|chai|lage|lagbe|koro|kor)\b/gi, ' ');
+    p = p.replace(/\b(?:shepu(?:[-\s]?ai)?)\b/gi, ' ');
+    p = p.replace(/(বানাও|বানাই|বানাইয়া|বানিয়ে|বানায়ে|বানাবেন|বানাতে|বানাবো|বানা|তৈরি|আঁকতে|আঁকো|আঁক|এঁকে|একে|জেনারেট|দেখাও|দেখান|দাও|দিন|দেন|দেবেন|চাই|লাগবে|করো)/g, ' ');
+    p = p.replace(/\b(?:ekta|akta|ekti|akti|ektu|aktu|amar|amake|jonno|jonyo|please|pls)\b/gi, ' ');
+    p = p.replace(/(একটি|একটা|আমার|আমাকে|জন্য)/g, ' ');
+    p = p.replace(/\s+/g, ' ').replace(/^[\s,.:;-]+|[\s,.:;-]+$/g, '').trim();
+
     if (!p || p.length < 2) return '';
     return p;
   }
@@ -874,7 +1010,8 @@ ${refs}`;
   // Small offline dictionary for common Bengali image subjects. Used only
   // when the free text API cannot translate the prompt.
   function _fallbackTranslateImagePrompt(text) {
-    let out = String(text || '');
+    // Romanized subjects first ("biraler" -> cat), then the Bengali table.
+    let out = _glossaryReplace(String(text || ''));
     const dict = [
       [/একটি|একটা/g, 'a'],
       [/মেয়ে|মেয়ে/gi, 'young woman'],
@@ -973,7 +1110,7 @@ ${refs}`;
     for (const [reg, rep] of dict) out = out.replace(reg, rep);
     // Strip leftover Banglish particles and command words such as "er",
     // "ke" and "chobi" so the final prompt reads as English.
-    out = out.replace(/\b(?:er|r|ke|re|ta|ti|gulo|guli|koro|kor|dao|deu|den|din|banao|banau|toiri|chobi|cbobi|sobi)\b/gi, ' ');
+    out = out.replace(/\b(?:er|r|ke|re|te|ta|ti|gulo|guli|koro|kor|dao|deu|den|din|banao|banau|banaiya|banie|baniye|toiri|chobi|cbobi|sobi)\b/gi, ' ');
     // Drop any untranslated Bengali suffix/garbage rather than sending it to
     // an English-only image model.
     out = out.replace(/[\u0980-\u09ff]+/g, ' ');
@@ -993,7 +1130,13 @@ ${refs}`;
 
   function _isEnglishImagePrompt(text) {
     const s = _cleanImagePrompt(text);
-    return !!s && !/[\u0980-\u09ff]/.test(s) && /[a-z]/i.test(s);
+    if (!s || /[\u0980-\u09ff]/.test(s) || !/[a-z]/i.test(s)) return false;
+    // Leftover romanized Bengali ("birale", "meyeder") would be read as English
+    // by the image model and turn into an unrelated picture.
+    if (_glossaryHits(s).length) return false;
+    // One real English word is enough here ("cat"); the booster and style
+    // suffixes are appended afterwards by _enhanceEnglishImagePrompt.
+    return /[a-z]{3,}/i.test(s);
   }
 
   // Last-resort English prompt. Keeps generation useful even when the free
@@ -1037,10 +1180,50 @@ ${refs}`;
     let out = _cleanImagePrompt(text);
     if (!out) return '';
     out = out.replace(/\s+,/g, ',').replace(/,\s*,/g, ',').replace(/\s+/g, ' ').trim();
-    if (out.length < 110 && !/(masterpiece|8k|cinematic|photorealistic|highly detailed|sharp focus)/i.test(out)) {
+    if (out.length < 150 && !/(carefully composed|cinematic|photorealistic|sharp focus|detailed)/i.test(out)) {
       out += ', ' + IMAGE_PROMPT_BOOSTERS;
     }
     return _cleanImagePrompt(out);
+  }
+
+  // ── Layer 1: prompt repair ──────────────────────────────────────
+  // The image model only understands English. This layer rewrites whatever
+  // the user typed — Bangla, Banglish, a typo, or a short English phrase —
+  // into one clean English prompt. It is given the romanized Bengali words
+  // found in the request, because the text model otherwise guesses (it read
+  // "biraler" as a winged creature and "birale" as "battle").
+  function _imagePromptSystem(glossary) {
+    let system = 'You prepare one image prompt for the FLUX image model. ' +
+      'The request may be written in English, Bengali script, romanized Bengali (Banglish) or a mix, often with spelling mistakes and typos. ' +
+      'Read romanized Bengali phonetically and correct the spelling before translating. ' +
+      'Preserve the exact subject, colour, action, place and art style the user asked for; never swap the subject for a different one. ' +
+      'If a word stays unclear, keep the parts you do understand faithful and describe the rest neutrally. ' +
+      'Add only useful visual direction: a clear focal subject, coherent setting, lighting, camera framing and composition. ' +
+      'Do not add text, lettering, watermarks, logos, frames, UI or a collage unless the user explicitly asks. ' +
+      'Keep it safe for work. Output only the 35-85 word prompt in English with Latin letters; no quotes, headings, explanation or negative prompt.';
+    if (glossary && glossary.length) {
+      system += '\n\nRomanized Bengali words in this request (authoritative meanings): ' +
+        glossary.map(pair => '"' + pair[0] + '" = ' + pair[1]).join(', ') + '.';
+    }
+    return system;
+  }
+
+  function _localImagePrompt(text) {
+    const local = _cleanImagePrompt(_fallbackTranslateImagePrompt(text));
+    return (local && _isEnglishImagePrompt(local)) ? local : '';
+  }
+
+  // Anything that is not plain, complete English needs layer 1: Bangla script,
+  // Banglish words, near-miss spellings, or a prompt too short to describe a
+  // scene on its own.
+  function _needsPromptRepair(text) {
+    const s = String(text || '');
+    if (!s) return false;
+    if (/[\u0980-\u09ff]/.test(s)) return true;
+    if (_glossaryHits(s).length) return true;
+    if (_looksBanglishImagePrompt(s)) return true;
+    if (!_isEnglishImagePrompt(s)) return true;
+    return s.split(/\s+/).filter(Boolean).length < 5;
   }
 
   async function _englishImagePrompt(rawPrompt, originalQuery) {
@@ -1050,45 +1233,28 @@ ${refs}`;
     const cached = _getCachedImagePrompt(prompt);
     if (cached) return cached;
 
-    let english = '';
-    const needsTranslation = /[\u0980-\u09ff]/.test(prompt) || _looksBanglishImagePrompt(prompt);
-
-    if (!needsTranslation) {
-      english = prompt;
-    } else {
-      // Priority 1: fast local dictionary. This mirrors 4.1's local-first
-      // prompt path and avoids burning the free text API for common subjects.
-      const localRaw = _cleanImagePrompt(_fallbackTranslateImagePrompt(prompt));
-      const local = localRaw && localRaw.split(/\s+/).filter(Boolean).length >= 2 && _isEnglishImagePrompt(localRaw)
-        ? localRaw
-        : '';
-      if (local) {
-        english = local;
-      } else {
-        // Priority 2: let the keyless text model translate AND refine the
-        // request into a visual FLUX prompt. Accept only an English result.
-        try {
-          const translated = await _postTextModel([
-            { role: 'system', content: 'Translate and refine the following image request into a detailed, safe-for-work English prompt for the FLUX image model. Always reply in English using Latin letters only. Include subject, setting, lighting and composition. Output only the prompt, 25-70 words, no quotes, no explanation.' },
-            { role: 'user', content: String(originalQuery || prompt) }
-          ], 300);
-          const cleaned = _cleanImagePrompt(translated);
-          if (cleaned && _isEnglishImagePrompt(cleaned) &&
-              !/^(sorry|i\s+cannot|i\s+can't|i'm\s+unable|as\s+an\s+ai)\b/i.test(cleaned)) {
-            english = cleaned;
-          }
-        } catch (e) { /* fall through to local dictionary */ }
-        if (!english || !_isEnglishImagePrompt(english)) english = local;
-      }
+    let repaired = '';
+    if (_needsPromptRepair(originalQuery || prompt)) {
+      const glossary = _glossaryHits(originalQuery || prompt);
+      try {
+        const reply = await _postTextModel([
+          { role: 'system', content: _imagePromptSystem(glossary) },
+          { role: 'user', content: String(originalQuery || prompt) }
+        ], 320, 9000);
+        const cleaned = _cleanImagePrompt(reply);
+        if (cleaned && _isEnglishImagePrompt(cleaned) &&
+            !/^(sorry|i\s+cannot|i\s+can't|i'm\s+unable|as\s+an\s+ai)\b/i.test(cleaned)) {
+          repaired = cleaned;
+        }
+      } catch (e) { /* fall back to the offline translator below */ }
     }
 
-    if (!_isEnglishImagePrompt(english)) english = _safeEnglishImagePrompt(prompt);
+    // Offline fallback: glossary + dictionary. Never the raw Banglish word.
+    let english = repaired || _localImagePrompt(prompt);
+    if (!english && _isEnglishImagePrompt(prompt)) english = prompt;
     if (!english) return '';
 
-    let enhanced = _enhanceEnglishImagePrompt(english);
-    if (!_isEnglishImagePrompt(enhanced)) {
-      enhanced = _enhanceEnglishImagePrompt(_safeEnglishImagePrompt(prompt));
-    }
+    const enhanced = _enhanceEnglishImagePrompt(english);
     if (!_isEnglishImagePrompt(enhanced)) return '';
     _cacheImagePrompt(prompt, enhanced);
     return enhanced;
@@ -1148,7 +1314,9 @@ ${refs}`;
       fallbackUrl: url.replace('model=flux', 'model=turbo'),
       prompt: english,
       official: false,
-      caption: 'নিশ্চয়ই! আপনার প্রম্পটটি আরও সুন্দর করে সাজিয়ে ছবি তৈরি করা হচ্ছে... 🎨\nছবিটি লোড হতে কয়েক সেকেন্ড লাগতে পারে।'
+      // Keep generated-image messages image-only. Loading is communicated by
+      // the in-chat animation, not by a persisted text caption.
+      caption: ''
     };
   }
 

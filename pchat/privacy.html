@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Privacy Policy — Pchat shepu</title>
   <meta name="description" content="What Pchat shepu does with your data, in plain language: what stays on your device, what is saved in the room owner's Drive, and what travels over the public relay." />
@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="css/components.css?v=20261025b" />
   <link rel="stylesheet" href="css/responsive.css?v=20261025b" />
   <link rel="stylesheet" href="css/help.css?v=20261025b" />
+  <script src="js/firebase-config.js?v=20261025c"></script>
+  <script src="js/analytics.js?v=20261025c"></script>
 </head>
 <body>
 <div class="bg-mesh" aria-hidden="true"></div>
@@ -79,7 +81,7 @@
           <li><strong>A saved room's history is written to a Google Sheet in the room owner's Google Drive.</strong> The owner controls that file, not us.</li>
           <li><strong>A quick room has no backend at all.</strong> Its messages live in the browsers of the people in the room, plus the public relay described below.</li>
           <li><strong>Messages also travel through public relay servers</strong> so they arrive across networks. In a room with a passphrase, those servers see ciphertext instead of the message text.</li>
-          <li><strong>No analytics, no advertising, no tracking pixels, no selling data.</strong> The app sets no cookies of its own.</li>
+          <li><strong>Google Analytics is used for aggregate usage measurement.</strong> We do not use advertising pixels, session recording, fingerprinting, or sell personal data. The app sets no cookies of its own.</li>
         </ul>
         <p style="color:var(--muted);font-size:0.875rem;">The rest of this page explains each of those points, including the parts that are less comfortable.</p>
       </div>
@@ -102,7 +104,7 @@
         <ul>
           <li><strong>No sign-up.</strong> You can use a quick room without a name, an email or a password.</li>
           <li><strong>No central message database.</strong> There is no server that stores your conversations.</li>
-          <li><strong>No advertising or analytics.</strong> There is no Google Analytics, no Meta pixel, no session recording, no fingerprinting script and no A/B testing service.</li>
+          <li><strong>No advertising or profiling.</strong> There is no Meta pixel, session recording, fingerprinting script, A/B testing service, or advertising network. Google Analytics collects aggregate usage data as described in section 12.</li>
           <li><strong>No selling or sharing of personal data.</strong> There is no business model that needs it.</li>
           <li><strong>No reading of your messages for ads or AI training.</strong> The one exception is when you explicitly ask the Shepu-AI bot something — see <a href="#ai" style="color:var(--accent-2);">section 9</a>.</li>
           <li><strong>No app cookies.</strong> The app never calls <code>document.cookie</code>. It stores state in localStorage, sessionStorage and IndexedDB instead (section 4).</li>
@@ -246,8 +248,11 @@
 
     <!-- ── 12. Firebase / Friends social layer ──────────────────── -->
     <section class="doc-section" id="firebase">
-      <h2>12. 🤝 Friends &amp; social layer (Firebase)</h2>
+      <h2>12. 🤝 Firebase, Friends &amp; Google Analytics</h2>
       <div class="about-prose">
+        <p>
+          We use <strong>Google Analytics for Firebase</strong> to understand aggregate app usage, such as page views, browser/device information, approximate location inferred by Google, and interaction events. We do not send chat messages, room links, room names, encryption keys, email addresses, Google account identifiers, or other user-entered content to Analytics. Google processes this data under its own policies.
+        </p>
         <p>
           The optional <strong>Friends</strong> feature uses <strong>Google Firebase
           (Firestore)</strong> to store a small social graph. This is separate from your

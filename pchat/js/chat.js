@@ -1371,6 +1371,7 @@ const Chat = (() => {
       // Clear so the next message doesn't re-attach the same file
       _pendingAttachment = null;
       document.getElementById('attachment-preview-bar')?.classList.add('hidden');
+      _voiceCardHide();
       const _fi = document.getElementById('attach-file-input');
       if (_fi) _fi.value = '';
     }
@@ -2294,6 +2295,8 @@ const Chat = (() => {
   // Shows the preview bar so the user can add a caption and press Send.
   function _showAttachmentPreview({ name, size, type, dataUrl }) {
     if (!name || !dataUrl) return;
+    // Another attachment replaces whatever the voice card was holding.
+    _voiceCardHide();
     _pendingAttachment = {
       name: name,
       size: size || 0,
@@ -2368,6 +2371,7 @@ const Chat = (() => {
         _pendingAttachment = null;
         fileInput.value = '';
         previewBar.classList.add('hidden');
+        _voiceCardHide();
         if (input) input.dispatchEvent(new Event('input', { bubbles: true }));
       });
     }
@@ -2399,6 +2403,16 @@ const Chat = (() => {
   let _recStartedAt = 0;
   let _recTimer = null;
   let _recStream = null;
+  let _recAudioCtx = null;    // analyser graph for the live waveform
+  let _recAnalyser = null;
+  let _recRaf = null;
+  let _recTimeline = [];      // sampled mic levels (0-1) across the whole note
+  let _recWindow = [];        // last N samples, drawn as a scrolling waveform
+  let _recLastSampleAt = 0;
+  let _recDiscard = false;    // discard button pressed mid-recording
+  let _voiceAudio = null;     // <audio> used by the preview player
+  const VOICE_BAR_COUNT = 26;
+  const VOICE_SAMPLE_MS = 45;  // waveform scroll speed
 
   function _bindVoice() {
     const micBtn = document.getElementById('voice-btn');
@@ -2408,15 +2422,252 @@ const Chat = (() => {
       if (_recorder) { await _stopVoiceRecording(false); return; }
       await _startVoiceRecording(micBtn);
     });
+    _bindVoiceCard();
+  }
+
+  // ── Voice card (recording + preview) ───────────────────────────
+  function _voiceCardEl() { return document.getElementById('voice-rec'); }
+
+  function _voiceBars() {
+    const wave = document.getElementById('voice-rec-wave');
+    if (!wave) return [];
+    if (!wave.childElementCount) {
+      for (let i = 0; i < VOICE_BAR_COUNT; i++) {
+        const bar = document.createElement('span');
+        bar.className = 'voice-rec-bar';
+        bar.style.height = '14%';
+        bar.style.animationDelay = (i * 42) + 'ms';
+        wave.appendChild(bar);
+      }
+    }
+    return Array.from(wave.querySelectorAll('.voice-rec-bar'));
+  }
+
+  function _voiceResetBars() {
+    _voiceBars().forEach(bar => {
+      bar.style.height = '14%';
+      bar.classList.remove('played');
+    });
+  }
+
+  function _voiceCardShow(mode) {
+    const card = _voiceCardEl();
+    if (!card) return;
+    _voiceBars();
+    const preview = mode === 'preview';
+    card.classList.remove('hidden', 'is-recording', 'is-preview');
+    card.classList.add(preview ? 'is-preview' : 'is-recording');
+    const label  = document.getElementById('voice-rec-label');
+    const stop   = document.getElementById('voice-rec-stop');
+    const play   = document.getElementById('voice-rec-play');
+    const send   = document.getElementById('voice-rec-send');
+    const wave   = document.getElementById('voice-rec-wave');
+    if (label) label.textContent = preview ? 'Voice message' : 'Recording';
+    if (stop) stop.classList.toggle('hidden', preview);
+    if (play) { play.classList.toggle('hidden', !preview); play.classList.remove('is-playing'); }
+    if (send) send.classList.toggle('hidden', !preview);
+    if (wave) wave.classList.remove('fallback');
+    _voiceResetBars();
+  }
+
+  function _voiceCardHide() {
+    _stopVoiceMeter();
+    _voiceStopPlayback();
+    const card = _voiceCardEl();
+    if (card) card.classList.add('hidden');
+    _recTimeline = [];
+    _recWindow = [];
+  }
+
+  // Live waveform from the microphone. Falls back to a calm CSS wave when an
+  // AudioContext is unavailable, so the card never looks frozen.
+  function _startVoiceMeter(stream) {
+    _stopVoiceMeter();
+    const bars = _voiceBars();
+    const wave = document.getElementById('voice-rec-wave');
+    _recTimeline = [];
+    _recWindow = new Array(bars.length).fill(0.04);
+    _recLastSampleAt = 0;
+    let ctx = null;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx || !stream) throw new Error('no audio context');
+      ctx = new Ctx();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      _recAudioCtx = ctx;
+      _recAnalyser = analyser;
+    } catch (e) {
+      _recAudioCtx = null;
+      _recAnalyser = null;
+      if (ctx) { try { ctx.close(); } catch {} }
+      if (wave) wave.classList.add('fallback');
+      return;
+    }
+    const data = new Uint8Array(_recAnalyser.frequencyBinCount);
+    const draw = () => {
+      if (!_recAnalyser) return;
+      _recAnalyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = (data[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / data.length);
+      // Soft knee so speech sits in the middle of the bars instead of
+      // slamming them to the top.
+      const level = Math.min(1, Math.pow(rms * 3.4, 0.8));
+      const now = performance.now();
+      if (!_recLastSampleAt || now - _recLastSampleAt >= VOICE_SAMPLE_MS) {
+        _recLastSampleAt = now;
+        // Newest sample enters on the right; the old ones slide left, which
+        // reads as a real waveform recording rather than a pulsing pattern.
+        _recWindow.push(level);
+        while (_recWindow.length > bars.length) _recWindow.shift();
+        _recTimeline.push(level);
+        if (_recTimeline.length > 4000) _recTimeline.shift();
+      }
+      const pad = Math.max(0, bars.length - _recWindow.length);
+      for (let i = 0; i < bars.length; i++) {
+        const v = _recWindow[i - pad] || 0;
+        // A whisper of motion keeps silent bars alive without looking noisy.
+        const idle = 0.035 + 0.02 * Math.sin(now / 320 + i * 0.6);
+        const pct = Math.max(8, Math.min(100, Math.max(v, idle) * 100));
+        bars[i].style.height = pct.toFixed(1) + '%';
+      }
+      _recRaf = requestAnimationFrame(draw);
+    };
+    _recRaf = requestAnimationFrame(draw);
+  }
+
+  function _stopVoiceMeter() {
+    if (_recRaf) { try { cancelAnimationFrame(_recRaf); } catch {} }
+    _recRaf = null;
+    _recAnalyser = null;
+    if (_recAudioCtx) { try { _recAudioCtx.close(); } catch {} }
+    _recAudioCtx = null;
+  }
+
+  function _voiceStopPlayback() {
+    if (_voiceAudio) {
+      try { _voiceAudio.pause(); } catch {}
+      try { _voiceAudio.currentTime = 0; } catch {}
+      _voiceAudio = null;
+    }
+    const play = document.getElementById('voice-rec-play');
+    if (play) play.classList.remove('is-playing');
+  }
+
+  // Static peaks captured during the recording + a real player, so the user
+  // hears the note before sending it.
+  function _voiceCardPreview(dataUrl, secs) {
+    _voiceStopPlayback();
+    _voiceCardShow('preview');
+    const bars = _voiceBars();
+    // Bucket the whole recording into the bars, so the preview shows the
+    // actual shape of what was said — quiet parts stay low.
+    const timeline = _recTimeline.slice();
+    bars.forEach((bar, i) => {
+      let peak = 0;
+      if (timeline.length) {
+        const from = Math.floor((i * timeline.length) / bars.length);
+        const to = Math.max(from + 1, Math.floor(((i + 1) * timeline.length) / bars.length));
+        for (let j = from; j < to && j < timeline.length; j++) {
+          if (timeline[j] > peak) peak = timeline[j];
+        }
+      }
+      const pct = peak ? Math.max(10, Math.min(100, peak * 100)) : 12;
+      bar.style.height = pct.toFixed(1) + '%';
+      bar.classList.remove('played');
+    });
+    const timeEl = document.getElementById('voice-rec-time');
+    const duration = Math.max(1, Math.round(secs || 0));
+    if (timeEl) timeEl.textContent = _fmtDuration(duration);
+
+    const audio = new Audio(dataUrl);
+    _voiceAudio = audio;
+    const paintProgress = () => {
+      const total = audio.duration && isFinite(audio.duration) ? audio.duration : duration;
+      const frac = total > 0 ? Math.min(1, (audio.currentTime || 0) / total) : 0;
+      bars.forEach((bar, i) => {
+        bar.classList.toggle('played', (i + 0.5) / bars.length <= frac);
+      });
+      if (timeEl) {
+        timeEl.textContent = frac > 0
+          ? _fmtDuration(audio.currentTime) + ' / ' + _fmtDuration(total)
+          : _fmtDuration(total);
+      }
+    };
+    audio.addEventListener('timeupdate', paintProgress);
+    audio.addEventListener('ended', () => {
+      const play = document.getElementById('voice-rec-play');
+      if (play) play.classList.remove('is-playing');
+      try { audio.currentTime = 0; } catch {}
+      paintProgress();
+    });
+    audio.addEventListener('error', () => {
+      const play = document.getElementById('voice-rec-play');
+      if (play) play.classList.remove('is-playing');
+    });
+    paintProgress();
+  }
+
+  function _bindVoiceCard() {
+    const card = _voiceCardEl();
+    if (!card || card.dataset.bound) return;
+    card.dataset.bound = '1';
+    document.getElementById('voice-rec-play')?.addEventListener('click', () => {
+      if (!_voiceAudio) return;
+      const play = document.getElementById('voice-rec-play');
+      if (_voiceAudio.paused) {
+        _voiceAudio.play().then(() => play?.classList.add('is-playing'))
+          .catch(() => play?.classList.remove('is-playing'));
+      } else {
+        _voiceAudio.pause();
+        play?.classList.remove('is-playing');
+      }
+    });
+    document.getElementById('voice-rec-stop')?.addEventListener('click', () => {
+      if (_recorder) _stopVoiceRecording(false);
+    });
+    document.getElementById('voice-rec-cancel')?.addEventListener('click', () => {
+      if (_recorder) { _cancelVoiceRecording(); return; }
+      // Preview mode: drop the recorded note, nothing is sent.
+      _pendingAttachment = null;
+      document.getElementById('attachment-preview-bar')?.classList.add('hidden');
+      _voiceCardHide();
+      if (input) input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    document.getElementById('voice-rec-send')?.addEventListener('click', () => {
+      if (_recorder || !_pendingAttachment) return;
+      sendMessage();
+    });
+  }
+
+  function _cancelVoiceRecording() {
+    _recDiscard = true;
+    _stopVoiceRecording(false);
   }
 
   function _setMicUI(recording, secs) {
     const micBtn = document.getElementById('voice-btn');
     if (micBtn) micBtn.classList.toggle('recording', !!recording);
+    // The card owns the live timer, so the composer placeholder stays short.
+    const cardTime = document.getElementById('voice-rec-time');
+    const card = _voiceCardEl();
+    if (cardTime && card && card.classList.contains('is-recording')) {
+      cardTime.textContent = _fmtDuration(secs || 0);
+    }
     if (input) {
       if (recording) {
-        if (!input.dataset.ph) input.dataset.ph = input.placeholder || '';
-        input.placeholder = `● Recording ${ _fmtDuration(secs || 0)}… tap mic to stop`;
+        // Check the attribute, not its truthiness: an empty placeholder would
+        // otherwise re-capture the recording text on the next timer tick and
+        // never restore the real placeholder.
+        if (!('ph' in input.dataset)) input.dataset.ph = input.placeholder || '';
+        input.placeholder = '● Recording… tap mic to stop';
       } else if (input.dataset.ph !== undefined) {
         input.placeholder = input.dataset.ph;
         delete input.dataset.ph;
@@ -2443,6 +2694,12 @@ const Chat = (() => {
   }
 
   async function _startVoiceRecording(micBtn) {
+    // A new recording replaces any note still waiting in preview.
+    if (_pendingAttachment && _pendingAttachment.kind === 'voice') {
+      _pendingAttachment = null;
+      document.getElementById('attachment-preview-bar')?.classList.add('hidden');
+    }
+    _voiceCardHide();
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         UI.toast('error', 'Not supported', 'Voice recording is not supported in this browser.');
@@ -2473,7 +2730,10 @@ const Chat = (() => {
     _recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) _recChunks.push(ev.data); };
     _recorder.onstop = () => { _finishVoiceRecording(); };
     _recorder.start(250);
+    _recDiscard = false;
     _setMicUI(true, 0);
+    _voiceCardShow('recording');
+    _startVoiceMeter(_recStream);
     clearInterval(_recTimer);
     _recTimer = setInterval(() => {
       const secs = (Date.now() - _recStartedAt) / 1000;
@@ -2485,6 +2745,7 @@ const Chat = (() => {
   async function _stopVoiceRecording(sendAfter) {
     clearInterval(_recTimer);
     _recTimer = null;
+    _stopVoiceMeter();
     const rec = _recorder;
     _recorder = null;
     _setMicUI(false);
@@ -2518,16 +2779,25 @@ const Chat = (() => {
     _setMicUI(false);
     const chunks = _recChunks;
     _recChunks = [];
+    if (_recDiscard) {
+      // "Discard" while recording: nothing is built and nothing is sent.
+      _recDiscard = false;
+      if (_voiceSendResolver) { _voiceSendResolver = null; }
+      _voiceCardHide();
+      return;
+    }
     if (!chunks.length) {
       // Nothing was recorded — drop the pending send instead of sending an
       // empty message.
       if (_voiceSendResolver) { _voiceSendResolver = null; }
+      _voiceCardHide();
       return;
     }
     const mime = (_recorder && _recorder.mimeType) || (chunks[0] && chunks[0].type) || 'audio/webm';
     const blob = new Blob(chunks, { type: mime });
     if (blob.size > 5 * 1024 * 1024) {
       UI.toast('error', 'Too long', 'Voice message exceeds 5MB. Try a shorter recording.');
+      _voiceCardHide();
       return;
     }
     const secs = (Date.now() - _recStartedAt) / 1000;
@@ -2544,17 +2814,13 @@ const Chat = (() => {
         durationSec: Math.round(secs),
         kind: 'voice',
       };
-      // Reuse the attachment preview bar
-      const previewBar = document.getElementById('attachment-preview-bar');
-      const thumbEl    = document.getElementById('attachment-thumb');
-      const fileIconEl = document.getElementById('attachment-file-icon');
-      const nameEl     = document.getElementById('attachment-name');
-      const sizeEl     = document.getElementById('attachment-size');
-      if (nameEl) nameEl.textContent = _pendingAttachment.name;
-      if (sizeEl) sizeEl.textContent = `${_fmtDuration(secs)} · ${UI.formatBytes ? UI.formatBytes(blob.size) : Math.round(blob.size/1024) + ' KB'}`;
-      if (thumbEl) thumbEl.classList.add('hidden');
-      if (fileIconEl) fileIconEl.style.display = '';
-      if (previewBar) previewBar.classList.remove('hidden');
+      // The voice card IS the preview: the generic attachment bar stays out
+      // of the way, and the note can be heard before it is sent.
+      document.getElementById('attachment-preview-bar')?.classList.add('hidden');
+      // Always paint the preview: on the Enter-to-send path the card is hidden
+      // again by sendMessage as soon as the message leaves, and if the send is
+      // refused the note stays visible instead of turning invisible.
+      _voiceCardPreview(e.target.result, secs);
       if (input) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.focus({ preventScroll: true });
@@ -3320,14 +3586,12 @@ const Chat = (() => {
     } catch {}
   }
 
-  // ── Shepu-AI 4.1-style image generation animation ─────────────
-  // A 19×19 wave of dots + a slowly rising percentage, adapted from the
-  // reference build's canvas loader. It runs behind the image until load.
+  // ── Minimal image-generation animation ─────────────────────────
+  // A label-free, border-free luminous motion field. It deliberately avoids
+  // claiming a percentage or showing status copy while the image is made.
   function _mediaGenMarkup() {
     return '<span class="msg-media-gen" aria-hidden="true">'
-      + '<span class="msg-media-gen-title">Creating image</span>'
       + '<canvas class="msg-media-gen-canvas" width="300" height="300"></canvas>'
-      + '<span class="msg-media-gen-percent">12%</span>'
       + '</span>';
   }
 
@@ -3335,8 +3599,7 @@ const Chat = (() => {
     try {
       if (!wrap || wrap._mediaGenStop) return;
       const canvas = wrap.querySelector('.msg-media-gen-canvas');
-      const percentElem = wrap.querySelector('.msg-media-gen-percent');
-      if (!canvas || !percentElem || typeof requestAnimationFrame !== 'function') return;
+      if (!canvas || typeof requestAnimationFrame !== 'function') return;
       const ctx = canvas.getContext && canvas.getContext('2d');
       if (!ctx) return;
 
@@ -3350,38 +3613,16 @@ const Chat = (() => {
       const reduceMotion = typeof window !== 'undefined' && window.matchMedia
         ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
       const isLight = document.body && document.body.classList.contains('light-mode');
-      const cols = 19;
-      const rows = 19;
-      const step = size / (cols + 1);
       const cx = size / 2;
       const cy = size / 2;
-      const maxDist = Math.hypot(cx, cy);
-      let progress = 12 + Math.floor(Math.random() * 3);
       let phase = 0;
       let raf = 0;
-      let timer = null;
       let stopped = false;
 
-      const paintPercent = () => { percentElem.textContent = progress + '%'; };
-      paintPercent();
-
-      if (!reduceMotion) {
-        timer = setInterval(() => {
-          if (stopped || progress >= 95) return;
-          const inc = progress < 40
-            ? (Math.floor(Math.random() * 2) + 1)
-            : (progress < 75 ? (Math.random() < 0.65 ? 1 : 2) : 1);
-          progress = Math.min(95, progress + inc);
-          paintPercent();
-        }, 450);
-      }
-
-      const stop = (complete) => {
+      const stop = () => {
         if (stopped) return;
         stopped = true;
-        if (timer) clearInterval(timer);
         if (raf) cancelAnimationFrame(raf);
-        if (complete) { progress = 100; paintPercent(); }
         wrap._mediaGenStop = null;
       };
       wrap._mediaGenStop = stop;
@@ -3390,33 +3631,25 @@ const Chat = (() => {
         if (stopped) return;
         if (!canvas.isConnected) { stop(false); return; }
         ctx.clearRect(0, 0, size, size);
-        phase += 0.62;
-        const cycle = maxDist * 1.5;
-        const wave1 = phase % cycle;
-        const wave2 = (phase + cycle * 0.5) % cycle;
-        for (let r = 1; r <= rows; r++) {
-          for (let c = 1; c <= cols; c++) {
-            const x = c * step;
-            const y = r * step;
-            const d = Math.hypot(x - cx, y - cy);
-            const int1 = Math.max(0, 1 - Math.abs(d - wave1) / 56);
-            const int2 = Math.max(0, 1 - Math.abs(d - wave2) / 56);
-            const intensity = Math.pow(Math.min(1, int1 + int2), 1.2);
-            const radius = 1.35 + intensity * 1.1;
-            let color;
-            if (intensity > 0.04) {
-              const alpha = 0.18 + intensity * 0.82;
-              color = isLight
-                ? `rgba(37, 99, 235, ${alpha})`
-                : `rgba(${Math.round(96 + intensity * 130)}, ${Math.round(165 + intensity * 75)}, 255, ${alpha})`;
-            } else {
-              color = isLight ? 'rgba(0, 0, 0, 0.11)' : 'rgba(255, 255, 255, 0.12)';
-            }
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-          }
+        phase += reduceMotion ? 0 : 0.018;
+
+        // The small, drifting points create a soft generative "thinking"
+        // motion without an enclosing card, ring, label, or progress meter.
+        for (let i = 0; i < 112; i++) {
+          const t = (i / 112) * Math.PI * 2;
+          const wave = Math.sin(t * 3 + phase * 2.3) * 17;
+          const drift = Math.sin(t * 5 - phase * 1.7) * 9;
+          const radius = 74 + wave;
+          const x = cx + Math.cos(t + phase * 0.32) * radius + Math.cos(t * 2 - phase) * drift;
+          const y = cy + Math.sin(t + phase * 0.32) * radius * 0.72 + Math.sin(t * 2 - phase) * drift;
+          const glow = (Math.sin(t * 4 - phase * 2.4) + 1) / 2;
+          const dot = 0.9 + glow * 1.9;
+          const hue = isLight ? 215 + glow * 38 : 195 + glow * 95;
+          const alpha = isLight ? 0.24 + glow * 0.5 : 0.22 + glow * 0.72;
+          ctx.beginPath();
+          ctx.arc(x, y, dot, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${hue}, 92%, ${isLight ? 46 : 72}%, ${alpha})`;
+          ctx.fill();
         }
         if (!reduceMotion) raf = requestAnimationFrame(draw);
         else stopped = true;

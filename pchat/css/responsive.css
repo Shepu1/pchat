@@ -311,6 +311,23 @@
 
   /* Progress steps */
   .progress-step .step-label { font-size: 0.875rem; }
+
+  /* Shepu-AI suggestion popup follows the phone composer's narrower padding */
+  .shepu-suggest {
+    left: 0.6rem;
+    width: min(336px, calc(100% - 1.2rem));
+  }
+
+  /* Voice pill fills the phone composer; the word label is dropped to keep
+     the timer and the wave readable on a small screen. */
+  .voice-rec {
+    width: auto;
+    margin: 0 0.6rem 0.3rem;
+    padding: 0.3rem 0.35rem 0.3rem 0.65rem;
+    gap: 0.4rem;
+  }
+  .voice-rec-label { display: none; }
+  .voice-rec-wave { gap: 1.5px; }
 }
 
 /* ── Very small screens (360px) ─────────────────────────────────── */

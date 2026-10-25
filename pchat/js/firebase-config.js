@@ -8,8 +8,8 @@
  *
  * Setup:
  *   Firebase Console → Project settings → General → Your apps → Web
- *   Copy the firebaseConfig object (without measurementId — analytics is
- *   intentionally disabled to keep the "no tracking" promise).
+ *   Copy the entire firebaseConfig object, including measurementId, from
+ *   Firebase Console → Project settings → Your apps → Web app.
  */
 
 window.FIREBASE_CONFIG = {
@@ -19,4 +19,5 @@ window.FIREBASE_CONFIG = {
   storageBucket: 'pchat-shepu.firebasestorage.app',
   messagingSenderId: '1019767137930',
   appId: '1:1019767137930:web:c13334f7d79ba6e789ef73',
+  measurementId: 'G-HJWKRVSGM6',
 };

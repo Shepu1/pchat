@@ -36,10 +36,10 @@ Each room is backed by:
 
 The Friends / Invite system uses Firebase Spark (free tier). Chat works without it.
 
-1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com) (Google Analytics: **off**).
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com) and enable Google Analytics.
 2. Enable **Firestore** (Production mode, region `asia-south1`).
 3. Enable **Authentication → Google sign-in**.
-4. Register a Web app — copy the `firebaseConfig` object into `js/firebase-config.js`.
+4. Register a Web app — copy the complete `firebaseConfig` object, including `measurementId`, into `js/firebase-config.js`.
 5. In **Authentication → Sign-in method → Google → Safelist client IDs from external projects**, add your GIS client ID.
 6. Deploy Firestore rules and indexes:
 

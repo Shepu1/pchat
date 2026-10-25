@@ -28,7 +28,7 @@ Quick rooms are even lighter: there is no server at all. Your messages travel di
 
 **🔐 Optional end-to-end encryption.** Turn on a room passphrase and everything after it is encrypted on each device before it leaves. We can't read it. Neither can the relay.
 
-**🕵️ No tracking, no ads, no accounts.** There's no analytics pipeline, no profile, no recommendation engine. Just a chat app.
+**🕵️ No ads, no accounts.** Google Analytics provides aggregate usage measurement; there is no advertising profile or recommendation engine.
 
 **📴 Works on a phone on a weak network.** Quick rooms connect devices directly, and a free relay picks up the slack when a network is too restrictive for a direct connection.
 

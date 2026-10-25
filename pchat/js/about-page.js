@@ -43,7 +43,7 @@
         ['🔗', 'A link is the whole signup', 'No account, no email, no password. Open the link, pick a name, you are in.'],
         ['🔐', 'Encryption you opt into', 'Set a room passphrase and every new message is encrypted on the device before it is sent. The key never leaves.'],
         ['📴', 'Built for weak networks', 'Messages travel peer-to-peer and over a multi-server relay at the same time. If one path is blocked, the other still delivers.'],
-        ['🕵️', 'No accounts, no tracking', 'No profile, no analytics, no advertising network. There is nothing to sell because there is no database of you.'],
+        ['🕵️', 'No ads or profiling', 'We use privacy-disclosed aggregate analytics, but no advertising network, session recording, or personal profile.'],
         ['🎨', 'Yours to shape', 'Wallpapers, a 500-plus emoji set, a room-wide music player, and an assistant that understands room commands.'],
       ];
       pill.innerHTML = pillars.map(([icon, title, body]) =>

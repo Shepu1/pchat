@@ -95,7 +95,7 @@ ck('covers encryption', /AES-256-GCM/.test(privacy) && /PBKDF2/.test(privacy));
 ck('covers Google sign-in', /Google sign-in/.test(privacy) && /access token/.test(privacy));
 ck('covers the AI bot', /Pollinations/.test(privacy));
 ck('covers deletion', /Clear local app data/.test(privacy));
-ck('says there are no trackers', /no analytics/i.test(privacy) && /no tracking/i.test(privacy));
+ck('discloses Google Analytics', /Google Analytics for Firebase/.test(privacy) && /aggregate usage/.test(privacy));
 // every in-page link must land on a real section
 const anchorIds = new Set([...privacy.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
 const anchorLinks = [...privacy.matchAll(/href="#([^"]+)"/g)].map(m => m[1]);

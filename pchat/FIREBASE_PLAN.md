@@ -37,7 +37,7 @@ Success criteria:
 - No Firebase Storage (not available on Spark).
 - No Cloud Functions in v1 (Blaze-only).
 - No background push in v1 (in-app delivery only; ntfy/Blaze later).
-- No Firebase Analytics (contradicts the "no tracking" promise).
+- Firebase Analytics is enabled for aggregate usage measurement; its use is disclosed in the privacy policy.
 - No Firebase Hosting for the main app (360 MB/day is too small for `assets/music`).
 
 ## 3. Architecture
