@@ -1,7 +1,8 @@
     @font-face {
       font-family: 'PchatNameFont';
-      src: url('assets/fonts/name_font.otf') format('opentype');
-      font-weight: normal;
+      src: url('../assets/fonts/name_font.otf') format('opentype'),
+           url('../assets/fonts/name_font.ttf') format('truetype');
+      font-weight: 100 900;
       font-style: normal;
       font-display: swap;
     }
@@ -152,16 +153,16 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #10b981;
+      background: #34d399;
     }
 
     .live-pulse-dot::after {
       content: "";
       position: absolute;
-      inset: -3px;
+      inset: -2px;
       border-radius: 50%;
-      border: 1.5px solid #10b981;
-      animation: livePulse 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+      border: 1px solid #34d399;
+      opacity: 0.6;
     }
 
     @keyframes livePulse {
@@ -374,7 +375,7 @@
       box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
       position: relative;
       border: 1.5px solid rgba(255, 255, 255, 0.16);
-      overflow: hidden;
+      overflow: visible;
     }
 
     .chat-avatar.has-photo {
@@ -386,14 +387,15 @@
 
     .chat-avatar .online-indicator {
       position: absolute;
-      bottom: -2px;
-      right: -2px;
+      bottom: -1px;
+      right: -1px;
       width: 11px;
       height: 11px;
       border-radius: 50%;
-      background: #10b981;
-      border: 2px solid var(--hub-bg-sidebar);
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+      background: #34d399;
+      border: 2px solid var(--hub-bg-sidebar, #0f172a);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      z-index: 2;
     }
 
     .chat-info {
@@ -546,7 +548,7 @@
       background:
         radial-gradient(1100px 480px at 50% 0%, rgba(37, 99, 235, 0.10) 0%, transparent 70%),
         linear-gradient(180deg, rgba(8, 12, 21, 0.42) 0%, rgba(8, 12, 21, 0.74) 48%, rgba(8, 12, 21, 0.90) 100%),
-        url('assets/themes/home_bg.png?v=20261025b') left top / cover no-repeat,
+        url('../assets/themes/home_bg.png?v=20261025b') left top / cover no-repeat,
         var(--hub-bg-canvas);
       position: relative;
       overflow-y: auto;
@@ -1140,42 +1142,70 @@
        Same markup, calmer surface: quieter chrome, one clear hierarchy,
        hairline separation, native-feeling bottom navigation.
        ═══════════════════════════════════════════════════════════════ */
-    /* Phone only: "+" under the filter row — shown inside the Joined view
-       to join a room with a link/code. */
+    /* Phone only: "+" floating button for Joined view to join with link/code */
     .mobile-new-row {
       display: none;
-      justify-content: flex-end;
-      padding: 0 0.9rem 0.1rem;
-      margin-top: -0.25rem;
     }
 
     .mobile-new-btn {
-      width: 38px;
-      height: 38px;
-      border-radius: 11px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #93c5fd;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.45);
       cursor: pointer;
-      transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+      transition: all var(--t-fast);
+    }
+
+    @keyframes tabAnimFade {
+      0% {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .tab-anim-fade {
+      animation: tabAnimFade 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     @media (max-width: 859px) {
 
-      .mobile-new-row.is-joined {
+      .mobile-new-row {
+        position: fixed;
+        bottom: 5.25rem;
+        right: 1.25rem;
+        z-index: 50;
+        margin: 0;
+        padding: 0;
         display: flex;
+        opacity: 0;
+        transform: scale(0.8) translateY(10px);
+        pointer-events: none;
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .mobile-new-row.is-joined {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        pointer-events: auto;
       }
 
       .mobile-new-btn:hover {
-        background: rgba(255, 255, 255, 0.09);
-        border-color: rgba(255, 255, 255, 0.18);
+        transform: scale(1.06);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
       }
 
       .mobile-new-btn:active {
-        background: rgba(255, 255, 255, 0.13);
+        transform: scale(0.94);
       }
 
       /* The labelled join row takes over from the top-bar link icon */
@@ -1295,12 +1325,16 @@
         color: var(--hub-text-mid);
         font-size: 0.75rem;
         font-weight: 600;
+        cursor: pointer;
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        user-select: none;
       }
 
       .chip-btn svg {
         width: 14px;
         height: 14px;
         opacity: 0.85;
+        transition: transform 0.2s ease;
       }
 
       .chip-btn:hover {
@@ -1310,10 +1344,15 @@
       }
 
       .chip-btn.active {
-        background: rgba(255, 255, 255, 0.07);
-        border-color: rgba(255, 255, 255, 0.12);
-        color: #e2e8f0;
-        box-shadow: none;
+        background: rgba(37, 99, 235, 0.2);
+        border-color: rgba(59, 130, 246, 0.38);
+        color: #93c5fd;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+      }
+
+      .chip-btn.active svg {
+        transform: scale(1.1);
+        color: #60a5fa;
       }
 
       /* ── Conversation rows: full bleed, hairline separated ── */

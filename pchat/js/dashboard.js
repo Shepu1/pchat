@@ -98,8 +98,8 @@
         // ── Connection Mode selector (Quick P2P vs Saved Sheet-backup) ──
         let roomMode = 'instant';
         const MODE_HINTS = {
-          instant: 'Quick rooms connect directly peer-to-peer — no sign-in, no cloud backup.',
-          secure:  'Saved rooms auto-save every message to a Google Sheet in your Drive. Google sign-in required.',
+          instant: 'Quick rooms let you start chatting immediately without signing in.',
+          secure:  'Saved rooms back up chat messages to Google Drive (requires Google sign-in).',
         };
         const syncModePickers = (pickers) => {
           pickers.forEach(btns => {
@@ -186,11 +186,17 @@
           if (!rooms.length) {
             chatListContainer.style.display = 'none';
             chatEmpty.style.display = 'block';
+            chatEmpty.classList.remove('tab-anim-fade');
+            void chatEmpty.offsetWidth;
+            chatEmpty.classList.add('tab-anim-fade');
             return;
           }
 
           chatEmpty.style.display = 'none';
           chatListContainer.style.display = 'flex';
+          chatListContainer.classList.remove('tab-anim-fade');
+          void chatListContainer.offsetWidth;
+          chatListContainer.classList.add('tab-anim-fade');
           chatListContainer.innerHTML = '';
 
           rooms.forEach(room => {
@@ -211,7 +217,7 @@
             item.innerHTML = `
         <div class="chat-avatar">
           ${initial.toUpperCase()}
-          <img src="${roomIcon}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
+          <img src="${roomIcon}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;" onload="this.parentElement.classList.add('has-photo')" onerror="this.remove()" />
           <span class="online-indicator"></span>
         </div>
         <div class="chat-info">
@@ -226,7 +232,7 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
               </button>
               <button type="button" class="btn btn-icon btn-ghost btn-item-call-video" title="Video Call" style="width:32px;height:32px;color:#a855f7;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.89L15 14v-4z"></path><rect x="2" y="6" width="13" height="12" rx="3"></rect></svg>
               </button>
               ${room.spreadsheetId ? `
               <a href="https://docs.google.com/spreadsheets/d/${room.spreadsheetId}/edit" target="_blank" rel="noopener noreferrer" class="btn btn-icon btn-ghost btn-item-sheet" title="Open Google Sheet (Drive: SHEPU ROOMS)" style="width:32px;height:32px;color:#10b981;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">

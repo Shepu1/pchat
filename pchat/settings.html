@@ -43,17 +43,17 @@
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
           <span class="item-label">Account</span>
         </button>
-        <button class="sidebar-item" data-section="privacy">
-          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
-          <span class="item-label">Privacy</span>
-        </button>
-        <button class="sidebar-item" data-section="terms">
-          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span>
-          <span class="item-label">Terms</span>
+        <button class="sidebar-item" data-section="friends">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+          <span class="item-label">Friends</span>
         </button>
         <button class="sidebar-item" data-section="notifications">
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
           <span class="item-label">Notifications</span>
+        </button>
+        <button class="sidebar-item" data-section="privacy">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+          <span class="item-label">Privacy</span>
         </button>
         <button class="sidebar-item" data-section="relay">
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"></path><circle cx="8" cy="7" r="2" fill="var(--surface)"></circle><circle cx="15" cy="12" r="2" fill="var(--surface)"></circle><circle cx="10" cy="17" r="2" fill="var(--surface)"></circle></svg></span>
@@ -67,9 +67,9 @@
           <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
           <span class="item-label">About</span>
         </button>
-        <button class="sidebar-item" data-section="friends">
-          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-          <span class="item-label">Friends</span>
+        <button class="sidebar-item" data-section="terms">
+          <span class="item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span>
+          <span class="item-label">Terms</span>
         </button>
       </nav>
 
@@ -162,6 +162,137 @@
           </div>
         </section>
 
+        <!-- Friends -->
+        <section class="settings-section" id="section-friends">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Friends &amp; Social</h3>
+
+            <!-- Handle card -->
+            <div class="panel" id="settings-friends-handle-card" style="margin-bottom:1rem;">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Your username
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                Friends find you by @username. You can change it once every 30 days.
+              </p>
+              <div id="settings-friends-status" style="font-size:0.875rem;color:var(--muted);">
+                Sign in with Google to use Friends.
+              </div>
+              <div id="settings-friends-handle-row" style="display:none;margin-top:0.5rem;flex-direction:column;gap:0.6rem;">
+                <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+                  <span style="font-size:1.1rem;font-weight:700;color:var(--accent);" id="settings-friends-handle-val">—</span>
+                  <button type="button" class="btn btn-ghost btn-sm" id="settings-copy-handle">Copy</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="settings-change-handle-btn" style="display:none;">Change username</button>
+                  <span id="settings-handle-cooldown-msg" style="font-size:0.78rem;color:var(--muted);display:none;"></span>
+                </div>
+                <!-- Change handle inline form -->
+                <div id="settings-change-handle-form" style="display:none;margin-top:0.5rem;">
+                  <div style="position:relative;margin-bottom:0.4rem;">
+                    <span style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);font-weight:700;color:var(--accent);pointer-events:none;">@</span>
+                    <input
+                      id="settings-new-handle-input"
+                      type="text"
+                      maxlength="20"
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="off"
+                      spellcheck="false"
+                      placeholder="new_username"
+                      style="width:100%;box-sizing:border-box;padding:0.7rem 0.75rem 0.7rem 2rem;font-size:0.95rem;font-weight:600;border-radius:0.6rem;border:2px solid var(--border);background:var(--surface-2);color:var(--text-1);outline:none;caret-color:var(--accent);"
+                    />
+                  </div>
+                  <p id="settings-new-handle-hint" style="font-size:0.78rem;color:var(--muted);min-height:1.2em;margin:0 0 0.5rem;">3–20 characters: a–z, 0–9, underscore</p>
+                  <div style="display:flex;gap:0.5rem;">
+                    <button type="button" class="btn btn-primary btn-sm" id="settings-confirm-handle-btn" disabled>Save username</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="settings-cancel-handle-btn">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active status toggle -->
+            <div class="panel" style="margin-bottom:1rem;">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Active status
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                When on, friends see "Active now" if you used the app in the last 15 minutes.
+                Turning this off hides your online presence from friends.
+              </p>
+              <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;">
+                <input type="checkbox" id="settings-presence-toggle" style="width:1.1rem;height:1.1rem;accent-color:var(--accent);" checked />
+                <span style="font-size:0.9rem;">Show my active status to friends</span>
+              </label>
+            </div>
+
+            <!-- Encrypted invite key -->
+            <div class="panel" style="margin-bottom:1rem;">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Encrypted room invites
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.5rem;" id="settings-invite-key-status">
+                Checking this device…
+              </p>
+              <button type="button" class="btn btn-secondary btn-sm" id="settings-repair-invite-key">
+                Reset invite key on this device
+              </button>
+              <p style="font-size:0.75rem;color:var(--muted);margin:0.6rem 0 0;">
+                Only affects encrypted invites. Rooms, messages and calls are untouched.
+                Invites sent to an old key cannot be opened; friends can send a new one.
+              </p>
+            </div>
+
+            <!-- Blocked users -->
+            <div class="panel" id="settings-blocked-card" style="margin-bottom:1rem;display:none;">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>
+                Blocked users
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                Blocked people cannot send you friend requests or room invites.
+              </p>
+              <div id="settings-blocked-list"></div>
+            </div>
+
+            <!-- Delete social data -->
+            <div class="panel" style="background:var(--surface-2);">
+              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;color:var(--danger,#ef4444)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Delete my social data
+              </h4>
+              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
+                Removes your Friends profile, username, friend list, and pending requests.
+                Your rooms and chat history are not affected.
+              </p>
+              <button class="btn btn-danger btn-sm" id="settings-delete-social-btn"
+                style="display:inline-flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Delete social data
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notifications -->
+        <section class="settings-section" id="section-notifications">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Notifications</h3>
+            <p style="color:var(--text-2);font-size:0.875rem;margin-bottom:1.25rem;">
+              Browser notifications for new messages (requires permission).
+            </p>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+              <div>
+                <div style="font-weight:500;">New message notifications</div>
+                <div style="font-size:0.8125rem;color:var(--muted);" id="notif-status-text">Status: Not requested</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="request-notif-btn">Enable</button>
+            </div>
+          </div>
+        </section>
+
         <!-- Privacy -->
         <section class="settings-section" id="section-privacy">
           <div class="panel">
@@ -188,9 +319,8 @@
               <div class="panel" style="background:var(--surface-2);">
                 <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line></svg> What does Pchat shepu store?</h4>
                 <p style="font-size:0.875rem;color:var(--text-2);">
-                  Pchat shepu stores room ID → deployment URL mappings in your browser's
-                  localStorage, plus a local offline cache of room messages in IndexedDB.
-                  No message content is stored on external third-party servers.
+                  Pchat stores your room list and an offline copy of messages directly on your device for fast loading.
+                  No message history is ever stored on central third-party servers.
                 </p>
               </div>
 
@@ -218,12 +348,100 @@
             </div>
 
             <div style="margin-top:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-              <button class="btn btn-danger btn-sm" id="clear-local-data-btn" style="display:inline-flex;align-items:center;gap:6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Clear local app data (storage + cache)
-              </button>
               <button class="btn btn-secondary btn-sm" id="clear-idb-btn" style="display:inline-flex;align-items:center;gap:6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path></svg> Clear message cache only
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path></svg> Clear Message Cache Only
               </button>
+              <button class="btn btn-danger btn-sm" id="clear-local-data-btn" style="display:inline-flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Reset All Local App Data
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Relay -->
+        <section class="settings-section" id="section-relay">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Message Delivery Servers</h3>
+            <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
+              Real-time messages across devices are delivered through these secure servers with automatic backup.
+              The default settings work automatically for everyone. You only need to edit these if messages
+              are blocked on your local network or Wi-Fi.
+            </p>
+
+            <div style="display:flex;flex-direction:column;gap:0.875rem;">
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                  Delivery Server List
+                  <span id="relay-status-badge" class="badge">checking…</span>
+                </div>
+                <textarea id="relay-servers-input" rows="4" spellcheck="false"
+                  style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem;color:var(--text);"></textarea>
+                <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" id="relay-test-btn">Test connection</button>
+                  <button class="btn btn-primary btn-sm" id="relay-save-btn">Save servers</button>
+                  <button class="btn btn-ghost btn-sm" id="relay-reset-btn">Reset to defaults</button>
+                </div>
+                <pre id="relay-report" style="font-size:0.75rem;max-height:160px;overflow:auto;margin-top:0.6rem;white-space:pre-wrap;"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Help -->
+        <section class="settings-section" id="section-help">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">Help</h3>
+            <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
+              Every feature of the app, in detail — generated from the app itself, so it is never out of date.
+            </p>
+
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+              <a href="help.html" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Open the help centre
+              </a>
+              <a href="about.html" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                About this app
+              </a>
+            </div>
+
+            <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.6rem;font-size:0.85rem;color:var(--text-2);">
+              <p><strong style="color:var(--text);">In the help centre you will find:</strong></p>
+              <ul style="margin:0;padding-left:1.1rem;line-height:1.8;">
+                <li>Every screen of the app and every button on it</li>
+                <li>All the assistant commands, with examples you can copy</li>
+                <li>Where your messages and local data are stored</li>
+                <li>How the relay and the encryption work, in plain language</li>
+                <li>Answers to the problems people hit most often</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- About -->
+        <section class="settings-section" id="section-about">
+          <div class="panel">
+            <h3 style="margin-bottom:1.25rem;">About SHEPU ROOMS</h3>
+
+            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
+              <div style="width:56px;height:56px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--accent),#a855f7);display:grid;place-items:center;font-size:1.375rem;font-weight:900;color:#fff;box-shadow:var(--shadow-glow);">S</div>
+              <div>
+                <div style="font-weight:800;font-size:1.125rem;font-family:var(--font-display);">SHEPU ROOMS</div>
+                <div style="color:var(--muted);font-size:0.875rem;">Private &middot; Secure &middot; Self-Controlled</div>
+                <div style="color:var(--muted);font-size:0.8125rem;margin-top:2px;">v1.0.0</div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.875rem;color:var(--text-2);">
+              <p><strong style="color:var(--text);">Private &amp; Direct:</strong> Chat with friends without any corporation reading or tracking your conversations.</p>
+              <p><strong style="color:var(--text);">You Own Your Data:</strong> In saved rooms, chat history is stored securely in your own Google Drive.</p>
+              <p><strong style="color:var(--text);">Instant Access:</strong> No installation or mandatory phone numbers required — runs directly in your browser.</p>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;margin-top:1.25rem;flex-wrap:wrap;">
+              <a href="about.html" class="btn btn-primary btn-sm">Open the about page</a>
+              <a href="help.html" class="btn btn-ghost btn-sm">Help &amp; all features</a>
             </div>
           </div>
         </section>
@@ -288,227 +506,6 @@
                 </div>
               </div>
               <a href="privacy.html" class="btn btn-secondary btn-sm" style="white-space:nowrap;">Read the policy →</a>
-            </div>
-          </div>
-        </section>
-
-        <!-- Notifications -->
-        <section class="settings-section" id="section-notifications">
-          <div class="panel">
-            <h3 style="margin-bottom:1.25rem;">Notifications</h3>
-            <p style="color:var(--text-2);font-size:0.875rem;margin-bottom:1.25rem;">
-              Browser notifications for new messages (requires permission).
-            </p>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
-              <div>
-                <div style="font-weight:500;">New message notifications</div>
-                <div style="font-size:0.8125rem;color:var(--muted);" id="notif-status-text">Status: Not requested</div>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="request-notif-btn">Enable</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Relay -->
-        <section class="settings-section" id="section-relay">
-          <div class="panel">
-            <h3 style="margin-bottom:1.25rem;">Message Relay</h3>
-            <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
-              Cross-device messages ride these public ntfy servers, with automatic failover between them.
-              If chat only works on your own device, a relay is probably blocked on your network — keep at
-              least one reachable server below, or use a VPN.
-            </p>
-
-            <div style="display:flex;flex-direction:column;gap:0.875rem;">
-              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
-                <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-                  Servers
-                  <span id="relay-status-badge" class="badge">checking…</span>
-                </div>
-                <textarea id="relay-servers-input" rows="4" spellcheck="false"
-                  style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem;color:var(--text);"></textarea>
-                <div style="display:flex;gap:0.5rem;margin-top:0.6rem;flex-wrap:wrap;">
-                  <button class="btn btn-secondary btn-sm" id="relay-test-btn">Test connection</button>
-                  <button class="btn btn-primary btn-sm" id="relay-save-btn">Save servers</button>
-                  <button class="btn btn-ghost btn-sm" id="relay-reset-btn">Reset to defaults</button>
-                </div>
-                <pre id="relay-report" style="font-size:0.75rem;max-height:160px;overflow:auto;margin-top:0.6rem;white-space:pre-wrap;"></pre>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- About -->
-        <!-- Help -->
-        <section class="settings-section" id="section-help">
-          <div class="panel">
-            <h3 style="margin-bottom:1.25rem;">Help</h3>
-            <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
-              Every feature of the app, in detail — generated from the app itself, so it is never out of date.
-            </p>
-
-            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
-              <a href="help.html" class="btn btn-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                Open the help centre
-              </a>
-              <a href="about.html" class="btn btn-secondary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                About this app
-              </a>
-            </div>
-
-            <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.6rem;font-size:0.85rem;color:var(--text-2);">
-              <p><strong style="color:var(--text);">In the help centre you will find:</strong></p>
-              <ul style="margin:0;padding-left:1.1rem;line-height:1.8;">
-                <li>Every screen of the app and every button on it</li>
-                <li>All the assistant commands, with examples you can copy</li>
-                <li>Where your messages and local data are stored</li>
-                <li>How the relay and the encryption work, in plain language</li>
-                <li>Answers to the problems people hit most often</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <!-- About -->
-        <section class="settings-section" id="section-about">
-          <div class="panel">
-            <h3 style="margin-bottom:1.25rem;">About SHEPU ROOMS</h3>
-
-            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;">
-              <div style="width:56px;height:56px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--accent),#a855f7);display:grid;place-items:center;font-size:1.375rem;font-weight:900;color:#fff;box-shadow:var(--shadow-glow);">S</div>
-              <div>
-                <div style="font-weight:800;font-size:1.125rem;font-family:var(--font-display);">SHEPU ROOMS</div>
-                <div style="color:var(--muted);font-size:0.875rem;">Create a room. Own the data.</div>
-                <div style="color:var(--muted);font-size:0.8125rem;margin-top:2px;">v1.0.0 · Phase 1-5</div>
-              </div>
-            </div>
-
-            <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.875rem;color:var(--text-2);">
-              <p><strong style="color:var(--text);">Architecture:</strong> Frontend → Apps Script endpoint → Google Sheet (owner's Drive)</p>
-              <p><strong style="color:var(--text);">Built with:</strong> HTML5, CSS3, Vanilla JavaScript, Google APIs</p>
-              <p><strong style="color:var(--text);">Storage:</strong> Google Drive (owner-controlled), localStorage (session), IndexedDB (cache)</p>
-              <p><strong style="color:var(--text);">Note:</strong> Google Sheets API quotas apply. Optimized for small private rooms, not unlimited public chat.</p>
-            </div>
-
-            <div style="display:flex;gap:0.5rem;margin-top:1.25rem;flex-wrap:wrap;">
-              <a href="about.html" class="btn btn-primary btn-sm">Open the about page</a>
-              <a href="help.html" class="btn btn-ghost btn-sm">Help &amp; all features</a>
-            </div>
-          </div>
-        </section>
-
-        <!-- Friends -->
-        <section class="settings-section" id="section-friends">
-          <div class="settings-content">
-            <h3 style="margin-bottom:1.25rem;">Friends &amp; Social</h3>
-
-            <!-- Handle card -->
-            <div class="panel" id="settings-friends-handle-card" style="margin-bottom:1rem;">
-              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                Your username
-              </h4>
-              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
-                Friends find you by @username. You can change it once every 30 days.
-              </p>
-              <div id="settings-friends-status" style="font-size:0.875rem;color:var(--muted);">
-                Sign in with Google to use Friends.
-              </div>
-              <div id="settings-friends-handle-row" style="display:none;margin-top:0.5rem;flex-direction:column;gap:0.6rem;">
-                <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
-                  <span style="font-size:1.1rem;font-weight:700;color:var(--accent);" id="settings-friends-handle-val">—</span>
-                  <button type="button" class="btn btn-ghost btn-sm" id="settings-copy-handle">Copy</button>
-                  <button type="button" class="btn btn-secondary btn-sm" id="settings-change-handle-btn" style="display:none;">Change username</button>
-                  <span id="settings-handle-cooldown-msg" style="font-size:0.78rem;color:var(--muted);display:none;"></span>
-                </div>
-                <!-- Change handle inline form -->
-                <div id="settings-change-handle-form" style="display:none;margin-top:0.5rem;">
-                  <div style="position:relative;margin-bottom:0.4rem;">
-                    <span style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);font-weight:700;color:var(--accent);pointer-events:none;">@</span>
-                    <input
-                      id="settings-new-handle-input"
-                      type="text"
-                      maxlength="20"
-                      autocomplete="off"
-                      autocorrect="off"
-                      autocapitalize="off"
-                      spellcheck="false"
-                      placeholder="new_username"
-                      style="width:100%;box-sizing:border-box;padding:0.7rem 0.75rem 0.7rem 2rem;font-size:0.95rem;font-weight:600;border-radius:0.6rem;border:2px solid var(--border);background:var(--surface-2);color:var(--text-1);outline:none;caret-color:var(--accent);"
-                    />
-                  </div>
-                  <p id="settings-new-handle-hint" style="font-size:0.78rem;color:var(--muted);min-height:1.2em;margin:0 0 0.5rem;">3–20 characters: a–z, 0–9, underscore</p>
-                  <div style="display:flex;gap:0.5rem;">
-                    <button type="button" class="btn btn-primary btn-sm" id="settings-confirm-handle-btn" disabled>Save username</button>
-                    <button type="button" class="btn btn-ghost btn-sm" id="settings-cancel-handle-btn">Cancel</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Active status toggle -->
-            <div class="panel" style="margin-bottom:1rem;">
-              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Active status
-              </h4>
-              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
-                When on, friends see "Active now" if you used the app in the last 15 minutes.
-                Turning this off stops the heartbeat write — no Firestore writes for presence.
-              </p>
-              <label style="display:flex;align-items:center;gap:0.75rem;cursor:pointer;">
-                <input type="checkbox" id="settings-presence-toggle" style="width:1.1rem;height:1.1rem;accent-color:var(--accent);" checked />
-                <span style="font-size:0.9rem;">Show my active status to friends</span>
-              </label>
-            </div>
-
-            <!-- Encrypted invite key -->
-            <div class="panel" style="margin-bottom:1rem;">
-              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                Encrypted room invites
-              </h4>
-              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.5rem;" id="settings-invite-key-status">
-                Checking this device…
-              </p>
-              <button type="button" class="btn btn-secondary btn-sm" id="settings-repair-invite-key">
-                Reset invite key on this device
-              </button>
-              <p style="font-size:0.75rem;color:var(--muted);margin:0.6rem 0 0;">
-                Only affects encrypted invites. Rooms, messages and calls are untouched.
-                Invites sent to an old key cannot be opened; friends can send a new one.
-              </p>
-            </div>
-
-            <!-- Blocked users -->
-            <div class="panel" id="settings-blocked-card" style="margin-bottom:1rem;display:none;">
-              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>
-                Blocked users
-              </h4>
-              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
-                Blocked people cannot send you friend requests or room invites.
-              </p>
-              <div id="settings-blocked-list"></div>
-            </div>
-
-            <!-- Delete social data -->
-            <div class="panel" style="background:var(--surface-2);">
-              <h4 style="margin-bottom:0.5rem;display:flex;align-items:center;gap:6px;color:var(--danger,#ef4444)">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                Delete my social data
-              </h4>
-              <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:0.75rem;">
-                Removes your Friends profile, username, friend list, and pending requests.
-                Your rooms and chat history are not affected.
-              </p>
-              <button class="btn btn-danger btn-sm" id="settings-delete-social-btn"
-                style="display:inline-flex;align-items:center;gap:6px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                Delete social data
-              </button>
             </div>
           </div>
         </section>

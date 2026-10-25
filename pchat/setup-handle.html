@@ -334,10 +334,15 @@
   <div class="success-overlay" id="success-view" aria-live="polite">
     <div class="success-icon" aria-hidden="true">✓</div>
     <p class="success-handle" id="success-handle-text"></p>
-    <p class="success-msg">Username set! Copy it to share, then redirecting…</p>
-    <button type="button" class="btn-claim" id="copy-handle-btn" style="max-width:220px;margin-top:0.35rem;">
-      <span class="btn-label">Copy @username</span>
-    </button>
+    <p class="success-msg">Username set! Copy it to share with friends.</p>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;width:100%;max-width:240px;margin-top:0.35rem;">
+      <button type="button" class="btn-claim" id="copy-handle-btn" style="width:100%;">
+        <span class="btn-label">Copy @username</span>
+      </button>
+      <a href="index.html" id="btn-success-home" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0.75rem 1.25rem;border-radius:0.75rem;background:rgba(255,255,255,0.08);color:var(--text-1,#f1f5f9);font-weight:600;font-size:0.95rem;text-decoration:none;border:1px solid rgba(255,255,255,0.12);transition:all 0.2s;">
+        Continue to Home →
+      </a>
+    </div>
   </div>
 
 </div>
@@ -615,6 +620,8 @@
         formView.style.display = 'none';
         successView.classList.add('visible');
         document.getElementById('success-handle-text').textContent = '@' + handle;
+        const homeBtn = document.getElementById('btn-success-home');
+        if (homeBtn) homeBtn.href = redirect;
 
         redirectTimer = setTimeout(() => {
           window.location.replace(redirect);

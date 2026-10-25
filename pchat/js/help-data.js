@@ -6,10 +6,10 @@
  * Re-run that script after changing a feature; it refuses to write
  * until every change in the code is described.
  *
- * Generated: 2026-10-25T20:10:38.947Z
+ * Generated: 2026-10-25T22:28:39.326Z
  */
 window.HelpData = {
-  "generatedAt": "2026-10-25T20:10:38.947Z",
+  "generatedAt": "2026-10-25T22:28:39.326Z",
   "app": {
     "name": "Pchat shepu",
     "aka": "SHEPU ROOMS",
@@ -170,10 +170,6 @@ window.HelpData = {
         "label": "Copy"
       },
       {
-        "id": "modal-sheet-url",
-        "label": "Open Sheet ↗"
-      },
-      {
         "id": "share-modal-chat",
         "label": "Enter Chat &rarr;"
       },
@@ -323,10 +319,6 @@ window.HelpData = {
         "label": "Go back"
       },
       {
-        "id": "header-video-call-btn",
-        "label": "Start HD Video Call"
-      },
-      {
         "id": "notify-toggle-btn",
         "label": "Turn notifications off"
       },
@@ -407,6 +399,10 @@ window.HelpData = {
         "label": "Unlock"
       },
       {
+        "id": "attach-btn",
+        "label": "Attach file"
+      },
+      {
         "id": "ctx-reply",
         "label": "Reply"
       },
@@ -456,11 +452,7 @@ window.HelpData = {
       },
       {
         "id": "btn-rotate-link",
-        "label": "🔄 Revoke old link / New invite link"
-      },
-      {
-        "id": "modal-sheet-url",
-        "label": "Open Sheet ↗"
+        "label": "Revoke link"
       },
       {
         "id": "share-modal-done",
@@ -493,26 +485,6 @@ window.HelpData = {
         "label": "Sign out"
       },
       {
-        "id": "clear-idb-btn",
-        "label": "Clear message cache only"
-      },
-      {
-        "id": "request-notif-btn",
-        "label": "Enable"
-      },
-      {
-        "id": "relay-test-btn",
-        "label": "Test connection"
-      },
-      {
-        "id": "relay-save-btn",
-        "label": "Save servers"
-      },
-      {
-        "id": "relay-reset-btn",
-        "label": "Reset to defaults"
-      },
-      {
         "id": "settings-copy-handle",
         "label": "Copy"
       },
@@ -531,6 +503,26 @@ window.HelpData = {
       {
         "id": "settings-delete-social-btn",
         "label": "Delete social data"
+      },
+      {
+        "id": "request-notif-btn",
+        "label": "Enable"
+      },
+      {
+        "id": "clear-idb-btn",
+        "label": "Clear Message Cache Only"
+      },
+      {
+        "id": "relay-test-btn",
+        "label": "Test connection"
+      },
+      {
+        "id": "relay-save-btn",
+        "label": "Save servers"
+      },
+      {
+        "id": "relay-reset-btn",
+        "label": "Reset to defaults"
       }
     ],
     "setup-handle.html": [
@@ -545,6 +537,10 @@ window.HelpData = {
       {
         "id": "copy-handle-btn",
         "label": "Copy @username"
+      },
+      {
+        "id": "btn-success-home",
+        "label": "Continue to Home →"
       }
     ],
     "terms.html": []
@@ -556,19 +552,19 @@ window.HelpData = {
       "heading": "Account"
     },
     {
-      "key": "privacy",
-      "label": "Privacy",
-      "heading": "Privacy Model"
-    },
-    {
-      "key": "terms",
-      "label": "Terms",
-      "heading": "Terms of Service"
+      "key": "friends",
+      "label": "Friends",
+      "heading": "Friends &amp; Social"
     },
     {
       "key": "notifications",
       "label": "Notifications",
       "heading": "Notifications"
+    },
+    {
+      "key": "privacy",
+      "label": "Privacy",
+      "heading": "Privacy Model"
     },
     {
       "key": "help",
@@ -581,9 +577,9 @@ window.HelpData = {
       "heading": "About SHEPU ROOMS"
     },
     {
-      "key": "friends",
-      "label": "Friends",
-      "heading": "Friends &amp; Social"
+      "key": "terms",
+      "label": "Terms",
+      "heading": "Terms of Service"
     }
   ],
   "bot": {
@@ -950,6 +946,7 @@ window.HelpData = {
   ],
   "storage": {
     "localStorage": [
+      "pchat_sidebar_collapsed",
       "shepu_auth",
       "shepu_current_room",
       "shepu_display_name",

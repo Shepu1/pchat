@@ -1914,7 +1914,7 @@ const Chat = (() => {
     });
 
     document.getElementById('menu-members')?.addEventListener('click', () => {
-      openSidebar();
+      toggleSidebar();
     });
 
     // Mobile overflow entry: proxies the header button hidden on small
@@ -2048,19 +2048,60 @@ const Chat = (() => {
 
   // ── Sidebar ───────────────────────────────────────────────────
   function openSidebar() {
-    document.getElementById('chat-sidebar')?.classList.add('open');
-    document.getElementById('sidebar-overlay').style.display = '';
+    const sidebar = document.getElementById('chat-sidebar');
+    if (!sidebar) return;
+    sidebar.classList.remove('collapsed');
+    sidebar.classList.add('open');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (overlay && window.innerWidth <= 900) overlay.style.display = '';
+    const toggleBtn = document.getElementById('members-toggle-btn');
+    if (toggleBtn) toggleBtn.classList.add('active');
+    try { localStorage.setItem('pchat_sidebar_collapsed', '0'); } catch {}
   }
 
   function closeSidebar() {
-    document.getElementById('chat-sidebar')?.classList.remove('open');
-    document.getElementById('sidebar-overlay').style.display = 'none';
+    const sidebar = document.getElementById('chat-sidebar');
+    if (!sidebar) return;
+    sidebar.classList.add('collapsed');
+    sidebar.classList.remove('open');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (overlay) overlay.style.display = 'none';
+    const toggleBtn = document.getElementById('members-toggle-btn');
+    if (toggleBtn) toggleBtn.classList.remove('active');
+    try { localStorage.setItem('pchat_sidebar_collapsed', '1'); } catch {}
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('chat-sidebar');
+    if (!sidebar) return;
+    if (window.innerWidth <= 900) {
+      if (sidebar.classList.contains('open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    } else {
+      if (sidebar.classList.contains('collapsed')) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    }
   }
 
   function _bindSidebar() {
-    document.getElementById('members-toggle-btn')?.addEventListener('click', openSidebar);
+    document.getElementById('members-toggle-btn')?.addEventListener('click', toggleSidebar);
     document.getElementById('close-sidebar-btn')?.addEventListener('click',  closeSidebar);
     document.getElementById('sidebar-overlay')?.addEventListener('click',    closeSidebar);
+
+    // Restore desktop collapsed preference
+    try {
+      if (window.innerWidth > 900 && localStorage.getItem('pchat_sidebar_collapsed') === '1') {
+        closeSidebar();
+      } else if (window.innerWidth > 900) {
+        document.getElementById('members-toggle-btn')?.classList.add('active');
+      }
+    } catch {}
   }
 
   // ── Render members list ───────────────────────────────────────

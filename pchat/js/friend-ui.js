@@ -433,6 +433,11 @@ const FriendUI = (() => {
       els.badge.hidden = count === 0;
       els.badge.textContent = count > 9 ? '9+' : String(count);
     }
+    const navBadge = document.getElementById('nav-friends-badge');
+    if (navBadge) {
+      navBadge.hidden = count === 0;
+      navBadge.textContent = count > 9 ? '9+' : String(count);
+    }
     if (els.openBtn) {
       els.openBtn.setAttribute(
         'aria-label',

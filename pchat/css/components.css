@@ -513,11 +513,12 @@
 
 /* ── Status Indicators ──────────────────────────────────────────── */
 .status-dot {
-  width: 8px; height: 8px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
-.status-dot.online  { background: var(--success); animation: pulse 2s ease infinite; }
+.status-dot.online  { background: #34d399; }
 .status-dot.offline { background: var(--muted); }
 .status-dot.away    { background: var(--warning); }
 
@@ -894,18 +895,10 @@
 }
 
 .live-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 10px var(--success);
-  animation: pulse-dot 2s infinite;
-}
-
-@keyframes pulse-dot {
-  0% { transform: scale(0.95); opacity: 0.8; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.8; }
+  background: #34d399;
 }
 
 /* ================================================================
@@ -974,7 +967,7 @@
 }
 
 .app-brand-title {
-  font-family: var(--font-display);
+  font-family: var(--font-brand);
   font-weight: 800;
   font-size: 1.35rem;
   letter-spacing: -0.02em;
@@ -1048,7 +1041,7 @@
   flex-shrink: 0;
   box-shadow: 0 4px 14px var(--accent-glow);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chat-avatar.has-photo {
@@ -1059,13 +1052,15 @@
 
 .chat-avatar .online-indicator {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
+  bottom: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: var(--success);
-  border: 2px solid var(--bg);
+  background: #34d399;
+  border: 2px solid var(--bg, #0f172a);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  z-index: 2;
 }
 
 .chat-info {
@@ -1156,8 +1151,13 @@
   z-index: 15;
 }
 
-/* Topbar Settings gear: PC-only (phones already have Settings in bottom-nav) */
+/* Topbar Settings gear: visible next to avatar on both phones and PC */
 #top-settings-btn {
+  display: inline-flex !important;
+}
+
+/* Topbar Friends button: hidden on phones (phones have Friends tab in bottom nav), visible on PC */
+#friends-open-btn {
   display: none !important;
 }
 
@@ -1165,7 +1165,7 @@
   .bottom-nav {
     display: none !important;
   }
-  #top-settings-btn {
+  #friends-open-btn {
     display: inline-flex !important;
   }
   .fab-create {
