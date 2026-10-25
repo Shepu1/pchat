@@ -102,6 +102,47 @@ GOOGLE_CLIENT_ID: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
 
 > **Never commit your Client ID to a public repository.** Use environment injection or a config file excluded from git.
 
+### 6. PCHAT Flutter App Sign-In (Android + Desktop)
+
+The Flutter wrapper (`pchat_app`) uses platform-specific Google sign-in:
+
+- **Android** — the phone's own Google account picker via `google_sign_in`
+  (Credential Manager). Add an **Android** OAuth client in the **same** Google
+  Cloud project as the web client:
+  - **Package name:** `com.shepu.pchat`
+  - **SHA-1:** fingerprint of the certificate the APK is signed with. For the
+    default debug keystore:
+    ```bash
+    keytool -list -v -keystore ~/.android/debug.keystore \
+      -alias androiddebugkey -storepass android -keypass android | grep SHA1
+    ```
+  - Add the release keystore's SHA-1 too before publishing.
+  - The wrapper passes the **web** client ID as `serverClientId`; no client
+    secret is used.
+  - Missing Android client/SHA-1 can make the picker close immediately (Google
+    may report it as a configuration error or as `canceled`). In that case the
+    wrapper can still use the browser page below.
+
+- **Desktop (Windows/Linux)** — the wrapper opens
+  `/pchat/app-login.html` in the default browser. That page runs the normal GIS
+  token flow on the site origin, then posts the token to a one-shot
+  `http://127.0.0.1:<random-port>` server inside the app (`state` is validated).
+  The app injects the token into its WebView, so the site signs in
+  automatically.
+  - `app-login.html` must be deployed with the site. Verify:
+    ```bash
+    curl -I https://pchatshepu.vercel.app/pchat/app-login.html
+    # HTTP/2 200
+    ```
+  - The web OAuth client's **Authorized JavaScript origins** must include the
+    site origin (`https://pchatshepu.vercel.app`).
+  - If the page is missing or unreachable, the wrapper falls back to its
+    embedded sign-in WebView (desktop only).
+
+- **Email/demo logins** remain local-only. Drive/Sheets actions require a real
+  Google login, so `Auth.getAccessToken()` no longer hands out fake
+  `email_token_…` tokens.
+
 ---
 
 ## Local Development
@@ -140,6 +181,11 @@ Deploy the static files to any static hosting service:
 - **Cloudflare Pages**
 
 Update `js/config.js` with your production domain's Client ID authorized origins.
+
+> **Using the Flutter wrapper?** Deploy `app-login.html` together with the rest
+> of the site. The desktop wrapper opens
+> `https://<your-domain>/pchat/app-login.html` to finish Google sign-in in the
+> default browser. See **Google Cloud Setup → 6. PCHAT Flutter App Sign-In**.
 
 ---
 

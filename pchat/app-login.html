@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com https://www.googleapis.com; frame-src https://accounts.google.com; form-action 'self' http://127.0.0.1:*; base-uri 'none'; object-src 'none'"
+  />
+  <title>PCHAT — Google লগইন</title>
+  <meta name="description" content="PCHAT অ্যাপের জন্য ব্রাউজারে Google লগইন সম্পন্ন করুন।" />
+  <meta name="theme-color" content="#090d16" />
+  <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070a12;
+      --surface: #0f1523;
+      --border: rgba(255, 255, 255, 0.10);
+      --text: #e7edf7;
+      --muted: #8493aa;
+      --accent: #3b82f6;
+      --success: #34d399;
+      --danger: #fb7185;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.18) 0%, transparent 55%),
+        radial-gradient(circle at 90% 90%, rgba(16, 185, 129, 0.07) 0%, transparent 45%),
+        var(--bg);
+      color: var(--text);
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      width: 100%;
+      max-width: 460px;
+      padding: 32px 28px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: rgba(15, 21, 35, 0.94);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), 0 0 40px rgba(37, 99, 235, 0.06);
+    }
+
+    .brand {
+      width: 68px;
+      height: 68px;
+      display: block;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      object-fit: cover;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--accent);
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      text-align: center;
+    }
+
+    .intro,
+    .scope-note,
+    .foot {
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .intro { margin: 0 0 18px; }
+
+    .scope-note {
+      margin: 0 0 20px;
+      padding: 10px 12px;
+      border: 1px solid rgba(59, 130, 246, 0.20);
+      border-radius: 12px;
+      background: rgba(59, 130, 246, 0.07);
+      color: #b9cdf0;
+      font-size: 0.82rem;
+    }
+
+    .google-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 13px 18px;
+      border: none;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #1f2937;
+      font: inherit;
+      font-size: 0.96rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.30);
+      transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .google-btn:hover:not(:disabled) { background: #f1f5f9; transform: translateY(-1px); }
+    .google-btn:active:not(:disabled) { transform: translateY(0); }
+    .google-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .google-btn svg { flex: 0 0 auto; }
+
+    .status,
+    .error {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 0.86rem;
+      text-align: center;
+    }
+
+    .status {
+      border: 1px solid rgba(59, 130, 246, 0.24);
+      background: rgba(59, 130, 246, 0.09);
+      color: #b9cdf0;
+    }
+
+    .error {
+      border: 1px solid rgba(251, 113, 133, 0.28);
+      background: rgba(251, 113, 133, 0.09);
+      color: #fecdd3;
+    }
+
+    .foot {
+      margin: 18px 0 0;
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 420px) {
+      main { padding: 26px 20px; }
+      h1 { font-size: 1.32rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <img
+      class="brand"
+      src="assets/icons/icon.png?v=20261025b"
+      alt="PCHAT"
+      onerror="this.style.display='none'"
+    />
+    <p class="eyebrow">PCHAT App Login</p>
+    <h1>Google দিয়ে লগইন</h1>
+
+    <p class="intro" id="intro">
+      PCHAT অ্যাপ এই পেজটি আপনার ডিফল্ট ব্রাউজারে খুলেছে। নিচের বাটনে চাপ দিয়ে
+      যে Gmail দিয়ে লগইন করতে চান সেটি বেছে নিন। লগইন শেষ হলে অ্যাপে
+      স্বয়ংক্রিয়ভাবে সাইন ইন হবে।
+    </p>
+
+    <p class="scope-note" id="scope-note">
+      Google Account দিয়ে লগইন করলে Google Drive ও Sheets-এ আপনার চ্যাট সংরক্ষণ
+      করার অনুমতি চাওয়া হবে।
+    </p>
+
+    <button type="button" class="google-btn" id="google-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      <span>Google দিয়ে চালিয়ে যান</span>
+    </button>
+
+    <div class="status" id="status" role="status"></div>
+    <div class="error" id="error" role="alert">
+      <strong>লগইন সম্পন্ন হয়নি</strong>
+      <div id="error-text"></div>
+    </div>
+
+    <p class="foot">
+      লগইন শেষ হলে এই ট্যাবটি বন্ধ করে PCHAT অ্যাপে ফিরে যান।<br />
+      This page only works when it is opened by the PCHAT app.
+    </p>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const params = new URLSearchParams(window.location.search);
+      const port = parseInt(params.get('port') || '', 10);
+      const state = (params.get('state') || '').trim();
+      const clientId = (params.get('client_id') || '').trim();
+      const scope = (params.get('scope') || 'openid email profile').trim();
+      const prompt = (params.get('prompt') || '').trim();
+      const loginHint = (params.get('login_hint') || '').trim();
+
+      const button = document.getElementById('google-btn');
+      const statusBox = document.getElementById('status');
+      const errorBox = document.getElementById('error');
+      const errorText = document.getElementById('error-text');
+      const scopeNote = document.getElementById('scope-note');
+
+      function showStatus(message) {
+        statusBox.textContent = message;
+        statusBox.style.display = 'block';
+      }
+
+      function showError(message) {
+        statusBox.style.display = 'none';
+        errorText.textContent = message;
+        errorBox.style.display = 'block';
+        button.disabled = false;
+      }
+
+      function hideError() {
+        errorBox.style.display = 'none';
+        errorText.textContent = '';
+      }
+
+      function validRequest() {
+        return Number.isInteger(port) && port > 0 && port <= 65535 &&
+          state.length > 0 && clientId.length > 0;
+      }
+
+      if (!validRequest()) {
+        button.disabled = true;
+        showError('এই পেজটি সরাসরি খোলা যাবে না। PCHAT অ্যাপ থেকে Google লগইন শুরু করুন।');
+        return;
+      }
+
+      if (!/drive|spreadsheets|script\./i.test(scope)) {
+        scopeNote.textContent = 'লগইন শেষ হলে PCHAT অ্যাপে স্বয়ংক্রিয়ভাবে সাইন ইন হবে।';
+      }
+
+      let tokenClient = null;
+
+      function loadGis() {
+        return new Promise(function (resolve, reject) {
+          if (window.google && google.accounts && google.accounts.oauth2) {
+            resolve();
+            return;
+          }
+
+          let script = document.getElementById('gis-script');
+          if (!script) {
+            script = document.createElement('script');
+            script.id = 'gis-script';
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.onerror = function () {
+              reject(new Error('Google Identity Services লোড হয়নি।'));
+            };
+            document.head.appendChild(script);
+          }
+
+          let checks = 0;
+          const timer = setInterval(function () {
+            if (window.google && google.accounts && google.accounts.oauth2) {
+              clearInterval(timer);
+              resolve();
+              return;
+            }
+            if (++checks > 100) {
+              clearInterval(timer);
+              reject(new Error('Google Identity Services লোড হতে সময় নিচ্ছে। ইন্টারনেট চেক করুন।'));
+            }
+          }, 100);
+        });
+      }
+
+      function addField(form, name, value) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = String(value == null ? '' : value);
+        form.appendChild(input);
+      }
+
+      function sendToken(response) {
+        showStatus('লগইন সফল — অ্যাপে পাঠানো হচ্ছে…');
+        button.disabled = true;
+
+        // A normal top-level form post, not fetch(): it works even where a
+        // browser blocks cross-origin requests to a loopback address.
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'http://127.0.0.1:' + port + '/';
+        form.acceptCharset = 'UTF-8';
+        form.autocomplete = 'off';
+        form.style.display = 'none';
+
+        addField(form, 'state', state);
+        addField(form, 'access_token', response.access_token);
+        addField(form, 'expires_in', response.expires_in || 3600);
+        addField(form, 'scope', response.scope || scope);
+        addField(form, 'token_type', response.token_type || 'Bearer');
+
+        document.body.appendChild(form);
+        form.submit();
+      }
+
+      function onToken(response) {
+        if (!response) {
+          showError('Google থেকে কোনো উত্তর আসেনি। আবার চেষ্টা করুন।');
+          return;
+        }
+        if (response.error) {
+          showError(response.error_description || response.error);
+          return;
+        }
+        if (!response.access_token) {
+          showError('Google access token দেয়নি। আবার চেষ্টা করুন।');
+          return;
+        }
+        sendToken(response);
+      }
+
+      function onError(error) {
+        let message = 'Google লগইন সম্পন্ন হয়নি। আবার চেষ্টা করুন।';
+        const type = error && error.type ? String(error.type) : '';
+        const detail = error && error.message ? String(error.message) : '';
+
+        if (type === 'popup_closed' || /popup closed|closed by user/i.test(detail)) {
+          message = 'Google লগইন উইন্ডো বন্ধ হয়ে গেছে। আবার চেষ্টা করুন।';
+        } else if (type === 'popup_failed_to_open' || /popup/i.test(detail)) {
+          message = 'Google লগইন উইন্ডো খোলা যায়নি। ব্রাউজারের পপআপ ব্লক করা থাকলে অনুমতি দিন।';
+        } else if (detail) {
+          message = detail;
+        }
+        showError(message);
+      }
+
+      function startSignIn() {
+        if (!validRequest()) return;
+        hideError();
+        button.disabled = true;
+        showStatus('Google লগইন উইন্ডো খোলা হচ্ছে…');
+
+        loadGis().then(function () {
+          try {
+            if (!tokenClient) {
+              tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: scope,
+                callback: onToken,
+                error_callback: onError,
+              });
+            }
+
+            const overrides = { prompt: prompt || 'select_account' };
+            if (loginHint) overrides.login_hint = loginHint;
+            tokenClient.requestAccessToken(overrides);
+          } catch (error) {
+            showError((error && error.message) || 'Google লগইন শুরু করা যায়নি।');
+          }
+        }).catch(function (error) {
+          showError((error && error.message) || 'Google লাইব্রেরি লোড হয়নি।');
+        });
+      }
+
+      button.addEventListener('click', startSignIn);
+    })();
+  </script>
+</body>
+</html>

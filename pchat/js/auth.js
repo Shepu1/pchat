@@ -116,16 +116,22 @@ const Auth = (() => {
   async function getAccessToken(forceRefresh = false) {
     const auth = Storage.getAuth();
 
-    // If token still valid
-    if (!forceRefresh && auth && auth.accessToken && Date.now() < auth.expiresAt) {
+    // A real, unexpired Google token is the only thing that may be sent to a
+    // Google API. Email/demo logins carry a local placeholder token
+    // (`email_token_…` / `demo_token_…`); sending it produced a 401 and then
+    // an unsolicited OAuth popup. Fail clearly instead, so the caller can ask
+    // the user to continue with Google.
+    if (!forceRefresh && hasGoogleToken()) {
       return auth.accessToken;
     }
 
-    if (auth && auth.isDemo) {
-      return auth.accessToken;
+    if (auth && (auth.isDemo || auth.isEmailAuth ||
+        String(auth.accessToken || '').startsWith('email_token_') ||
+        String(auth.accessToken || '').startsWith('demo_token_'))) {
+      throw new Error('Google sign-in is required for this action. Please continue with Google first.');
     }
 
-    // Token expired or missing — request new one
+    // Token expired or missing — request a new one.
     return requestToken();
   }
 
@@ -239,8 +245,11 @@ const Auth = (() => {
   // ── Sign Out ──────────────────────────────────────────────────
   function signOut() {
     const auth = Storage.getAuth();
-    if (auth && auth.accessToken && !auth.isDemo && typeof google !== 'undefined' && google.accounts?.oauth2) {
-      try { google.accounts.oauth2.revoke(auth.accessToken, () => {}); } catch { /* ignore */ }
+    const token = auth && auth.accessToken ? String(auth.accessToken) : '';
+    const realGoogleToken = token && !auth.isDemo && !auth.isEmailAuth &&
+      !token.startsWith('email_token_') && !token.startsWith('demo_token_');
+    if (realGoogleToken && typeof google !== 'undefined' && google.accounts?.oauth2) {
+      try { google.accounts.oauth2.revoke(token, () => {}); } catch { /* ignore */ }
     }
     // Also end the Firebase social session, if the SDK was loaded.
     // Fire-and-forget: signing out of the app must never block.
