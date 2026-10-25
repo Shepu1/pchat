@@ -1233,19 +1233,21 @@
         letter-spacing: 0.01em;
       }
 
-      /* Live indicator: keep the pulse, drop the words */
+      /* Under app name on mobile: remove the pulsing dot, show by Shepu cleanly */
       .live-status-pill {
         gap: 0;
         margin-top: 1px;
       }
 
-      .live-status-pill span:last-child {
-        display: none;
+      .live-pulse-dot {
+        display: none !important;
       }
 
-      .live-pulse-dot {
-        width: 7px;
-        height: 7px;
+      .live-status-pill span:last-child {
+        display: inline-block;
+        font-size: 0.65rem;
+        color: var(--hub-text-mid);
+        letter-spacing: 0.01em;
       }
 
       .top-action-btn {
@@ -2419,8 +2421,6 @@
         const randomBtn = document.getElementById('btn-sheet-random');
 
         const topJoin = document.getElementById('top-join-btn');
-        const joinSheet = document.getElementById('join-sheet');
-        const closeJoin = document.getElementById('close-join-sheet');
         const joinForm = document.getElementById('fast-join-form');
         const joinCodeInput = document.getElementById('join-code-input');
 
@@ -2908,10 +2908,6 @@
           openActionSheet('join');
         };
         if (topJoin) topJoin.onclick = openJoinSheet;
-        if (closeJoin) closeJoin.onclick = () => createSheet.classList.remove('active');
-        if (joinSheet && joinSheet !== createSheet) {
-          joinSheet.onclick = (e) => { if (e.target === joinSheet) joinSheet.classList.remove('active'); };
-        }
 
         const handleJoin = (val) => {
           if (!val) return;
