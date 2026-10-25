@@ -306,6 +306,7 @@ PCHAT/
 │   ├── components.css  — Buttons, forms, modals, cards, badges
 │   ├── chat.css        — Chat feed, bubbles, input bar
 │   ├── calls.css       — Call overlay
+│   ├── dashboard.css   — Main dashboard & conversation hub styles
 │   ├── help.css        — About & Help pages
 │   └── responsive.css  — Breakpoints (360px → 1280px+)
 │
@@ -333,6 +334,7 @@ PCHAT/
 │   ├── owner.js        — Owner panel logic
 │   ├── create-room.js  — Create room flow orchestration
 │   ├── join-room.js    — Join room flow
+│   ├── dashboard.js    — index.html entry point (rooms list, filter, modals)
 │   └── app.js          — room.html entry point (session → sync → presence)
 │
 ├── apps-script/

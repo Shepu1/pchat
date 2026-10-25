@@ -6,10 +6,10 @@
  * Re-run that script after changing a feature; it refuses to write
  * until every change in the code is described.
  *
- * Generated: 2026-10-25T18:33:40.649Z
+ * Generated: 2026-10-25T20:10:38.947Z
  */
 window.HelpData = {
-  "generatedAt": "2026-10-25T18:33:40.649Z",
+  "generatedAt": "2026-10-25T20:10:38.947Z",
   "app": {
     "name": "Pchat shepu",
     "aka": "SHEPU ROOMS",
