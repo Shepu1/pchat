@@ -254,3 +254,20 @@
   .doc-inventory { grid-template-columns: 1fr; }
   .about-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Data tables on phones ────────────────────────────────────────
+   The privacy tables are ~800px wide, so on a phone the panel scrolled
+   sideways and each row looked like a tall, mostly empty block with the
+   real content off-screen. Let every cell wrap (long code tokens too) so
+   the table fits the panel instead. */
+@media (max-width: 640px) {
+  .doc-table { font-size: 0.78rem; }
+  .doc-table th,
+  .doc-table td {
+    padding: 0.45rem 0.4rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .doc-table td:first-child { white-space: normal; }
+  .doc-table code { font-size: 0.72rem; overflow-wrap: anywhere; }
+}

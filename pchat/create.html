@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#090d16" />
   <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
   <link rel="stylesheet" href="css/base.css?v=20261025b" />
-  <link rel="stylesheet" href="css/layout.css?v=20261025b" />
+  <link rel="stylesheet" href="css/layout.css?v=20261026d" />
   <link rel="stylesheet" href="css/components.css?v=20261025b" />
   <link rel="stylesheet" href="css/responsive.css?v=20261025b" />
   <style>
@@ -40,6 +40,13 @@
       border-color: var(--accent);
       color: var(--accent);
     }
+
+    /* Phones: two side-by-side mode cards left only ~40px for the label
+       and description, so the text broke into one word per line. Stack the
+       two options instead — each gets the full width and reads normally. */
+    @media (max-width: 480px) {
+      #room-mode-picker { grid-template-columns: 1fr !important; }
+    }
   </style>
   <script src="js/icons.js?v=20261025b"></script>
   <script src="js/firebase-config.js?v=20261025c"></script>
@@ -51,7 +58,7 @@
 <!-- ── Navbar ───────────────────────────────────────────────────── -->
 <nav class="navbar">
   <div class="container" style="display:flex;align-items:center;justify-content:space-between;">
-    <a href="index.html" class="navbar-brand" style="display:flex;align-items:center;gap:0.75rem;font-family:var(--font-display);font-weight:800;font-size:1.25rem;">
+    <a href="index.html" class="navbar-brand">
       <img src="assets/icons/icon.png?v=20261025b" alt="Pchat" class="app-logo-img" />
       Pchat
     </a>

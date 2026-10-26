@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#090d16" />
   <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
   <link rel="stylesheet" href="css/base.css?v=20261025b" />
-  <link rel="stylesheet" href="css/layout.css?v=20261025b" />
+  <link rel="stylesheet" href="css/layout.css?v=20261026d" />
   <link rel="stylesheet" href="css/components.css?v=20261025b" />
   <link rel="stylesheet" href="css/responsive.css?v=20261025b" />
   <style>
@@ -23,7 +23,7 @@
       align-items: center;
       justify-content: center;
       padding: 1.5rem;
-      background: var(--bg-base);
+      background: var(--bg);
       position: relative;
       overflow: hidden;
     }
@@ -51,7 +51,7 @@
       z-index: 1;
       width: 100%;
       max-width: 420px;
-      background: var(--surface-1, rgba(255,255,255,0.05));
+      background: var(--surface);
       border: 1px solid var(--border, rgba(255,255,255,0.1));
       border-radius: 1.5rem;
       padding: 2.5rem 2rem;
@@ -71,7 +71,7 @@
       height: 72px;
       border-radius: 50%;
       object-fit: cover;
-      border: 3px solid var(--primary, #6c63ff);
+      border: 3px solid var(--accent, #2563eb);
       display: block;
       margin: 0 auto 1rem;
       box-shadow: 0 0 0 6px rgba(108,99,255,0.15);
@@ -126,7 +126,7 @@
       transform: translateY(-50%);
       font-size: 1.1rem;
       font-weight: 700;
-      color: var(--primary, #6c63ff);
+      color: var(--accent, #2563eb);
       pointer-events: none;
       z-index: 1;
     }
@@ -143,14 +143,14 @@
       color: var(--text-1, #f1f5f9);
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
-      caret-color: var(--primary, #6c63ff);
+      caret-color: var(--accent, #2563eb);
     }
     .handle-input:focus {
-      border-color: var(--primary, #6c63ff);
+      border-color: var(--accent, #2563eb);
       box-shadow: 0 0 0 4px rgba(108,99,255,0.18);
     }
     .handle-input.is-valid   { border-color: var(--success, #22c55e); }
-    .handle-input.is-invalid { border-color: var(--error,   #ef4444); }
+    .handle-input.is-invalid { border-color: var(--danger,  #ef4444); }
 
     /* live hint row */
     .handle-hint {
@@ -161,7 +161,7 @@
       transition: color 0.2s;
     }
     .handle-hint.ok  { color: var(--success, #22c55e); }
-    .handle-hint.err { color: var(--error,   #ef4444); }
+    .handle-hint.err { color: var(--danger,  #ef4444); }
 
     /* ── Claim button ───────────────────────────────────────── */
     .btn-claim {

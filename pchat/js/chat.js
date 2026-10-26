@@ -2977,6 +2977,13 @@ const Chat = (() => {
     let activeCat = 'All';
     let query = '';
 
+    // On a phone, focusing the search field pops the keyboard and leaves the
+    // picker covering almost the whole screen. Only auto-focus with a mouse.
+    const hasFinePointer = () => {
+      try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches; }
+      catch { return true; }
+    };
+
     // ── Recent emojis (localStorage, newest first, max 8) ───────
     // Only normal-set tokens are stored (a Unicode char or a Pchat
     // shortcode). Special emojis are deliberately excluded: their pack is
@@ -3460,7 +3467,9 @@ const Chat = (() => {
         } else if (searchInput) {
           unlockSearch();
           purgeAutofill();
-          setTimeout(() => searchInput.focus({ preventScroll: true }), 50);
+          if (hasFinePointer()) {
+            setTimeout(() => searchInput.focus({ preventScroll: true }), 50);
+          }
         }
       }
     });
@@ -3788,6 +3797,18 @@ const Chat = (() => {
     const total = parsed.durationSec > 0 ? parsed.durationSec : 0;
     if (timeEl && total > 0) timeEl.textContent = _fmtDuration(total);
 
+    // Attach the data URL lazily: one media fetch per clip, only when it is
+    // actually played (or scrubbed), instead of preloading the whole history.
+    let srcLoaded = false;
+    const loadSrc = () => {
+      if (srcLoaded) return;
+      srcLoaded = true;
+      try {
+        audio.src = parsed.dataUrl;
+        audio.load();
+      } catch {}
+    };
+
     // Build waveform bars optimistically; fill real peaks when decoded
     const N = 36;
     const bars = [];
@@ -3829,6 +3850,7 @@ const Chat = (() => {
         return;
       }
       _stopActiveVoice();
+      loadSrc();
       try {
         await audio.play();
         btn.innerHTML = VP_PAUSE;
@@ -3861,21 +3883,23 @@ const Chat = (() => {
       const r = wave.getBoundingClientRect();
       const frac = r.width ? (e.clientX - r.left) / r.width : 0;
       const d = (total > 0 ? total : (audio.duration || 0)) || 0;
-      if (d > 0) {
-        audio.currentTime = Math.max(0, Math.min(0.999, frac)) * d;
+      if (!(d > 0)) return;
+      loadSrc();
+      const seek = () => {
+        try { audio.currentTime = Math.max(0, Math.min(0.999, frac)) * d; } catch {}
         paint();
-      }
+      };
+      if (audio.readyState >= 1) seek();
+      else audio.addEventListener('loadedmetadata', seek, { once: true });
     });
 
-    // Decode failure → fall back to the native player
+    // If the clip really is unplayable, keep the custom card and go back to
+    // the idle state. Never replace it with the browser's default player.
     audio.addEventListener('error', () => {
-      const native = document.createElement('audio');
-      native.controls = true;
-      native.preload = 'metadata';
-      native.src = parsed.dataUrl;
-      native.className = 'msg-audio';
-      root.replaceWith(native);
-    }, { once: true });
+      btn.innerHTML = VP_PLAY;
+      btn.classList.remove('playing');
+      if (_playingVoice && _playingVoice.audio === audio) _playingVoice = null;
+    });
   }
 
   // ── Professional image rendering helpers ─────────────────────
@@ -4264,7 +4288,11 @@ const Chat = (() => {
         const isAudio = messageType === 'audio' || (typeof parsed.fileType === 'string' && parsed.fileType.startsWith('audio/'));
         if (isAudio && typeof parsed.dataUrl === 'string' && /^data:audio\//i.test(parsed.dataUrl)) {
           const dur = parsed.durationSec > 0 ? _fmtDuration(parsed.durationSec) : '';
-          let ahtml = `<div class="voice-player"><button type="button" class="vp-play" aria-label="Play voice message">${VP_PLAY}</button><div class="vp-wave" role="slider" aria-label="Seek"></div><button type="button" class="vp-speed" aria-label="Playback speed">1x</button><span class="vp-time">${dur ? escapeHtml(dur) : ''}</span><audio class="vp-audio" preload="metadata" src="${escapeHtml(parsed.dataUrl)}"></audio></div>`;
+          // The clip is attached on the first tap, not at render. Loading
+          // every voice note up front made phones fail the media fetch (and
+          // Safari refuses big data: URLs until a user gesture), which was
+          // swapping this card for the browser's default <audio> player.
+          let ahtml = `<div class="voice-player"><button type="button" class="vp-play" aria-label="Play voice message">${VP_PLAY}</button><div class="vp-wave" role="slider" aria-label="Seek"></div><button type="button" class="vp-speed" aria-label="Playback speed">1x</button><span class="vp-time">${dur ? escapeHtml(dur) : ''}</span><audio class="vp-audio" preload="none"></audio></div>`;
           if (parsed.text) ahtml += `<div class="msg-attach-caption">${_renderText(parsed.text)}</div>`;
           container.innerHTML = ahtml;
           _bindVoicePlayer(container, parsed, msgId);
