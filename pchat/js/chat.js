@@ -2977,6 +2977,52 @@ const Chat = (() => {
     let activeCat = 'All';
     let query = '';
 
+    // ── Recent emojis (localStorage, newest first, max 8) ───────
+    // Only normal-set tokens are stored (a Unicode char or a Pchat
+    // shortcode). Special emojis are deliberately excluded: their pack is
+    // password-locked and must not outlive the page session.
+    const RECENT_KEY = 'pchat_recent_emojis_v1';
+    const RECENT_MAX = 8;
+    let recentEmojis = loadRecent();
+
+    function loadRecent() {
+      try {
+        const raw = localStorage.getItem(RECENT_KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) return [];
+        const seen = new Set();
+        return list.filter(t => {
+          if (typeof t !== 'string' || !t || seen.has(t)) return false;
+          seen.add(t);
+          return true;
+        }).slice(0, RECENT_MAX);
+      } catch { return []; }
+    }
+
+    function saveRecent(list) {
+      try {
+        if (list.length) localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+        else localStorage.removeItem(RECENT_KEY);
+      } catch { /* storage full / private mode — recents just won't persist */ }
+    }
+
+    function rememberEmoji(token) {
+      if (!token) return;
+      recentEmojis = [token, ...recentEmojis.filter(t => t !== token)].slice(0, RECENT_MAX);
+      saveRecent(recentEmojis);
+      // Repaint on the next open (not mid-session) so the visible grid does
+      // not shuffle under the pointer while multi-picking.
+    }
+
+    function clearRecent() {
+      recentEmojis = [];
+      saveRecent(recentEmojis);
+      refreshRecentSection();
+      // The Clear button disappears with the section — keep keyboard focus
+      // somewhere sensible instead of dropping it on <body>.
+      try { searchInput.focus({ preventScroll: true }); } catch {}
+    }
+
     function setPassStatus(msg, kind) {
       if (!passStatus) return;
       if (!msg) { passStatus.classList.add('hidden'); passStatus.textContent = ''; return; }
@@ -3069,10 +3115,13 @@ const Chat = (() => {
           setTimeout(() => { try { passInput.focus({ preventScroll: true }); } catch {} }, 50);
         }
         renderSpecial();
+        scrollResultsTop();
       } else {
         query = '';
         if (searchInput) searchInput.value = '';
         renderResults();
+        scrollResultsTop();
+        ensureActiveChipVisible();
       }
     }
 
@@ -3153,9 +3202,27 @@ const Chat = (() => {
           activeCat = cat;
           renderCats();
           renderResults();
+          scrollResultsTop();
         });
         catRow.appendChild(btn);
       });
+      ensureActiveChipVisible();
+    }
+
+    // Keep the selected pill on screen when the category row is scrolled or
+    // when the picker reopens on a category near the end of the list.
+    function ensureActiveChipVisible() {
+      if (popover.classList.contains('hidden')) return;
+      const active = catRow.querySelector('.emoji-cat-btn.active');
+      if (!active) return;
+      try {
+        const row = catRow.getBoundingClientRect();
+        const chip = active.getBoundingClientRect();
+        if (!row.width) return;
+        if (chip.left < row.left || chip.right > row.right) {
+          catRow.scrollLeft += (chip.left - row.left) - (row.width - chip.width) / 2;
+        }
+      } catch {}
     }
 
     function emojiButton(item) {
@@ -3175,8 +3242,69 @@ const Chat = (() => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         insertEmoji(item.unicode);
+        rememberEmoji(item.unicode);
       });
       return btn;
+    }
+
+    // Resolve stored tokens back to the current emoji data so a renamed or
+    // removed file never leaves a broken tile behind.
+    function recentItems() {
+      if (typeof CustomEmoji === 'undefined' || !CustomEmoji.lookup) return [];
+      const out = [];
+      const seen = new Set();
+      for (const token of recentEmojis) {
+        if (seen.has(token)) continue;
+        seen.add(token);
+        const item = CustomEmoji.lookup(token);
+        if (item) out.push(item);
+      }
+      return out;
+    }
+
+    function buildRecentSection() {
+      const items = recentItems();
+      if (!items.length) return null;
+      const section = document.createElement('section');
+      section.className = 'emoji-recent';
+      section.setAttribute('aria-label', 'Recent emojis');
+
+      const head = document.createElement('div');
+      head.className = 'emoji-section-head';
+      const title = document.createElement('span');
+      title.className = 'emoji-section-title';
+      title.textContent = 'Recent';
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'emoji-recent-clear';
+      clear.textContent = 'Clear';
+      clear.title = 'Clear recent emojis';
+      clear.setAttribute('aria-label', 'Clear recent emojis');
+      clear.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearRecent();
+      });
+      head.append(title, clear);
+      section.appendChild(head);
+
+      const grid = document.createElement('div');
+      grid.className = 'emoji-grid emoji-grid-recent';
+      items.forEach(it => grid.appendChild(emojiButton(it)));
+      section.appendChild(grid);
+      return section;
+    }
+
+    // Keeps the top section in sync without rebuilding the whole grid.
+    function refreshRecentSection() {
+      const existing = resultsEl.querySelector('.emoji-recent');
+      if (existing) existing.remove();
+      const section = buildRecentSection();
+      if (section) resultsEl.prepend(section);
+    }
+
+    function scrollResultsTop() {
+      try { resultsEl.scrollTop = 0; } catch {}
+      popover.classList.remove('is-scrolled');
     }
 
     function renderResults() {
@@ -3210,7 +3338,9 @@ const Chat = (() => {
         return;
       }
       if (activeCat === 'All') {
-        // Grouped sections with category headings
+        // Recent emojis first, then grouped sections with category headings.
+        const recent = buildRecentSection();
+        if (recent) resultsEl.appendChild(recent);
         CustomEmoji.categories().forEach(cat => {
           if (cat === 'All') return;
           const items = CustomEmoji.itemsByCategory(cat);
@@ -3272,6 +3402,7 @@ const Chat = (() => {
       searchTimer = setTimeout(() => {
         query = searchInput.value || '';
         renderResults();
+        scrollResultsTop();
       }, 120);
     });
     // If autofill sneaked text in without typing, wipe it when opening the picker.
@@ -3293,11 +3424,24 @@ const Chat = (() => {
       } catch (err) {
         console.warn('[Chat] custom emoji load failed:', err && err.message);
       }
+      // Drop tokens whose emoji no longer exists in the current set.
+      try {
+        const before = recentEmojis.length;
+        recentEmojis = recentEmojis.filter(t => {
+          try { return !!CustomEmoji.lookup(t); } catch { return false; }
+        });
+        if (recentEmojis.length !== before) saveRecent(recentEmojis);
+      } catch {}
       if (loadingEl) loadingEl.style.display = 'none';
       renderCats();
       renderResults();
     }
     boot();
+
+    // Shadow under the pinned search bar once the grid is scrolled.
+    resultsEl.addEventListener('scroll', () => {
+      popover.classList.toggle('is-scrolled', resultsEl.scrollTop > 4);
+    }, { passive: true });
 
     emojiBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3305,6 +3449,12 @@ const Chat = (() => {
       if (!popover.classList.contains('hidden')) {
         closeModeMenu();
         const special = (typeof SpecialEmoji !== 'undefined') && SpecialEmoji.getMode() === 'special';
+        // Repaint Recents with anything picked since the last open.
+        if (!special) {
+          if (activeCat === 'All' && !(query || '').trim()) refreshRecentSection();
+          ensureActiveChipVisible();
+        }
+        scrollResultsTop();
         if (special && passInput) {
           setTimeout(() => { try { passInput.focus({ preventScroll: true }); } catch {} }, 50);
         } else if (searchInput) {
@@ -3318,7 +3468,20 @@ const Chat = (() => {
     document.addEventListener('click', (e) => {
       if (!popover.contains(e.target) && e.target !== emojiBtn && !emojiBtn.contains(e.target)) {
         popover.classList.add('hidden');
+        closeModeMenu();
       }
+    });
+
+    // Escape closes the menu first, then the picker itself.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (popover.classList.contains('hidden')) return;
+      if (modeMenu && !modeMenu.classList.contains('hidden')) {
+        closeModeMenu();
+        return;
+      }
+      popover.classList.add('hidden');
+      try { emojiBtn.focus({ preventScroll: true }); } catch {}
     });
   }
 
