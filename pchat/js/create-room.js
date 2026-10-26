@@ -371,6 +371,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Success View ──────────────────────────────────────────────
   function showSuccess(room) {
+    // Aggregate product analytics only — never the room name, description,
+    // invite link, or owner identity.
+    try {
+      const roomType = (room.deploymentUrl && !String(room.deploymentUrl).startsWith('mock://')) ? 'saved' : 'quick';
+      window.PchatAnalytics?.logEvent('room_created', {
+        room_type: roomType,
+        has_description: !!room.description,
+      });
+    } catch {}
+
     document.getElementById('step-progress').style.display = 'none';
     document.getElementById('step-form').style.display     = 'none';
     if (document.getElementById('step-manual')) document.getElementById('step-manual').style.display = 'none';

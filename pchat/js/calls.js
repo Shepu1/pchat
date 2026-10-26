@@ -720,6 +720,13 @@ const CallManager = (() => {
 
     _playOutgoingRing();
 
+    try {
+      window.PchatAnalytics?.logEvent('call_started', {
+        call_type: type === 'video' ? 'video' : 'audio',
+        targeted: !!callTargetId,
+      });
+    } catch {}
+
     // 2. RING FIRST. Getting mic/camera permission can hang on the prompt
     //    (or take seconds on a slow device). Previously the invite was only
     //    broadcast after that await, so the other side never saw the call.
@@ -992,6 +999,12 @@ const CallManager = (() => {
 
     _playConnectedChime();
     _startCallTimer();
+
+    try {
+      window.PchatAnalytics?.logEvent('call_accepted', {
+        call_type: _callType === 'video' ? 'video' : 'audio',
+      });
+    } catch {}
 
     const session = (typeof Storage !== 'undefined') ? Storage.getSession() : null;
     const myPeerId = (typeof P2PSync !== 'undefined' && P2PSync.getPeer()) ? P2PSync.getPeer().id : '';

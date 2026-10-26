@@ -360,6 +360,14 @@ function bindJoinForm() {
       };
       Storage.addJoinedRoom(localRoom);
 
+      // Aggregate event only: no room id, name, invite link, or display name.
+      try {
+        window.PchatAnalytics?.logEvent('room_joined', {
+          room_type: localRoom.kind === 'saved' ? 'saved' : 'quick',
+          has_password: localRoom.passwordLocked === true,
+        });
+      } catch {}
+
       // Redirect to chat — FORWARD the full invite params (r/ep/n/th/k + #k=)
       // so room.html can recover the key even if session save hiccups.
       // (This is the "URL crop" users notice; the key travels in session AND url.)

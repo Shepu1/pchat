@@ -12,6 +12,28 @@
 
   if (!config || !config.apiKey || !config.projectId || !config.measurementId) return;
 
+  const queuedEvents = [];
+  let analyticsInstance = null;
+  let logEventFn = null;
+  let ready = false;
+
+  function track(name, params = {}) {
+    // Events fired before the SDK finishes loading are queued, not dropped.
+    if (!ready) {
+      queuedEvents.push([name, params]);
+      return;
+    }
+    try {
+      logEventFn(analyticsInstance, name, params);
+    } catch (e) {
+      console.warn('[Analytics] logEvent error:', e);
+    }
+  }
+
+  // Expose the API immediately so early interactions (for example login) are
+  // still measured. isReady flips to true once Firebase Analytics is active.
+  window.PchatAnalytics = { isReady: false, logEvent: track };
+
   async function startAnalytics() {
     const [appMod, analyticsMod] = await Promise.all([
       import(CDN + '/firebase-app.js'),
@@ -27,17 +49,14 @@
       : appMod.initializeApp(config);
     const analytics = analyticsMod.getAnalytics(app);
 
-    window.PchatAnalytics = {
-      instance: analytics,
-      isReady: true,
-      logEvent: (name, params = {}) => {
-        try {
-          analyticsMod.logEvent(analytics, name, params);
-        } catch (e) {
-          console.warn('[Analytics] logEvent error:', e);
-        }
-      },
-    };
+    analyticsInstance = analytics;
+    logEventFn = analyticsMod.logEvent;
+    ready = true;
+    window.PchatAnalytics.instance = analytics;
+    window.PchatAnalytics.isReady = true;
+
+    // Flush events captured while the SDK was loading.
+    queuedEvents.splice(0).forEach(([name, params]) => track(name, params));
 
     try {
       console.log('[Pchat Analytics] Google Analytics active (Measurement ID: ' + config.measurementId + ')');

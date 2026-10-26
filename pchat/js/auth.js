@@ -16,6 +16,14 @@ const Auth = (() => {
   let tokenResolve = null;
   let tokenReject  = null;
 
+  // Aggregate analytics only: the sign-in method, never the email or account id.
+  // Use a custom name: Firebase Auth already auto-collects its own `login`.
+  function trackLogin(method) {
+    try {
+      window.PchatAnalytics?.logEvent('app_login', { method });
+    } catch {}
+  }
+
   function resetTokenClient() {
     tokenClient = null;
     tokenClientClientId = null;
@@ -178,6 +186,7 @@ const Auth = (() => {
               else localStorage.removeItem('shepu_profile_pic');
             }
           } catch {}
+          trackLogin('google');
           resolve(fullAuth);
         } catch (e) {
           // Even if userinfo fails, auth is still valid
@@ -195,6 +204,7 @@ const Auth = (() => {
           try {
             if (localStorage.getItem('shepu_pic_custom') !== '1') localStorage.removeItem('shepu_profile_pic');
           } catch {}
+          trackLogin('google');
           resolve(fullAuth);
         }
       };
@@ -218,6 +228,7 @@ const Auth = (() => {
       },
     };
     Storage.setAuth(demoAuth);
+    trackLogin('guest');
     localStorage.setItem('shepu_display_name', name);
     // Email/demo logins carry no photo: drop a previous Google photo unless
     // the user manually chose one (custom photos survive every login).
@@ -309,6 +320,7 @@ const Auth = (() => {
       },
     };
     Storage.setAuth(authData);
+    trackLogin('email');
     localStorage.setItem('shepu_display_name', cleanName);
     try {
       if (localStorage.getItem('shepu_pic_custom') !== '1') localStorage.removeItem('shepu_profile_pic');

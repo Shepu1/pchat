@@ -1462,6 +1462,15 @@ const Chat = (() => {
 
       // Mark sent
       _markOptimisticSent(msgId, optimisticMsg);
+      if (!retry) {
+        // Aggregate event only: message type and reply flag, never content.
+        try {
+          window.PchatAnalytics?.logEvent('message_sent', {
+            message_type: msgType,
+            is_reply: !!replyToId,
+          });
+        } catch {}
+      }
       _saveMessageToSheet(wireMsg);
       if (typeof P2PSync !== 'undefined' && P2PSync.broadcastMessage) {
         P2PSync.broadcastMessage(wireMsg);
