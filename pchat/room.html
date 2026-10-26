@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="css/base.css?v=20261025b" />
   <link rel="stylesheet" href="css/layout.css?v=20261026d" />
   <link rel="stylesheet" href="css/components.css?v=20261025b" />
-  <link rel="stylesheet" href="css/chat.css?v=20261026d" />
+  <link rel="stylesheet" href="css/chat.css?v=20261027f" />
   <link rel="stylesheet" href="css/calls.css?v=20261025b" />
   <link rel="stylesheet" href="css/friends.css?v=20261025b" />
   <link rel="stylesheet" href="css/invites.css?v=20261025b" />
@@ -254,6 +254,18 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"></rect></svg>
         </button>
       </div>
+      <!-- Enhance before sending: cleans the take up on the device. -->
+      <div class="voice-rec-enhance-row hidden" id="voice-rec-enhance-row">
+        <button type="button" class="voice-rec-enhance" id="voice-rec-enhance" aria-label="Enhance with Shepu AI">
+          <span class="vre-ico" aria-hidden="true">
+            <svg class="vre-ico-spark" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M11.5 2.2l1.6 4.6 4.6 1.6-4.6 1.6-1.6 4.6-1.6-4.6L5.3 8.4l4.6-1.6z"></path><path d="M18.8 13.6l.9 2.5 2.5.9-2.5.9-.9 2.5-.9-2.5-2.5-.9 2.5-.9z"></path><path d="M5.6 15.4l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z"></path></svg>
+            <svg class="vre-ico-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </span>
+          <span class="vre-text" id="voice-rec-enhance-text">Enhance with Shepu AI</span>
+          <span class="vre-spin" aria-hidden="true"></span>
+        </button>
+      </div>
+      <span class="voice-rec-sparks" id="voice-rec-sparks" aria-hidden="true"></span>
     </div>
 
     <!-- Attachment preview bar -->
@@ -596,7 +608,7 @@
 <script src="ai/shepu.js?v=20261025d"></script>
 <script src="js/shepu-actions.js?v=20261025b"></script>
 <script src="js/shepu-bot.js?v=20261025d"></script>
-<script src="js/chat.js?v=20261026e"></script>
+<script src="js/chat.js?v=20261027j"></script>
 <script src="js/firebase.js?v=20261025b"></script>
 <script src="js/friends.js?v=20261025b"></script>
 <script src="js/invites.js?v=20261025b"></script>

@@ -755,6 +755,9 @@ const Chat = (() => {
     // Bubble
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
+    // A quoted reply needs the regular bubble padding, so the quote is not
+    // jammed into the tight photo frame below.
+    if (col.querySelector('.msg-reply-quote')) bubble.classList.add('has-reply');
     if (isEmojiMsg) {
       bubble.classList.add('msg-bubble-emoji');
       // Use grapheme-aware count; if Intl.Segmenter returns 0 (edge case), estimate from text length
@@ -2572,10 +2575,17 @@ const Chat = (() => {
     const play   = document.getElementById('voice-rec-play');
     const send   = document.getElementById('voice-rec-send');
     const wave   = document.getElementById('voice-rec-wave');
+    // The second row has a 100% flex basis while previewing. It must be
+    // removed from the layout entirely while recording, otherwise it claims
+    // the whole line and squeezes the live waveform down to nothing.
+    const enhanceRow = document.getElementById('voice-rec-enhance-row');
     if (label) label.textContent = preview ? 'Voice message' : 'Recording';
     if (stop) stop.classList.toggle('hidden', preview);
     if (play) { play.classList.toggle('hidden', !preview); play.classList.remove('is-playing'); }
     if (send) send.classList.toggle('hidden', !preview);
+    if (enhanceRow) enhanceRow.classList.toggle('hidden', !preview);
+    // A fresh take always starts unenhanced.
+    if (!preview) _resetVoiceEnhance();
     if (wave) wave.classList.remove('fallback');
     _voiceResetBars();
   }
@@ -2583,6 +2593,7 @@ const Chat = (() => {
   function _voiceCardHide() {
     _stopVoiceMeter();
     _voiceStopPlayback();
+    _resetVoiceEnhance();
     const card = _voiceCardEl();
     if (card) card.classList.add('hidden');
     _recTimeline = [];
@@ -2671,6 +2682,458 @@ const Chat = (() => {
     if (play) play.classList.remove('is-playing');
   }
 
+  // ── "Enhance with Shepu AI" — on-device voice cleanup ──────────
+  // Everything runs in this tab: decode the take, high-pass the rumble,
+  // trim mud, lift consonants, compress, add make-up gain, limit, soft-gate
+  // the room noise and normalise. The result is re-encoded as a compact WAV
+  // data URL, so the note the receiver gets is cleaner and louder than the
+  // raw microphone capture — no upload and no API key involved.
+  let _voiceEnhancing = false;
+  let _voiceEnhanced = false;
+
+  function _dataUrlToArrayBuffer(dataUrl) {
+    const src = String(dataUrl || '');
+    const comma = src.indexOf(',');
+    if (comma < 0) throw new Error('Unsupported audio payload');
+    const meta = src.slice(0, comma);
+    const body = src.slice(comma + 1);
+    if (!/;base64/i.test(meta)) {
+      const text = decodeURIComponent(body);
+      const plain = new Uint8Array(text.length);
+      for (let i = 0; i < text.length; i++) plain[i] = text.charCodeAt(i) & 0xff;
+      return plain.buffer;
+    }
+    const bin = atob(body);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+
+  function _pcmToWav(pcm, sampleRate) {
+    const n = pcm.length;
+    const buffer = new ArrayBuffer(44 + n * 2);
+    const view = new DataView(buffer);
+    const str = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); view.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+    str(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true); str(36, 'data'); view.setUint32(40, n * 2, true);
+    let o = 44;
+    for (let i = 0; i < n; i++) {
+      const s = pcm[i] < -1 ? -1 : pcm[i] > 1 ? 1 : pcm[i];
+      view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      o += 2;
+    }
+    const bytes = new Uint8Array(buffer);
+    let bin = '';
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return { dataUrl: 'data:audio/wav;base64,' + btoa(bin), size: bytes.length };
+  }
+
+  // ── STFT denoiser ─────────────────────────────────────────────
+  // A tiny radix-2 FFT keeps the whole enhancer dependency-free. The clip
+  // is only a few seconds long, so a plain JS implementation is plenty fast.
+  function _fftInPlace(re, im, inverse) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) {
+        let t = re[i]; re[i] = re[j]; re[j] = t;
+        t = im[i]; im[i] = im[j]; im[j] = t;
+      }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const half = len >> 1;
+      const ang = (inverse ? 2 : -2) * Math.PI / len;
+      const wr = Math.cos(ang), wi = Math.sin(ang);
+      for (let i = 0; i < n; i += len) {
+        let cr = 1, ci = 0;
+        for (let j = 0; j < half; j++) {
+          const a = i + j, b = a + half;
+          const xr = re[b] * cr - im[b] * ci;
+          const xi = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi;
+          re[a] += xr;        im[a] += xi;
+          const nr = cr * wr - ci * wi;
+          ci = cr * wi + ci * wr; cr = nr;
+        }
+      }
+    }
+    if (inverse) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+
+  let _dnWin = null;
+  function _hann(n) {
+    if (_dnWin && _dnWin.length === n) return _dnWin;
+    _dnWin = new Float32Array(n);
+    for (let i = 0; i < n; i++) _dnWin[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / n);
+    return _dnWin;
+  }
+
+  // Spectral subtraction with a Wiener-style soft mask. The noise profile is
+  // learned from the quietest passages of the take itself, then the gain mask
+  // is smoothed in frequency and time so no "musical noise" survives. A light
+  // de-esser rides along in the sibilance band (5.6 kHz+).
+  function _spectralDenoise(pcm, sampleRate) {
+    const N = 512, hop = 256, half = N >> 1, bins = half + 1;
+    const win = _hann(N);
+
+    // 1) Quieter 20 ms blocks ≈ room tone / pauses: they define the noise.
+    const probe = Math.max(48, Math.round(sampleRate * 0.02));
+    const levels = [];
+    for (let s = 0; s + probe <= pcm.length; s += probe) {
+      let sum = 0;
+      for (let i = s; i < s + probe; i++) sum += pcm[i] * pcm[i];
+      levels.push({ at: s, rms: Math.sqrt(sum / probe) });
+    }
+    if (levels.length < 8) return;
+    const sorted = levels.map(l => l.rms).sort((a, b) => a - b);
+    const floorRms = sorted[Math.floor(sorted.length * 0.15)] || 0;
+    if (!(floorRms > 2e-4)) return;                 // already silent
+    const quiet = levels.filter(l => l.rms <= floorRms * 1.7).slice(0, 160);
+    if (quiet.length < 4) return;
+
+    const noise = new Float32Array(bins);
+    const re = new Float32Array(N), im = new Float32Array(N);
+    quiet.forEach(l => {
+      const start = Math.max(0, Math.min(pcm.length - N, l.at - hop));
+      for (let i = 0; i < N; i++) { re[i] = (pcm[start + i] || 0) * win[i]; im[i] = 0; }
+      _fftInPlace(re, im, false);
+      for (let k = 0; k < bins; k++) noise[k] += re[k] * re[k] + im[k] * im[k];
+    });
+    for (let k = 0; k < bins; k++) noise[k] = (noise[k] / quiet.length) * 1.15 + 1e-11;
+
+    // 2) Main pass: over-subtract, then smooth the mask.
+    const out = new Float32Array(pcm.length + N);
+    const norm = new Float32Array(pcm.length + N);
+    // Decision-directed (Ephraim–Malah style) gain: the previous frame's
+    // estimate is fed back, which suppresses stationary noise far better
+    // than plain subtraction without chewing holes into the voice.
+    const prevGain = new Float32Array(bins).fill(0.04);
+    const prevPow = new Float32Array(bins);
+    const gains = new Float32Array(bins);
+    const smooth = new Float32Array(bins);
+    const NOISE_BIAS = 1.2;     // small safety margin over the learned floor
+    const FLOOR = 0.04;         // −28 dB maximum attenuation
+    const DD = 0.98;            // decision-directed smoothing
+    const hiFrom = Math.max(1, Math.round(5600 * N / sampleRate));
+    const midFrom = Math.round(400 * N / sampleRate);
+    const midTo = Math.round(3200 * N / sampleRate);
+
+    for (let start = 0; start < pcm.length; start += hop) {
+      for (let i = 0; i < N; i++) {
+        const s = start + i;
+        re[i] = (s < pcm.length ? pcm[s] : 0) * win[i];
+        im[i] = 0;
+      }
+      _fftInPlace(re, im, false);
+
+      // Sibilance check: when the 5.6k+ band outweighs the speech body, pull
+      // it down softly instead of letting "s" spit at the listener.
+      let mid = 0, high = 0;
+      for (let k = midFrom; k <= midTo && k < bins; k++) mid += re[k] * re[k] + im[k] * im[k];
+      for (let k = hiFrom; k < bins; k++) high += re[k] * re[k] + im[k] * im[k];
+      const ratio = high / Math.max(1e-9, mid);
+      const ess = ratio > 1.15 ? Math.min(1, (ratio - 1.15) / 3.5) : 0;
+      const essGain = 1 - 0.4 * ess;    // up to ≈ −4.4 dB
+
+      for (let k = 0; k < bins; k++) {
+        const p = re[k] * re[k] + im[k] * im[k];
+        const noiseK = noise[k] * NOISE_BIAS;
+        const gamma = p / noiseK;
+        const xi = DD * (prevGain[k] * prevGain[k] * prevPow[k] / noiseK)
+                 + (1 - DD) * Math.max(gamma - 1, 0);
+        let g = xi / (1 + xi);
+        if (g < FLOOR) g = FLOOR;
+        if (k >= hiFrom) g *= essGain;
+        gains[k] = g;
+        prevPow[k] = p;
+      }
+      for (let k = 0; k < bins; k++) {
+        const a = gains[k > 0 ? k - 1 : 0];
+        const b = gains[k];
+        const c = gains[k < half ? k + 1 : half];
+        smooth[k] = (a + b + c) / 3;
+      }
+      for (let k = 0; k < bins; k++) {
+        const target = smooth[k];
+        const prev = prevGain[k];
+        const g = target > prev
+          ? prev + (target - prev) * 0.72     // open fast so speech stays intact
+          : prev + (target - prev) * 0.3;     // close slower to hide the mask
+        prevGain[k] = g;
+        re[k] *= g; im[k] *= g;
+        if (k > 0 && k < half) { re[N - k] = re[k]; im[N - k] = -im[k]; }
+      }
+      _fftInPlace(re, im, true);
+      for (let i = 0; i < N; i++) {
+        const s = start + i;
+        out[s] += re[i] * win[i];
+        norm[s] += win[i] * win[i];
+      }
+    }
+    for (let i = 0; i < pcm.length; i++) {
+      const w = norm[i];
+      pcm[i] = w > 1e-6 ? out[i] / w : 0;
+    }
+  }
+
+  // Gentle level control so whispers and shouts sit at similar loudness.
+  function _compressVoice(pcm, sampleRate) {
+    const thrDb = -24, ratio = 3, kneeDb = 7;
+    const attack = Math.exp(-1 / (sampleRate * 0.006));
+    const release = Math.exp(-1 / (sampleRate * 0.13));
+    let env = 0;
+    for (let i = 0; i < pcm.length; i++) {
+      const x = Math.abs(pcm[i]);
+      env = x > env ? attack * env + (1 - attack) * x : release * env + (1 - release) * x;
+      const db = 20 * Math.log10(env + 1e-9);
+      let gainDb = 0;
+      if (db > thrDb + kneeDb / 2) {
+        gainDb = (thrDb + (db - thrDb) / ratio) - db;
+      } else if (db > thrDb - kneeDb / 2) {
+        const t = db - (thrDb - kneeDb / 2);
+        gainDb = ((1 / ratio - 1) * t * t) / (2 * kneeDb);
+      }
+      if (gainDb < 0) pcm[i] *= Math.pow(10, gainDb / 20);
+    }
+  }
+
+  // Loudness of the spoken part only: 20 ms frames, pauses ignored.
+  function _measureActiveRms(pcm, sampleRate) {
+    const frame = Math.max(32, Math.round(sampleRate * 0.02));
+    let sum = 0, n = 0;
+    for (let s = 0; s + frame <= pcm.length; s += frame) {
+      let acc = 0;
+      for (let i = s; i < s + frame; i++) acc += pcm[i] * pcm[i];
+      const rms = Math.sqrt(acc / frame);
+      if (rms > 0.004) { sum += rms * rms; n++; }   // ignore pauses below −48 dBFS
+    }
+    return n ? Math.sqrt(sum / n) : 0;
+  }
+
+  // Land the note at `target` active RMS. The level is always matched
+  // against the take as it was recorded, so enhancing can only ever make a
+  // voice note louder, never quieter. Peaks that would overshoot go through
+  // a soft (tanh) knee instead of a hard gain cap: that keeps the loudness
+  // while nothing can clip.
+  function _normalizeLoudness(pcm, sampleRate, target = 0.15) {
+    const activeRms = _measureActiveRms(pcm, sampleRate);
+    if (!(activeRms > 1e-5)) return;
+    let peak = 0;
+    for (let i = 0; i < pcm.length; i++) {
+      const v = pcm[i] < 0 ? -pcm[i] : pcm[i];
+      if (v > peak) peak = v;
+    }
+    const CEIL = 0.96;
+    let gain = target / activeRms;
+    // at most ≈4 dB of over-drive into the knee, then accept the gain
+    const maxGain = peak > 1e-6 ? (CEIL * 1.6) / peak : gain;
+    if (gain > maxGain) gain = maxGain;
+    const knee = CEIL * 0.72, span = CEIL - knee;
+    for (let i = 0; i < pcm.length; i++) {
+      let v = pcm[i] * gain;
+      const a = v < 0 ? -v : v;
+      if (a > knee) {
+        const s = knee + span * Math.tanh((a - knee) / span);
+        v = v < 0 ? -s : s;
+      }
+      pcm[i] = v < -1 ? -1 : v > 1 ? 1 : v;
+    }
+  }
+
+  async function _enhanceVoiceTake(at) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!AC || !Offline) throw new Error('This browser cannot process audio');
+
+    const bytes = _dataUrlToArrayBuffer(at.dataUrl);
+    const decodeCtx = new AC();
+    let decoded = null;
+    try {
+      decoded = await new Promise((resolve, reject) => {
+        let maybe = null;
+        try { maybe = decodeCtx.decodeAudioData(bytes, resolve, reject); }
+        catch (e) { reject(e); return; }
+        if (maybe && typeof maybe.then === 'function') maybe.then(resolve, reject);
+      });
+    } finally {
+      try { decodeCtx.close(); } catch {}
+    }
+    if (!decoded || !decoded.length) throw new Error('This recording could not be decoded');
+
+    const seconds = decoded.duration || at.durationSec || 0;
+    if (!(seconds > 0)) throw new Error('This recording is empty');
+    // 24 kHz mono is plenty for speech; long takes drop to 16 kHz so the
+    // enhanced file stays far inside the 5 MB attachment limit.
+    const sampleRate = seconds > 90 ? 16000 : 24000;
+    const length = Math.max(1, Math.ceil(seconds * sampleRate));
+    const off = new Offline(1, length, sampleRate);
+
+    const src = off.createBufferSource();
+    src.buffer = decoded;
+    const rumble = off.createBiquadFilter();
+    rumble.type = 'highpass'; rumble.frequency.value = 85; rumble.Q.value = 0.7;
+    const mud = off.createBiquadFilter();
+    mud.type = 'peaking'; mud.frequency.value = 320; mud.Q.value = 1; mud.gain.value = -2.5;
+    const presence = off.createBiquadFilter();
+    presence.type = 'peaking'; presence.frequency.value = 2800; presence.Q.value = 0.9; presence.gain.value = 3.2;
+    src.connect(rumble); rumble.connect(mud); mud.connect(presence);
+    presence.connect(off.destination);
+    src.start(0);
+
+    const rendered = await off.startRendering();
+    const pcm = rendered.getChannelData(0);
+    // Reference level = the take exactly as it was recorded, i.e. what the
+    // sender heard while previewing it before enhancing.
+    const refRms = _measureActiveRms(decoded.getChannelData(0), decoded.sampleRate);
+    _spectralDenoise(pcm, sampleRate);
+    _compressVoice(pcm, sampleRate);
+    // Aim a touch above the original level, with a floor for weak mics and
+    // a ceiling so an already-hot take does not distort.
+    const target = Math.min(0.3, Math.max(0.15, refRms * 1.15));
+    _normalizeLoudness(pcm, sampleRate, target);
+
+    const wav = _pcmToWav(pcm, sampleRate);
+    if (wav.size > 4.6 * 1024 * 1024) throw new Error('This note is too long to enhance — send it as it is');
+    const base = String(at.name || 'voice').replace(/\.[a-z0-9]+$/i, '').replace(/_enhanced$/i, '');
+    return {
+      dataUrl: wav.dataUrl,
+      size: wav.size,
+      durationSec: Math.max(1, Math.round(seconds)),
+      name: base + '_enhanced.wav',
+    };
+  }
+
+  function _voiceEnhanceEls() {
+    return {
+      card:  _voiceCardEl(),
+      btn:   document.getElementById('voice-rec-enhance'),
+      text:  document.getElementById('voice-rec-enhance-text'),
+      label: document.getElementById('voice-rec-label'),
+      send:  document.getElementById('voice-rec-send'),
+      play:  document.getElementById('voice-rec-play'),
+    };
+  }
+
+  function _voiceEnhanceIdle() {
+    const els = _voiceEnhanceEls();
+    if (els.btn) {
+      els.btn.classList.remove('is-working', 'is-done');
+      els.btn.disabled = false;
+      els.btn.removeAttribute('aria-busy');
+      els.btn.setAttribute('aria-label', 'Enhance with Shepu AI');
+    }
+    if (els.text) els.text.textContent = 'Enhance with Shepu AI';
+    if (els.send) els.send.disabled = false;
+    if (els.play) els.play.disabled = false;
+  }
+
+  function _resetVoiceEnhance() {
+    _voiceEnhancing = false;
+    _voiceEnhanced = false;
+    const card = _voiceCardEl();
+    if (card) card.classList.remove('is-enhancing', 'is-enhanced');
+    _voiceSparks(false);
+    _voiceEnhanceIdle();
+  }
+
+  // Light particles that drift up through the card while a take is being
+  // processed. Created per run so their paths differ every time.
+  function _voiceSparks(on, count = 16) {
+    const layer = document.getElementById('voice-rec-sparks');
+    if (!layer) return;
+    layer.innerHTML = '';
+    if (!on) return;
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('i');
+      dot.style.setProperty('--x', (5 + Math.random() * 90).toFixed(1) + '%');
+      dot.style.setProperty('--s', (2 + Math.random() * 3.2).toFixed(1) + 'px');
+      dot.style.setProperty('--d', (Math.random() * 1.25).toFixed(2) + 's');
+      dot.style.setProperty('--t', (1.15 + Math.random() * 1.15).toFixed(2) + 's');
+      layer.appendChild(dot);
+    }
+  }
+
+  async function _runVoiceEnhance() {
+    if (_voiceEnhancing || _voiceEnhanced) return;
+    const at = _pendingAttachment;
+    if (!at || at.kind !== 'voice') return;
+
+    const els = _voiceEnhanceEls();
+    _voiceEnhancing = true;
+    _voiceStopPlayback();
+    els.card?.classList.add('is-enhancing');
+    if (els.btn) {
+      els.btn.classList.add('is-working');
+      els.btn.disabled = true;
+      els.btn.setAttribute('aria-busy', 'true');
+    }
+    if (els.text) els.text.textContent = 'Enhancing with Shepu AI…';
+    if (els.label) els.label.textContent = 'Enhancing';
+    if (els.send) els.send.disabled = true;
+    if (els.play) els.play.disabled = true;
+    _voiceSparks(true);
+
+    const clock = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const startedAt = clock();
+    try {
+      const out = await _enhanceVoiceTake(at);
+      // Let the animation read as a deliberate step even for short clips.
+      const elapsed = clock() - startedAt;
+      if (elapsed < 900) await new Promise(r => setTimeout(r, 900 - elapsed));
+
+      _pendingAttachment = {
+        ...at,
+        name: out.name,
+        type: 'audio/wav',
+        size: out.size,
+        dataUrl: out.dataUrl,
+        durationSec: out.durationSec,
+      };
+      _voiceEnhanced = true;
+      _voiceCardPreview(_pendingAttachment.dataUrl, _pendingAttachment.durationSec);
+      _voiceSparks(false);
+      els.card?.classList.remove('is-enhancing');
+      els.card?.classList.add('is-enhanced');
+      setTimeout(() => els.card?.classList.remove('is-enhanced'), 1200);
+      if (els.btn) {
+        els.btn.classList.remove('is-working');
+        els.btn.classList.add('is-done');
+        // Enhanced once and there is no revert: the badge is informational.
+        els.btn.disabled = true;
+        els.btn.removeAttribute('aria-busy');
+        els.btn.setAttribute('aria-label', 'Enhanced with Shepu AI');
+      }
+      if (els.text) els.text.textContent = 'Enhanced';
+      if (els.label) els.label.textContent = 'Voice message';
+      if (els.send) els.send.disabled = false;
+      if (els.play) els.play.disabled = false;
+      UI.toast('success', 'Enhanced with Shepu AI', 'Noise reduced, voice lifted, volume evened out.');
+    } catch (err) {
+      _voiceSparks(false);
+      els.card?.classList.remove('is-enhancing');
+      if (els.btn) {
+        els.btn.classList.remove('is-working');
+        els.btn.disabled = false;
+        els.btn.removeAttribute('aria-busy');
+      }
+      if (els.text) els.text.textContent = 'Enhance with Shepu AI';
+      if (els.label) els.label.textContent = 'Voice message';
+      if (els.send) els.send.disabled = false;
+      if (els.play) els.play.disabled = false;
+      UI.toast('error', 'Could not enhance', (err && err.message) || 'The recording was left untouched.');
+    } finally {
+      _voiceEnhancing = false;
+    }
+  }
+
   // Static peaks captured during the recording + a real player, so the user
   // hears the note before sending it.
   function _voiceCardPreview(dataUrl, secs) {
@@ -2754,6 +3217,11 @@ const Chat = (() => {
     document.getElementById('voice-rec-send')?.addEventListener('click', () => {
       if (_recorder || !_pendingAttachment) return;
       sendMessage();
+    });
+    // Enhance the take before it is sent (a single pass, no revert).
+    document.getElementById('voice-rec-enhance')?.addEventListener('click', () => {
+      if (_recorder) return;
+      _runVoiceEnhance();
     });
   }
 
@@ -3786,6 +4254,28 @@ const Chat = (() => {
     _playingVoice = null;
   }
 
+  // A playable voice source. Anything script-bearing (data:text/html, svg…)
+  // is refused; a data: clip, a blob: URL and an https: file are all fine.
+  function _voiceSrc(parsed) {
+    if (!parsed || typeof parsed.dataUrl !== 'string' || !parsed.dataUrl) return '';
+    const url = parsed.dataUrl;
+    if (SAFE_DATA_URL_RE.test(url) || /^blob:/i.test(url) || /^https:\/\//i.test(url)) return url;
+    return '';
+  }
+
+  // Is this attachment a voice note? Decided from the payload itself as well
+  // as messageType. An audio body whose MIME got lost or was reported as
+  // application/octet-stream (or a voice note relayed by an older client as
+  // messageType 'file') used to fall through to the generic file card: tapping
+  // it opened the raw audio URL in the browser's OWN player, which is the
+  // "my player turns into the default audio player" bug.
+  function _isAudioPayload(parsed, messageType) {
+    if (!parsed || typeof parsed !== 'object') return false;
+    if (messageType === 'audio' || parsed.kind === 'voice') return true;
+    if (typeof parsed.fileType === 'string' && parsed.fileType.startsWith('audio/')) return true;
+    return typeof parsed.dataUrl === 'string' && /^data:audio\//i.test(parsed.dataUrl);
+  }
+
   function _bindVoicePlayer(scope, parsed, msgId) {
     const root = scope.querySelector('.voice-player');
     if (!root) return;
@@ -3796,17 +4286,23 @@ const Chat = (() => {
     const audio = root.querySelector('.vp-audio');
     const total = parsed.durationSec > 0 ? parsed.durationSec : 0;
     if (timeEl && total > 0) timeEl.textContent = _fmtDuration(total);
+    const voiceSrc = _voiceSrc(parsed);
 
-    // Attach the data URL lazily: one media fetch per clip, only when it is
+    // Attach the source lazily: one media fetch per clip, only when it is
     // actually played (or scrubbed), instead of preloading the whole history.
     let srcLoaded = false;
     const loadSrc = () => {
-      if (srcLoaded) return;
+      if (!voiceSrc) return false;
+      if (srcLoaded) return true;
       srcLoaded = true;
       try {
-        audio.src = parsed.dataUrl;
+        audio.src = voiceSrc;
         audio.load();
-      } catch {}
+      } catch { return false; }
+      return true;
+    };
+    const unavailable = () => {
+      UI.toast('error', 'Voice unavailable', 'This voice message could not be loaded.');
     };
 
     // Build waveform bars optimistically; fill real peaks when decoded
@@ -3821,7 +4317,7 @@ const Chat = (() => {
       wave.appendChild(b);
       bars.push(b);
     }
-    _voicePeaksFor(msgId, parsed.dataUrl, N).then(entry => {
+    if (voiceSrc) _voicePeaksFor(msgId, voiceSrc, N).then(entry => {
       if (!entry || !wave.isConnected) return;
       entry.peaks.forEach((v, i) => {
         if (bars[i]) bars[i].style.height = Math.max(4, Math.round(v * 27)) + 'px';
@@ -3850,7 +4346,7 @@ const Chat = (() => {
         return;
       }
       _stopActiveVoice();
-      loadSrc();
+      if (!loadSrc()) { unavailable(); return; }
       try {
         await audio.play();
         btn.innerHTML = VP_PAUSE;
@@ -3899,6 +4395,11 @@ const Chat = (() => {
       btn.innerHTML = VP_PLAY;
       btn.classList.remove('playing');
       if (_playingVoice && _playingVoice.audio === audio) _playingVoice = null;
+      // Allow another tap to re-attach the source (a transient decode
+      // failure must not leave the card permanently dead).
+      srcLoaded = false;
+      try { audio.removeAttribute('src'); audio.load(); } catch {}
+      if (total > 0 && timeEl) timeEl.textContent = _fmtDuration(total);
     });
   }
 
@@ -4135,6 +4636,14 @@ const Chat = (() => {
             _revealMediaWrap(wrap, hasGen ? 180 : 0);
           };
           const onLoad = () => {
+            // Tiny pictures (stickers, avatars, screenshots of a single icon)
+            // get a compact frame: the hover/tap action buttons would cover
+            // more than half of them, so the photo itself stays tappable.
+            try {
+              if (img.naturalWidth && img.naturalWidth <= 170 && img.naturalHeight <= 170) {
+                wrap.classList.add('media-mini');
+              }
+            } catch {}
             // 4.1 keeps the dots loader on screen for the official portrait
             // even though the bundled image is already available locally.
             if (hasGen && revealDelay > 0) {
@@ -4285,8 +4794,7 @@ const Chat = (() => {
       }
       if ((messageType === 'image' || messageType === 'file' || messageType === 'audio') && typeof content === 'string' && content.startsWith('{')) {
         const parsed = JSON.parse(content);
-        const isAudio = messageType === 'audio' || (typeof parsed.fileType === 'string' && parsed.fileType.startsWith('audio/'));
-        if (isAudio && typeof parsed.dataUrl === 'string' && /^data:audio\//i.test(parsed.dataUrl)) {
+        if (_isAudioPayload(parsed, messageType)) {
           const dur = parsed.durationSec > 0 ? _fmtDuration(parsed.durationSec) : '';
           // The clip is attached on the first tap, not at render. Loading
           // every voice note up front made phones fail the media fetch (and

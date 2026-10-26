@@ -1033,6 +1033,7 @@
    recording, then a playable preview with send / discard before
    anything leaves the device. */
 .voice-rec {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1040,6 +1041,8 @@
   margin: 0 0 0.4rem 0.9rem;
   padding: 0.35rem 0.4rem 0.35rem 0.75rem;
   border-radius: 999px;
+  overflow: hidden;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
   background: linear-gradient(180deg, rgba(24, 32, 48, 0.97) 0%, rgba(11, 15, 25, 0.99) 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.05);
@@ -1198,6 +1201,230 @@
   box-shadow: 0 8px 18px -10px rgba(37, 99, 235, 0.95);
 }
 .voice-rec-send:hover { color: #fff; filter: brightness(1.08); }
+.voice-rec-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+/* ── "Enhance with Shepu AI" pill (preview mode) ───────────────
+   The preview card opens into a small rounded card so the pill can sit on
+   its own line under the waveform. The pill hugs its text — it never spans
+   the whole card like a bar. */
+.voice-rec.is-preview {
+  flex-wrap: wrap;
+  row-gap: 0.32rem;
+  border-radius: 18px;
+  padding: 0.4rem 0.45rem 0.45rem 0.75rem;
+}
+.voice-rec-enhance-row {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+}
+.voice-rec-enhance {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.32rem 0.68rem 0.32rem 0.56rem;
+  border-radius: 999px;
+  border: 1px solid rgba(129, 161, 255, 0.3);
+  background:
+    linear-gradient(100deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.26) 55%, rgba(14, 165, 233, 0.18) 100%);
+  color: #dbeafe;
+  font: inherit;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 8px 22px -16px rgba(99, 102, 241, 0.95);
+  transition: transform 0.16s ease, border-color 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+.voice-rec-enhance:hover {
+  border-color: rgba(165, 180, 252, 0.6);
+  filter: brightness(1.12);
+  box-shadow: 0 10px 24px -14px rgba(99, 102, 241, 1);
+}
+.voice-rec-enhance:active { transform: scale(0.97); }
+/* A slow light sweep while the pill is idle, so it quietly invites a tap. */
+.voice-rec-enhance::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%);
+  transform: translateX(-180%);
+  animation: vreSheen 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.voice-rec-enhance:disabled { cursor: default; }
+.vre-ico {
+  display: inline-flex;
+  color: #a5b4fc;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.6));
+}
+.vre-ico-check { display: none; }
+.vre-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vre-spin {
+  display: none;
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #e0e7ff;
+  animation: vreSpin 0.7s linear infinite;
+}
+/* Working: a flowing energy fill, a breathing glow and a fast shimmer. */
+.voice-rec-enhance.is-working {
+  border-color: rgba(167, 139, 250, 0.62);
+  background:
+    linear-gradient(100deg, rgba(59, 130, 246, 0.42) 0%, rgba(167, 139, 250, 0.58) 35%, rgba(14, 165, 233, 0.46) 65%, rgba(59, 130, 246, 0.42) 100%);
+  background-size: 320% 100%;
+  animation: vreFlowBg 1.7s linear infinite, vrePillPulse 1.15s ease-in-out infinite;
+}
+.voice-rec-enhance.is-working .vre-spin { display: block; }
+.voice-rec-enhance.is-working .vre-ico { animation: vreTwinkle 0.85s ease-in-out infinite; }
+.voice-rec-enhance.is-working::after { width: 62%; animation-duration: 1s; }
+/* Done: a calm success badge. There is nothing left to tap. */
+.voice-rec-enhance.is-done {
+  pointer-events: none;
+  border-color: rgba(16, 185, 129, 0.42);
+  background: linear-gradient(100deg, rgba(16, 185, 129, 0.22) 0%, rgba(59, 130, 246, 0.14) 100%);
+  color: #d1fae5;
+  box-shadow: 0 8px 22px -16px rgba(16, 185, 129, 0.9);
+  animation: vreDonePop 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.voice-rec-enhance.is-done .vre-ico { color: #6ee7b7; filter: drop-shadow(0 0 7px rgba(16, 185, 129, 0.6)); }
+.voice-rec-enhance.is-done .vre-ico-spark { display: none; }
+.voice-rec-enhance.is-done .vre-ico-check { display: block; }
+.voice-rec-enhance.is-done::after { display: none; }
+
+/* Floating sparks — spawned per run from chat.js, so each enhancement
+   visibly "gathers" light while it works. */
+.voice-rec-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.voice-rec.is-enhancing .voice-rec-sparks { opacity: 1; }
+.voice-rec-sparks i {
+  position: absolute;
+  bottom: -6px;
+  left: var(--x, 50%);
+  width: var(--s, 3px);
+  height: var(--s, 3px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(224, 231, 255, 0.95) 0%, rgba(129, 140, 248, 0.55) 45%, rgba(96, 165, 250, 0) 72%);
+  animation: vreSpark var(--t, 1.4s) ease-out var(--d, 0s) infinite;
+}
+
+/* Card-wide feedback while the take is processed */
+.voice-rec.is-enhancing {
+  border-color: rgba(129, 161, 255, 0.45);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.18), 0 18px 46px -22px rgba(59, 130, 246, 0.95);
+}
+.voice-rec.is-enhancing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 160% at 8% 50%, rgba(59, 130, 246, 0.3), transparent 60%),
+    radial-gradient(130% 160% at 92% 50%, rgba(167, 139, 250, 0.3), transparent 60%),
+    radial-gradient(90% 120% at 50% 120%, rgba(14, 165, 233, 0.22), transparent 65%);
+  background-size: 200% 200%;
+  animation: vreGlow 1.7s ease-in-out infinite, vreAurora 3.4s linear infinite;
+}
+.voice-rec.is-enhancing::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  background: linear-gradient(100deg, transparent 0%, rgba(191, 219, 254, 0.18) 45%, rgba(167, 139, 250, 0.3) 60%, transparent 100%);
+  filter: blur(1px);
+  animation: vreScan 1.3s ease-in-out infinite;
+  pointer-events: none;
+}
+.voice-rec.is-enhancing .voice-rec-bar {
+  animation: vreFlow 0.85s ease-in-out infinite alternate;
+}
+.voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 1) { animation-delay: 0s; }
+.voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 2) { animation-delay: 0.09s; }
+.voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 3) { animation-delay: 0.18s; }
+.voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 4) { animation-delay: 0.27s; }
+.voice-rec.is-enhanced { animation: vreSuccess 1.15s ease-out; }
+@keyframes vreSheen {
+  0%, 55% { transform: translateX(-180%); }
+  88%, 100% { transform: translateX(340%); }
+}
+@keyframes vreSpin { to { transform: rotate(360deg); } }
+@keyframes vreTwinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+  50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+}
+@keyframes vreGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+@keyframes vreAurora {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes vreFlowBg {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes vrePillPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.35); }
+  50% { box-shadow: 0 0 14px 1px rgba(139, 92, 246, 0.5); }
+}
+@keyframes vreScan {
+  0% { transform: translateX(-110%) skewX(-12deg); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateX(340%) skewX(-12deg); opacity: 0; }
+}
+@keyframes vreSpark {
+  0% { transform: translateY(0) scale(0.35); opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: 0.9; }
+  100% { transform: translateY(-78px) scale(1.1); opacity: 0; }
+}
+@keyframes vreFlow {
+  from { transform: scaleY(0.4); filter: brightness(1.05); }
+  to   { transform: scaleY(1.06); filter: brightness(1.55); }
+}
+@keyframes vreDonePop {
+  0% { transform: scale(0.94); }
+  55% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@keyframes vreSuccess {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  35%  { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22), 0 0 34px rgba(16, 185, 129, 0.4); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-rec-enhance::after,
+  .voice-rec.is-enhancing::before,
+  .voice-rec.is-enhancing::after,
+  .voice-rec.is-enhancing .voice-rec-bar,
+  .voice-rec-sparks i,
+  .voice-rec.is-enhanced,
+  .voice-rec-enhance.is-working,
+  .voice-rec-enhance.is-working .vre-ico,
+  .voice-rec-enhance.is-done,
+  .vre-spin { animation: none; }
+}
 
 /* Google Sheet Action Button */
 .btn-sheet-link {
@@ -1556,25 +1783,29 @@
 .attachment-preview-bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  gap: 0.7rem;
+  padding: 0.45rem 0.5rem;
   background: var(--surface-2);
   border-top: 1px solid var(--border);
   font-size: 0.8125rem;
 }
 .attachment-preview-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--r-sm);
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
   object-fit: cover;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--surface-3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 .attachment-preview-info {
   flex: 1;
   min-width: 0;
 }
 .attachment-preview-name {
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.005em;
   color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1582,7 +1813,22 @@
 }
 .attachment-preview-size {
   color: var(--text-3);
-  font-size: 0.75rem;
+  font-size: 0.71rem;
+  margin-top: 1px;
+}
+.attachment-preview-bar #cancel-attachment-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.attachment-preview-bar #cancel-attachment-btn:hover {
+  background: var(--danger-dim);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
 }
 
 /* ── Emoji Picker Popover ─────────────────────────────────────── */
@@ -2242,28 +2488,73 @@ img.custom-emoji-picker {
 }
 
 /* ── Professional image messages ──────────────────────────── */
-/* Image-only bubbles go edge-to-edge (WhatsApp style) */
-.msg-bubble.msg-media {
-  padding: 4px;
+/* Photo bubbles lose the chat frame: a hairline edge + soft depth instead of
+   a padded card, so the picture itself carries the bubble's rounding.
+   The .msg-row selectors are deliberate — they outrank the per-side bubble
+   padding declared earlier (and in responsive.css), which used to win and
+   leave a grey margin around every photo. */
+.msg-row.own .msg-bubble.msg-media:not(.has-reply),
+.msg-row.msg-mine .msg-bubble.msg-media:not(.has-reply),
+.msg-row.other .msg-bubble.msg-media:not(.has-reply),
+.msg-row:not(.msg-mine) .msg-bubble.msg-media:not(.has-reply) {
+  padding: 3px;
   overflow: hidden;
-  border: none;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  border-radius: 20px 20px 20px 7px;
 }
-.msg-bubble.msg-media .msg-meta {
-  padding: 0 0.55rem 0.3rem 0;
+.msg-row.own .msg-bubble.msg-media:not(.has-reply),
+.msg-row.msg-mine .msg-bubble.msg-media:not(.has-reply) {
+  background: rgba(59, 90, 246, 0.16);
+  border-color: rgba(129, 161, 255, 0.24);
+  border-radius: 20px 20px 7px 20px;
+}
+/* Captioned photos keep the same frame so the caption breathes below. */
+.msg-row.own .msg-bubble.has-caption:not(.has-reply),
+.msg-row.msg-mine .msg-bubble.has-caption:not(.has-reply),
+.msg-row.other .msg-bubble.has-caption:not(.has-reply),
+.msg-row:not(.msg-mine) .msg-bubble.has-caption:not(.has-reply) {
+  padding: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  border-radius: 20px 20px 20px 7px;
+}
+.msg-row.own .msg-bubble.has-caption:not(.has-reply),
+.msg-row.msg-mine .msg-bubble.has-caption:not(.has-reply) {
+  background: rgba(59, 90, 246, 0.16);
+  border-color: rgba(129, 161, 255, 0.24);
+  border-radius: 20px 20px 7px 20px;
+}
+.msg-bubble.msg-media .msg-meta,
+.msg-bubble.has-caption .msg-meta {
+  padding: 0.16rem 0.5rem 0.12rem;
+  margin-top: 0;
+  justify-content: flex-end;
+  opacity: 0.72;
 }
 .msg-bubble.has-caption .msg-img-caption {
-  padding: 0.15rem 0.55rem 0.35rem;
+  padding: 0.45rem 0.6rem 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 .msg-media-wrap {
   position: relative;
   margin: 0;
-  min-width: 180px;
-  min-height: 140px;
-  border-radius: calc(var(--r-lg) - 6px);
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  border-radius: 17px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   isolation: isolate;
+}
+/* Only an unloaded photo needs a reserved box; AI cards below keep theirs. */
+.msg-media-wrap:not(.msg-media-ai):not(.msg-media-generating):not(.loaded):not(.media-error) {
+  min-width: 220px;
+  min-height: 150px;
 }
 .msg-media-wrap.msg-media-ai {
   min-width: min(260px, 76vw);
@@ -2279,20 +2570,22 @@ img.custom-emoji-picker {
   max-width: 100%;
   width: auto;
   height: auto;
-  max-height: 380px;
+  max-height: min(420px, 60vh);
   margin: 0 auto;
   border-radius: inherit;
   object-fit: contain;
   cursor: zoom-in;
   opacity: 0;
-  transition: opacity 0.35s ease, transform 0.25s ease;
+  transform: scale(0.995);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: opacity 0.35s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.msg-media-wrap.loaded .msg-attachment-img { opacity: 1; }
+.msg-media-wrap.loaded .msg-attachment-img { opacity: 1; transform: scale(1); }
 .msg-media-wrap.loaded .msg-media-shimmer { display: none; }
-.msg-media-wrap .msg-attachment-img:hover {
-  transform: none;
-  opacity: 1;
-}
+.msg-media-wrap .msg-attachment-img:hover { opacity: 1; }
+.msg-media-wrap .msg-attachment-img:active { transform: scale(0.99); }
 /* Loading shimmer while Shepu-AI generates/decodes the photo */
 .msg-media-shimmer {
   position: absolute;
@@ -2422,53 +2715,98 @@ img.custom-emoji-picker {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(8, 12, 24, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(6, 10, 20, 0.62);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
   color: #fff;
   cursor: pointer;
   text-decoration: none;
-  transition: background var(--t-fast), transform var(--t-fast);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: background var(--t-fast), transform var(--t-fast), border-color var(--t-fast);
 }
-.msg-media-btn:hover { background: rgba(59, 90, 246, 0.85); transform: scale(1.06); }
+.msg-media-btn:hover {
+  background: rgba(59, 90, 246, 0.88);
+  border-color: rgba(147, 178, 255, 0.55);
+  transform: translateY(-1px) scale(1.05);
+}
+.msg-media-btn:active { transform: scale(0.94); }
+/* Very small pictures: no floating buttons over the tiny frame — the photo
+   itself opens the viewer. */
+.msg-media-wrap.media-mini { border-radius: 14px; }
+.msg-media-wrap.media-mini .msg-media-overlay { display: none; }
+.msg-media-wrap.media-mini .msg-media-watermark { font-size: 0.58rem; padding: 0.12rem 0.36rem; }
+@media (max-width: 768px) {
+  .msg-media-wrap .msg-attachment-img { max-height: min(380px, 56vh); }
+  .msg-media-wrap .msg-media-overlay { right: 0.45rem; bottom: 0.45rem; gap: 0.35rem; }
+  .msg-media-btn { width: 32px; height: 32px; }
+  .msg-row.own .msg-bubble.msg-media .msg-meta,
+  .msg-row.msg-mine .msg-bubble.msg-media .msg-meta { padding-bottom: 0.05rem; }
+}
 
-/* ── Lightbox top bar ─────────────────────────────────────── */
+/* ── Lightbox: floating glass bar over the photo ───────────── */
 .lightbox-modal { flex-direction: column; gap: 0.75rem; padding: 1rem; }
 .lightbox-bar {
+  position: absolute;
+  z-index: 2;
+  top: max(1rem, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  width: min(880px, 94vw);
+  width: min(880px, calc(100% - 2rem));
+  padding: 0.4rem 0.45rem 0.4rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(13, 19, 34, 0.68);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  cursor: default;
 }
 .lightbox-name {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.85);
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.9);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lightbox-actions { display: flex; gap: 0.5rem; }
+.lightbox-actions { display: flex; gap: 0.45rem; flex-shrink: 0; }
 .lightbox-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
   cursor: pointer;
   text-decoration: none;
-  transition: background var(--t-fast);
+  transition: background var(--t-fast), transform var(--t-fast), border-color var(--t-fast);
 }
-.lightbox-btn:hover { background: rgba(255, 255, 255, 0.22); }
-.lightbox-img { cursor: zoom-out; }
+.lightbox-btn:hover {
+  background: rgba(59, 130, 246, 0.85);
+  border-color: rgba(147, 178, 255, 0.55);
+  transform: scale(1.06);
+}
+.lightbox-btn:active { transform: scale(0.94); }
+.lightbox-img { cursor: default; }
+@media (max-width: 480px) {
+  .lightbox-bar { top: max(0.7rem, env(safe-area-inset-top, 0px)); width: calc(100% - 1.2rem); padding-left: 0.85rem; }
+  .lightbox-name { font-size: 0.78rem; }
+  .lightbox-btn { width: 36px; height: 36px; }
+}
 
 /* ── Room password gate + modal ───────────────────────────── */
 .pw-gate {
@@ -2633,21 +2971,47 @@ img.custom-emoji-picker {
 .lightbox-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.85);
-  backdrop-filter: blur(8px);
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(30, 44, 82, 0.55) 0%, rgba(4, 7, 14, 0) 55%),
+    rgba(3, 6, 14, 0.94);
+  backdrop-filter: blur(22px) saturate(1.15);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   cursor: zoom-out;
+  animation: lbFade 0.18s ease-out;
 }
 .lightbox-modal.hidden { display: none; }
 .lightbox-img {
-  max-width: 90vw;
-  max-height: 85vh;
-  border-radius: var(--r-md);
-  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  max-width: min(92vw, 1120px);
+  max-height: 82vh;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.09),
+    0 0 0 8px rgba(255, 255, 255, 0.02);
   cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: lbZoom 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes lbFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes lbZoom {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (max-width: 640px) {
+  .lightbox-img { max-width: 94vw; max-height: 76vh; border-radius: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lightbox-modal, .lightbox-img { animation: none; }
+  .lightbox-img { transform: none; }
 }
 
 /* ── Synced Room Music Player & Equalizer ─────────────────────── */
@@ -3088,8 +3452,18 @@ img.custom-emoji-picker {
 /* ── Attachment preview bar: match input ─────────────────────── */
 .attachment-preview-bar {
   margin: 0 0.9rem 0.55rem;
-  border-radius: 14px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(20, 28, 50, 0.9);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(180deg, rgba(24, 32, 56, 0.96) 0%, rgba(16, 23, 40, 0.96) 100%);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: attachPreviewIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes attachPreviewIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attachment-preview-bar { animation: none; }
 }
