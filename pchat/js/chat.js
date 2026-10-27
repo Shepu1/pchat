@@ -2918,33 +2918,67 @@ const Chat = (() => {
     return n ? Math.sqrt(sum / n) : 0;
   }
 
+  // Lookahead peak limiter. The gain is pulled down a few milliseconds
+  // *before* each peak arrives and released slowly afterwards, so the level
+  // can be pushed hard without clipping and without the crunch a memoryless
+  // soft-clipper would add to the tops of syllables.
+  function _limitPeaks(pcm, sampleRate, ceil = 0.95) {
+    const n = pcm.length;
+    if (!n) return;
+    const look = Math.max(4, Math.round(sampleRate * 0.004));   // 4 ms
+    // Gain every sample would need to stay under the ceiling.
+    const need = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
+      need[i] = a > ceil ? ceil / a : 1;
+    }
+    // Sliding minimum of `need` over [i-look, i] (monotonic deque), which
+    // read one window ahead is exactly the minimum over [i, i+look].
+    const win = new Float32Array(n);
+    const dq = new Int32Array(n);
+    let lo = 0, hi = -1;
+    for (let i = 0; i < n; i++) {
+      const v = need[i];
+      while (hi >= lo && need[dq[hi]] >= v) hi--;
+      dq[++hi] = i;
+      const start = i - look;
+      while (dq[lo] < start) lo++;
+      win[i] = need[dq[lo]];
+    }
+    // Drops are immediate, recoveries are smoothed, and the per-sample
+    // ceiling is re-checked below so smoothing can never overshoot.
+    const rel = Math.exp(-1 / (sampleRate * 0.05));
+    let s = 1;
+    for (let i = 0; i < n; i++) {
+      const fwd = i + look < n ? win[i + look] : win[n - 1];
+      s = fwd < s ? fwd : rel * s + (1 - rel) * fwd;
+      const a = pcm[i] < 0 ? -pcm[i] : pcm[i];
+      const cap = a > ceil ? ceil / a : 1;
+      pcm[i] *= s < cap ? s : cap;
+    }
+  }
+
   // Land the note at `target` active RMS. The level is always matched
   // against the take as it was recorded, so enhancing can only ever make a
-  // voice note louder, never quieter. Peaks that would overshoot go through
-  // a soft (tanh) knee instead of a hard gain cap: that keeps the loudness
-  // while nothing can clip.
+  // voice note louder, never quieter. Peaks are held by the limiter rather
+  // than by capping the gain, so loudness is never traded away for headroom.
   function _normalizeLoudness(pcm, sampleRate, target = 0.15) {
-    const activeRms = _measureActiveRms(pcm, sampleRate);
-    if (!(activeRms > 1e-5)) return;
-    let peak = 0;
-    for (let i = 0; i < pcm.length; i++) {
-      const v = pcm[i] < 0 ? -pcm[i] : pcm[i];
-      if (v > peak) peak = v;
-    }
-    const CEIL = 0.96;
-    let gain = target / activeRms;
-    // at most ≈4 dB of over-drive into the knee, then accept the gain
-    const maxGain = peak > 1e-6 ? (CEIL * 1.6) / peak : gain;
-    if (gain > maxGain) gain = maxGain;
-    const knee = CEIL * 0.72, span = CEIL - knee;
-    for (let i = 0; i < pcm.length; i++) {
-      let v = pcm[i] * gain;
-      const a = v < 0 ? -v : v;
-      if (a > knee) {
-        const s = knee + span * Math.tanh((a - knee) / span);
-        v = v < 0 ? -s : s;
-      }
-      pcm[i] = v < -1 ? -1 : v > 1 ? 1 : v;
+    const n = pcm.length;
+    if (!n) return;
+    let total = 1;
+    let prev = _measureActiveRms(pcm, sampleRate);
+    for (let pass = 0; pass < 3; pass++) {
+      if (!(prev > 1e-5)) return;
+      const need = target / prev;
+      if (pass > 0 && need < 1.03) break;          // already at the target
+      const gain = Math.min(need, 32 / total);      // never lift by >30 dB
+      if (pass > 0 && gain <= 1) break;
+      total *= gain;
+      for (let i = 0; i < n; i++) pcm[i] *= gain;
+      _limitPeaks(pcm, sampleRate, 0.95);
+      const now = _measureActiveRms(pcm, sampleRate);
+      if (pass > 0 && now <= prev * 1.002) break;   // limiter has no more to give
+      prev = now;
     }
   }
 
