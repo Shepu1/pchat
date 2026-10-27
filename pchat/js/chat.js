@@ -2683,13 +2683,14 @@ const Chat = (() => {
   }
 
   // ── "Enhance with Shepu AI" — on-device voice cleanup ──────────
-  // Everything runs in this tab: decode the take, high-pass the rumble,
-  // trim mud, lift consonants, compress, add make-up gain, limit, soft-gate
-  // the room noise and normalise. The result is re-encoded as a compact WAV
-  // data URL, so the note the receiver gets is cleaner and louder than the
-  // raw microphone capture — no upload and no API key involved.
+  // Everything runs in this tab: decode the take, cut the rumble, trim mud,
+  // lift presence/air, learn the room tone and denoise, gate the gaps between
+  // words, compress, normalise to −15 LUFS and limit. The result is re-encoded
+  // as a compact WAV data URL, so the note the receiver gets is cleaner and
+  // louder than the raw microphone capture — no upload and no API key.
   let _voiceEnhancing = false;
   let _voiceEnhanced = false;
+  let _voiceEnhanceRun = 0;   // bumped when the take is discarded/replaced
 
   function _dataUrlToArrayBuffer(dataUrl) {
     const src = String(dataUrl || '');
@@ -2776,12 +2777,30 @@ const Chat = (() => {
     return _dnWin;
   }
 
+  // Yield a macrotask so the browser can paint the progress ring without the
+  // background throttling that setTimeout gets when the tab is not focused.
+  function _yieldToBrowser() {
+    if (typeof MessageChannel === 'function') {
+      return new Promise(resolve => {
+        const ch = new MessageChannel();
+        ch.port1.onmessage = () => { try { ch.port1.close(); } catch {} resolve(); };
+        ch.port2.postMessage(0);
+      });
+    }
+    return new Promise(resolve => setTimeout(resolve, 0));
+  }
+
   // Spectral subtraction with a Wiener-style soft mask. The noise profile is
   // learned from the quietest passages of the take itself, then the gain mask
   // is smoothed in frequency and time so no "musical noise" survives. A light
-  // de-esser rides along in the sibilance band (5.6 kHz+).
-  function _spectralDenoise(pcm, sampleRate) {
-    const N = 512, hop = 256, half = N >> 1, bins = half + 1;
+  // de-esser rides along in the sibilance band (5.6 kHz+). Frames are yielded
+  // in small batches so the enhance animation keeps moving on long takes.
+  async function _spectralDenoise(pcm, sampleRate, onProgress, shouldAbort) {
+    // 1024-sample frames at 24 kHz give ~23 Hz resolution: enough to tell a
+    // voice apart from steady room tone without smearing consonants. Long
+    // 16 kHz takes use 512 so the window stays ~32 ms.
+    const N = sampleRate >= 22050 ? 1024 : 512;
+    const hop = N >> 1, half = N >> 1, bins = half + 1;
     const win = _hann(N);
 
     // 1) Quieter 20 ms blocks ≈ room tone / pauses: they define the noise.
@@ -2819,12 +2838,14 @@ const Chat = (() => {
     const prevPow = new Float32Array(bins);
     const gains = new Float32Array(bins);
     const smooth = new Float32Array(bins);
-    const NOISE_BIAS = 1.2;     // small safety margin over the learned floor
-    const FLOOR = 0.04;         // −28 dB maximum attenuation
-    const DD = 0.98;            // decision-directed smoothing
+    const NOISE_BIAS = 1.25;    // safety margin over the learned floor
+    const FLOOR = 0.06;         // −24 dB maximum attenuation
+    const DD = 0.975;           // decision-directed smoothing
     const hiFrom = Math.max(1, Math.round(5600 * N / sampleRate));
     const midFrom = Math.round(400 * N / sampleRate);
     const midTo = Math.round(3200 * N / sampleRate);
+    const frameTotal = Math.max(1, Math.ceil(pcm.length / hop));
+    let frames = 0;
 
     for (let start = 0; start < pcm.length; start += hop) {
       for (let i = 0; i < N; i++) {
@@ -2840,8 +2861,8 @@ const Chat = (() => {
       for (let k = midFrom; k <= midTo && k < bins; k++) mid += re[k] * re[k] + im[k] * im[k];
       for (let k = hiFrom; k < bins; k++) high += re[k] * re[k] + im[k] * im[k];
       const ratio = high / Math.max(1e-9, mid);
-      const ess = ratio > 1.15 ? Math.min(1, (ratio - 1.15) / 3.5) : 0;
-      const essGain = 1 - 0.4 * ess;    // up to ≈ −4.4 dB
+      const ess = ratio > 1.1 ? Math.min(1, (ratio - 1.1) / 3.2) : 0;
+      const essGain = 1 - 0.45 * ess;   // up to ≈ −5 dB
 
       for (let k = 0; k < bins; k++) {
         const p = re[k] * re[k] + im[k] * im[k];
@@ -2856,17 +2877,19 @@ const Chat = (() => {
         prevPow[k] = p;
       }
       for (let k = 0; k < bins; k++) {
-        const a = gains[k > 0 ? k - 1 : 0];
-        const b = gains[k];
-        const c = gains[k < half ? k + 1 : half];
-        smooth[k] = (a + b + c) / 3;
+        const a = gains[k > 1 ? k - 2 : 0];
+        const b = gains[k > 0 ? k - 1 : 0];
+        const c = gains[k];
+        const d = gains[k < half ? k + 1 : half];
+        const e = gains[k < half - 1 ? k + 2 : half];
+        smooth[k] = a * 0.15 + b * 0.2 + c * 0.3 + d * 0.2 + e * 0.15;
       }
       for (let k = 0; k < bins; k++) {
         const target = smooth[k];
         const prev = prevGain[k];
         const g = target > prev
           ? prev + (target - prev) * 0.72     // open fast so speech stays intact
-          : prev + (target - prev) * 0.3;     // close slower to hide the mask
+          : prev + (target - prev) * 0.28;    // close slower to hide the mask
         prevGain[k] = g;
         re[k] *= g; im[k] *= g;
         if (k > 0 && k < half) { re[N - k] = re[k]; im[N - k] = -im[k]; }
@@ -2877,23 +2900,91 @@ const Chat = (() => {
         out[s] += re[i] * win[i];
         norm[s] += win[i] * win[i];
       }
+      frames++;
+      if ((frames & 63) === 0 && (onProgress || shouldAbort)) {
+        // The take was discarded while this long loop was running: stop
+        // burning CPU instead of finishing a result nobody will use.
+        if (shouldAbort && shouldAbort()) throw new Error('Enhance cancelled');
+        if (onProgress) onProgress(frames / frameTotal);
+        await _yieldToBrowser();
+      }
     }
     for (let i = 0; i < pcm.length; i++) {
       const w = norm[i];
       pcm[i] = w > 1e-6 ? out[i] / w : 0;
     }
+    if (onProgress) onProgress(1);
   }
 
-  // Gentle level control so whispers and shouts sit at similar loudness.
+  // Gentle expander / gate for the gaps between words. It follows the level
+  // of the cleaned take, holds open through natural pauses and only pulls the
+  // residual room tone down (never fully silent), so the note sounds treated
+  // rather than chopped up like a walkie-talkie.
+  function _gateNoise(pcm, sampleRate) {
+    const n = pcm.length;
+    if (!n) return;
+    const frame = Math.max(32, Math.round(sampleRate * 0.01));
+    const count = Math.ceil(n / frame);
+    const levels = new Float32Array(count);
+    for (let f = 0; f < count; f++) {
+      const a = f * frame, b = Math.min(n, a + frame);
+      let acc = 0;
+      for (let i = a; i < b; i++) acc += pcm[i] * pcm[i];
+      levels[f] = Math.sqrt(acc / Math.max(1, b - a));
+    }
+    const sorted = Array.from(levels).sort((a, b) => a - b);
+    const floor = sorted[Math.floor(sorted.length * 0.2)] || 0;
+    const speech = _measureActiveRms(pcm, sampleRate);
+    if (!(speech > 1e-5)) return;
+
+    const open = Math.max(floor * 3.4, speech * 0.055, 0.0018);
+    const minGain = 0.14;                 // ≈ −17 dB, not digital silence
+    const holdFrames = Math.max(1, Math.round(0.18 / 0.01));
+    const openCoef = 1 - Math.exp(-1 / (sampleRate * 0.005 / frame));  // 5 ms
+    const closeCoef = 1 - Math.exp(-1 / (sampleRate * 0.15 / frame));  // 150 ms
+    let gain = 1, hold = 0;
+
+    for (let f = 0; f < count; f++) {
+      const level = levels[f];
+      let target;
+      if (level >= open) {
+        hold = holdFrames;
+        target = 1;
+      } else if (hold > 0) {
+        hold--;
+        target = 1;
+      } else {
+        const t = Math.max(0, level / open);
+        // 2.5:1 downward expansion: gentle just under the threshold, close
+        // to the floor for true room tone.
+        target = minGain + (1 - minGain) * Math.pow(t, 1.5);
+      }
+      // Open fast so the first syllable after a pause is intact; close slowly
+      // so word tails and breaths fade rather than chop.
+      const coef = target > gain ? openCoef : closeCoef;
+      const from = gain;
+      gain += (target - gain) * coef;
+      const a = f * frame, b = Math.min(n, a + frame);
+      const span = Math.max(1, b - a);
+      for (let i = a; i < b; i++) {
+        const t = (i - a) / span;
+        pcm[i] *= from + (gain - from) * t;
+      }
+    }
+  }
+
+  // Gentle level control so whispers and shouts sit at similar loudness. The
+  // detector follows power (RMS), which tracks perceived loudness better than
+  // peak following and keeps the tops of syllables from sounding crunchy.
   function _compressVoice(pcm, sampleRate) {
-    const thrDb = -24, ratio = 3, kneeDb = 7;
-    const attack = Math.exp(-1 / (sampleRate * 0.006));
-    const release = Math.exp(-1 / (sampleRate * 0.13));
+    const thrDb = -26, ratio = 2.6, kneeDb = 9;
+    const attack = Math.exp(-1 / (sampleRate * 0.008));
+    const release = Math.exp(-1 / (sampleRate * 0.16));
     let env = 0;
     for (let i = 0; i < pcm.length; i++) {
-      const x = Math.abs(pcm[i]);
-      env = x > env ? attack * env + (1 - attack) * x : release * env + (1 - release) * x;
-      const db = 20 * Math.log10(env + 1e-9);
+      const p = pcm[i] * pcm[i];
+      env = p > env ? attack * env + (1 - attack) * p : release * env + (1 - release) * p;
+      const db = 10 * Math.log10(env + 1e-12);
       let gainDb = 0;
       if (db > thrDb + kneeDb / 2) {
         gainDb = (thrDb + (db - thrDb) / ratio) - db;
@@ -2958,35 +3049,114 @@ const Chat = (() => {
     }
   }
 
-  // Land the note at `target` active RMS. The level is always matched
-  // against the take as it was recorded, so enhancing can only ever make a
-  // voice note louder, never quieter. Peaks are held by the limiter rather
-  // than by capping the gain, so loudness is never traded away for headroom.
-  function _normalizeLoudness(pcm, sampleRate, target = 0.15) {
-    const n = pcm.length;
-    if (!n) return;
-    let total = 1;
-    let prev = _measureActiveRms(pcm, sampleRate);
-    for (let pass = 0; pass < 3; pass++) {
-      if (!(prev > 1e-5)) return;
-      const need = target / prev;
-      if (pass > 0 && need < 1.03) break;          // already at the target
-      const gain = Math.min(need, 32 / total);      // never lift by >30 dB
-      if (pass > 0 && gain <= 1) break;
-      total *= gain;
-      for (let i = 0; i < n; i++) pcm[i] *= gain;
-      _limitPeaks(pcm, sampleRate, 0.95);
-      const now = _measureActiveRms(pcm, sampleRate);
-      if (pass > 0 && now <= prev * 1.002) break;   // limiter has no more to give
-      prev = now;
+  // ── Loudness (ITU-R BS.1770) ──────────────────────────────────
+  // RBJ biquads let the K-weighting filters work at 16/24 kHz instead of
+  // being locked to the 48 kHz coefficients from the standard.
+  function _biquad(type, sampleRate, freq, Q, gainDb) {
+    const w0 = 2 * Math.PI * freq / sampleRate;
+    const cosw = Math.cos(w0);
+    const sinw = Math.sin(w0);
+    let b0, b1, b2, a0, a1, a2;
+    if (type === 'highpass') {
+      const alpha = sinw / (2 * Q);
+      b0 = (1 + cosw) / 2; b1 = -(1 + cosw); b2 = b0;
+      a0 = 1 + alpha; a1 = -2 * cosw; a2 = 1 - alpha;
+    } else {
+      const A = Math.pow(10, (gainDb || 0) / 40);
+      const alpha = sinw / (2 * Q);
+      const root = Math.sqrt(A);
+      b0 = A * ((A + 1) + (A - 1) * cosw + 2 * root * alpha);
+      b1 = -2 * A * ((A - 1) + (A + 1) * cosw);
+      b2 = A * ((A + 1) + (A - 1) * cosw - 2 * root * alpha);
+      a0 = (A + 1) - (A - 1) * cosw + 2 * root * alpha;
+      a1 = 2 * ((A - 1) - (A + 1) * cosw);
+      a2 = (A + 1) - (A - 1) * cosw - 2 * root * alpha;
+    }
+    return {
+      b0: b0 / a0, b1: b1 / a0, b2: b2 / a0,
+      a1: a1 / a0, a2: a2 / a0,
+    };
+  }
+
+  function _applyBiquad(pcm, c) {
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < pcm.length; i++) {
+      const x = pcm[i];
+      const y = c.b0 * x + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2;
+      x2 = x1; x1 = x; y2 = y1; y1 = y; pcm[i] = y;
     }
   }
 
-  async function _enhanceVoiceTake(at) {
+  // Integrated loudness in LUFS for a mono take: K-weighting, 400 ms blocks
+  // with 75 % overlap, then the −70 LUFS absolute and −10 LU relative gates.
+  function _measureLoudness(pcm, sampleRate) {
+    const n = pcm.length;
+    if (!n) return -Infinity;
+    const k = new Float32Array(pcm);
+    _applyBiquad(k, _biquad('highshelf', sampleRate, 1681.974450955533, 0.7071752369554196, 3.999843853973347));
+    _applyBiquad(k, _biquad('highpass', sampleRate, 38.13547087602444, 0.5003270373238773, 0));
+
+    const block = Math.max(1, Math.round(sampleRate * 0.4));
+    const hop = Math.max(1, Math.round(sampleRate * 0.1));
+    const powers = [];
+    if (n < block) {
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += k[i] * k[i];
+      powers.push(sum / n);
+    } else {
+      for (let s = 0; s + block <= n; s += hop) {
+        let sum = 0;
+        for (let i = s; i < s + block; i++) sum += k[i] * k[i];
+        powers.push(sum / block);
+      }
+    }
+    if (!powers.length) return -Infinity;
+    const loud = p => -0.691 + 10 * Math.log10(Math.max(p, 1e-12));
+    const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+    let gated = powers.filter(p => loud(p) > -70);
+    if (!gated.length) return -Infinity;
+    const rel = loud(mean(gated)) - 10;
+    gated = gated.filter(p => loud(p) > rel);
+    if (!gated.length) return -Infinity;
+    return loud(mean(gated));
+  }
+
+  // Lift the note to a consistent −15 LUFS (never quieter than it arrived),
+  // then catch every peak 1 dB below full scale with the lookahead limiter.
+  // A second, smaller pass recovers loudness the limiter had to spend.
+  function _normalizeLoudness(pcm, sampleRate, target = -15) {
+    const n = pcm.length;
+    if (!n) return;
+    for (let pass = 0; pass < 2; pass++) {
+      const now = _measureLoudness(pcm, sampleRate);
+      if (!isFinite(now)) return;
+      const cap = pass === 0 ? 24 : 4;
+      const need = Math.max(0, Math.min(cap, target - now));
+      if (need < 0.1) break;
+      const gain = Math.pow(10, need / 20);
+      for (let i = 0; i < n; i++) pcm[i] *= gain;
+      _limitPeaks(pcm, sampleRate, 0.89);
+    }
+  }
+
+  // Trim a few milliseconds of edge click so the note starts and ends clean.
+  function _fadeEdges(pcm, sampleRate) {
+    const n = pcm.length;
+    const fade = Math.min(Math.floor(n / 2), Math.max(1, Math.round(sampleRate * 0.004)));
+    for (let i = 0; i < fade; i++) {
+      const g = i / fade;
+      pcm[i] *= g;
+      pcm[n - 1 - i] *= g;
+    }
+  }
+
+  async function _enhanceVoiceTake(at, onProgress, shouldAbort) {
     const AC = window.AudioContext || window.webkitAudioContext;
     const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (!AC || !Offline) throw new Error('This browser cannot process audio');
+    const report = (p, stage) => { try { onProgress && onProgress(p, stage); } catch {} };
 
+    report(0.04, 'Preparing…');
     const bytes = _dataUrlToArrayBuffer(at.dataUrl);
     const decodeCtx = new AC();
     let decoded = null;
@@ -3010,33 +3180,55 @@ const Chat = (() => {
     const length = Math.max(1, Math.ceil(seconds * sampleRate));
     const off = new Offline(1, length, sampleRate);
 
+    // Tone shaping happens before denoising: cut the rumble below the voice,
+    // remove the boxy 300 Hz "mud", then add presence and a little air so the
+    // consonants survive the noise reduction.
     const src = off.createBufferSource();
     src.buffer = decoded;
     const rumble = off.createBiquadFilter();
-    rumble.type = 'highpass'; rumble.frequency.value = 85; rumble.Q.value = 0.7;
+    rumble.type = 'highpass'; rumble.frequency.value = 80; rumble.Q.value = 0.707;
     const mud = off.createBiquadFilter();
-    mud.type = 'peaking'; mud.frequency.value = 320; mud.Q.value = 1; mud.gain.value = -2.5;
+    mud.type = 'peaking'; mud.frequency.value = 300; mud.Q.value = 1.1; mud.gain.value = -2.6;
     const presence = off.createBiquadFilter();
-    presence.type = 'peaking'; presence.frequency.value = 2800; presence.Q.value = 0.9; presence.gain.value = 3.2;
+    presence.type = 'peaking'; presence.frequency.value = 3000; presence.Q.value = 0.9; presence.gain.value = 3.2;
+    const air = off.createBiquadFilter();
+    air.type = 'highshelf';
+    air.frequency.value = Math.min(8500, sampleRate * 0.45);
+    air.gain.value = 1.8;
     src.connect(rumble); rumble.connect(mud); mud.connect(presence);
-    presence.connect(off.destination);
+    presence.connect(air); air.connect(off.destination);
     src.start(0);
 
+    report(0.12, 'Shaping tone…');
     const rendered = await off.startRendering();
+    if (shouldAbort && shouldAbort()) throw new Error('Enhance cancelled');
     const pcm = rendered.getChannelData(0);
-    // Reference level = the take exactly as it was recorded, i.e. what the
-    // sender heard while previewing it before enhancing.
-    const refRms = _measureActiveRms(decoded.getChannelData(0), decoded.sampleRate);
-    _spectralDenoise(pcm, sampleRate);
-    _compressVoice(pcm, sampleRate);
-    // Aim a touch above the original level, with a floor for weak mics and
-    // a ceiling so an already-hot take does not distort.
-    const target = Math.min(0.3, Math.max(0.15, refRms * 1.15));
-    _normalizeLoudness(pcm, sampleRate, target);
 
+    report(0.18, 'Reducing noise…');
+    await _spectralDenoise(pcm, sampleRate, f => {
+      report(0.18 + f * 0.52, f < 0.2 ? 'Learning the room…' : 'Reducing noise…');
+    }, shouldAbort);
+
+    if (shouldAbort && shouldAbort()) throw new Error('Enhance cancelled');
+    report(0.73, 'Cleaning pauses…');
+    _gateNoise(pcm, sampleRate);
+    await _yieldToBrowser();
+    if (shouldAbort && shouldAbort()) throw new Error('Enhance cancelled');
+
+    report(0.79, 'Lifting voice…');
+    _compressVoice(pcm, sampleRate);
+
+    report(0.87, 'Balancing volume…');
+    _normalizeLoudness(pcm, sampleRate, -15);
+    _fadeEdges(pcm, sampleRate);
+    await _yieldToBrowser();
+    if (shouldAbort && shouldAbort()) throw new Error('Enhance cancelled');
+
+    report(0.93, 'Finalizing…');
     const wav = _pcmToWav(pcm, sampleRate);
     if (wav.size > 4.6 * 1024 * 1024) throw new Error('This note is too long to enhance — send it as it is');
     const base = String(at.name || 'voice').replace(/\.[a-z0-9]+$/i, '').replace(/_enhanced$/i, '');
+    report(0.99, 'Finalizing…');
     return {
       dataUrl: wav.dataUrl,
       size: wav.size,
@@ -3063,6 +3255,7 @@ const Chat = (() => {
       els.btn.disabled = false;
       els.btn.removeAttribute('aria-busy');
       els.btn.setAttribute('aria-label', 'Enhance with Shepu AI');
+      els.btn.style.removeProperty('--p');
     }
     if (els.text) els.text.textContent = 'Enhance with Shepu AI';
     if (els.send) els.send.disabled = false;
@@ -3070,6 +3263,7 @@ const Chat = (() => {
   }
 
   function _resetVoiceEnhance() {
+    _voiceEnhanceRun++;
     _voiceEnhancing = false;
     _voiceEnhanced = false;
     const card = _voiceCardEl();
@@ -3080,17 +3274,19 @@ const Chat = (() => {
 
   // Light particles that drift up through the card while a take is being
   // processed. Created per run so their paths differ every time.
-  function _voiceSparks(on, count = 16) {
+  function _voiceSparks(on, count = 18) {
     const layer = document.getElementById('voice-rec-sparks');
     if (!layer) return;
     layer.innerHTML = '';
     if (!on) return;
     for (let i = 0; i < count; i++) {
       const dot = document.createElement('i');
-      dot.style.setProperty('--x', (5 + Math.random() * 90).toFixed(1) + '%');
-      dot.style.setProperty('--s', (2 + Math.random() * 3.2).toFixed(1) + 'px');
-      dot.style.setProperty('--d', (Math.random() * 1.25).toFixed(2) + 's');
-      dot.style.setProperty('--t', (1.15 + Math.random() * 1.15).toFixed(2) + 's');
+      if (i % 3 === 0) dot.className = 'alt';
+      dot.style.setProperty('--x', (4 + Math.random() * 92).toFixed(1) + '%');
+      dot.style.setProperty('--s', (1.6 + Math.random() * 3).toFixed(1) + 'px');
+      dot.style.setProperty('--d', (Math.random() * 1.6).toFixed(2) + 's');
+      dot.style.setProperty('--t', (1.2 + Math.random() * 1.3).toFixed(2) + 's');
+      dot.style.setProperty('--dx', ((Math.random() - 0.5) * 46).toFixed(1) + 'px');
       layer.appendChild(dot);
     }
   }
@@ -3101,6 +3297,7 @@ const Chat = (() => {
     if (!at || at.kind !== 'voice') return;
 
     const els = _voiceEnhanceEls();
+    const runId = ++_voiceEnhanceRun;
     _voiceEnhancing = true;
     _voiceStopPlayback();
     els.card?.classList.add('is-enhancing');
@@ -3108,20 +3305,65 @@ const Chat = (() => {
       els.btn.classList.add('is-working');
       els.btn.disabled = true;
       els.btn.setAttribute('aria-busy', 'true');
+      els.btn.style.setProperty('--p', '0.02');
     }
-    if (els.text) els.text.textContent = 'Enhancing with Shepu AI…';
+    if (els.text) els.text.textContent = 'Enhancing…';
     if (els.label) els.label.textContent = 'Enhancing';
     if (els.send) els.send.disabled = true;
     if (els.play) els.play.disabled = true;
     _voiceSparks(true);
 
+    // Real DSP progress drives the ring, but short takes finish the actual
+    // work in well under a second. Pace the visible run so the ring and the
+    // stage label move smoothly instead of blinking past.
+    const MIN_ENHANCE_MS = 2600;
+    const STAGE_HOLD_MS = 300;
+    let targetP = 0.02;
+    let shownP = 0.02;
+    let stageQueue = [];
+    let lastQueuedStage = '';
+    let lastStageAt = -STAGE_HOLD_MS;
+    const setProgress = (p, stage) => {
+      if (runId !== _voiceEnhanceRun) return;
+      const value = Math.max(0.02, Math.min(1, Number(p) || 0));
+      targetP = Math.max(targetP, value);
+      if (stage && stage !== lastQueuedStage && stageQueue.length < 12) {
+        stageQueue.push(stage);
+        lastQueuedStage = stage;
+      }
+    };
+    const paint = value => {
+      if (els.btn) els.btn.style.setProperty('--p', value.toFixed(3));
+    };
+
     const clock = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     const startedAt = clock();
+    const pTimer = setInterval(() => {
+      if (runId !== _voiceEnhanceRun) return;
+      const t = Math.min(1, (clock() - startedAt) / MIN_ENHANCE_MS);
+      // Leave the last few percent for the done state, so the ring never
+      // reads as complete while the take is still being prepared.
+      const paced = 0.03 + 0.94 * t;
+      shownP = Math.max(shownP, Math.min(targetP, paced));
+      paint(shownP);
+      if (!stageQueue.length) return;
+      const now = clock();
+      if (now - lastStageAt < STAGE_HOLD_MS) return;
+      lastStageAt = now;
+      const stage = stageQueue.shift();
+      if (els.text && els.text.textContent !== stage) els.text.textContent = stage;
+      if (els.btn) els.btn.setAttribute('aria-label', stage);
+    }, 60);
+
     try {
-      const out = await _enhanceVoiceTake(at);
-      // Let the animation read as a deliberate step even for short clips.
+      const out = await _enhanceVoiceTake(at, setProgress, () => runId !== _voiceEnhanceRun);
+      // Give even a very short clip a calm, deliberate finish.
       const elapsed = clock() - startedAt;
-      if (elapsed < 900) await new Promise(r => setTimeout(r, 900 - elapsed));
+      if (elapsed < MIN_ENHANCE_MS) await new Promise(r => setTimeout(r, MIN_ENHANCE_MS - elapsed));
+      clearInterval(pTimer);
+      // The take was discarded or replaced while we were working: drop the
+      // result instead of resurrecting the old note.
+      if (runId !== _voiceEnhanceRun || _pendingAttachment !== at) return;
 
       _pendingAttachment = {
         ...at,
@@ -3136,7 +3378,9 @@ const Chat = (() => {
       _voiceSparks(false);
       els.card?.classList.remove('is-enhancing');
       els.card?.classList.add('is-enhanced');
-      setTimeout(() => els.card?.classList.remove('is-enhanced'), 1200);
+      setTimeout(() => els.card?.classList.remove('is-enhanced'), 1300);
+      paint(1);
+      if (els.text) els.text.textContent = 'Enhanced';
       if (els.btn) {
         els.btn.classList.remove('is-working');
         els.btn.classList.add('is-done');
@@ -3145,18 +3389,19 @@ const Chat = (() => {
         els.btn.removeAttribute('aria-busy');
         els.btn.setAttribute('aria-label', 'Enhanced with Shepu AI');
       }
-      if (els.text) els.text.textContent = 'Enhanced';
       if (els.label) els.label.textContent = 'Voice message';
       if (els.send) els.send.disabled = false;
       if (els.play) els.play.disabled = false;
       UI.toast('success', 'Enhanced with Shepu AI', 'Noise reduced, voice lifted, volume evened out.');
     } catch (err) {
+      if (runId !== _voiceEnhanceRun) return;   // discarded mid-run
       _voiceSparks(false);
       els.card?.classList.remove('is-enhancing');
       if (els.btn) {
         els.btn.classList.remove('is-working');
         els.btn.disabled = false;
         els.btn.removeAttribute('aria-busy');
+        els.btn.style.setProperty('--p', '0.02');
       }
       if (els.text) els.text.textContent = 'Enhance with Shepu AI';
       if (els.label) els.label.textContent = 'Voice message';
@@ -3164,7 +3409,8 @@ const Chat = (() => {
       if (els.play) els.play.disabled = false;
       UI.toast('error', 'Could not enhance', (err && err.message) || 'The recording was left untouched.');
     } finally {
-      _voiceEnhancing = false;
+      clearInterval(pTimer);
+      if (runId === _voiceEnhanceRun) _voiceEnhancing = false;
     }
   }
 
