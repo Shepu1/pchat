@@ -74,37 +74,47 @@ const P2PSync = (() => {
       lastSeen: Date.now()
     });
 
-    if (_isHost) {
-      _initHost();
-    } else {
-      _initGuest();
-    }
+    // Fetch optional short-lived TURN credentials before creating PeerJS.
+    // Local STUN/custom servers remain available if the provider is offline.
+    _loadIceServers().then(() => {
+      if (!_active) return;
+      if (_isHost) _initHost();
+      else _initGuest();
+    }).catch(err => {
+      console.warn('[P2PSync] Could not load ICE servers; starting with STUN defaults:', err && err.message);
+      if (!_active) return;
+      if (window.CONFIG && CONFIG.getBaseIceServers) _iceServers = CONFIG.getBaseIceServers();
+      if (_isHost) _initHost();
+      else _initGuest();
+    });
   }
 
-  // ── ICE Servers (STUN + TURN for NAT/Firewall traversal) ─────
-  // CRITICAL: passing `config.iceServers` to `new Peer(...)` REPLACES
-  // PeerJS's bundled default ICE config (they shallow-merge options, so the
-  // `config` key is overwritten) — it does NOT merge. So whatever we list
-  // here is the *only* TURN the app gets.
-  //
-  // The previous list used only `openrelay.metered.ca` (user/pass
-  // openrelay/openrelay), a FREE service that was discontinued years ago —
-  // it never succeeds. STUN alone cannot traverse symmetric NAT / carrier
-  // CGNAT (most mobile phones). Result: a guest on mobile could never reach
-  // a host whose device sat behind such a NAT, yet could reach a host on a
-  // "friendly" home network. That is exactly the reported symptom —
-  // "chat works when I am the host, fails when a friend hosts".
-  //
-  // Fix: use PeerJS's own public TURN relays (the bundled default), which
-  // are actually operational, alongside Google STUN.
+  // ── ICE Servers (STUN + configurable TURN for NAT traversal) ──
+  // PeerJS's config.iceServers replaces its own defaults. Never include
+  // the discontinued public PeerJS TURN hostnames here.
+  let _iceServers = (window.CONFIG && CONFIG.getBaseIceServers) ? CONFIG.getBaseIceServers() : [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+  ];
+  let _iceServersReady = null;
+
   function _getIceServers() {
-    return [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'turn:eu-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
-      { urls: 'turn:us-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
-    ];
+    return _iceServers.slice();
+  }
+
+  async function _loadIceServers() {
+    if (_iceServersReady) return _iceServersReady;
+    _iceServersReady = (async () => {
+      if (window.CONFIG && typeof CONFIG.getIceServers === 'function') {
+        try { _iceServers = await CONFIG.getIceServers(); }
+        catch (err) {
+          console.warn('[P2PSync] TURN credentials unavailable; continuing with STUN/custom servers:', err && err.message);
+          _iceServers = CONFIG.getBaseIceServers();
+        }
+      }
+      return _iceServers;
+    })();
+    return _iceServersReady;
   }
 
   // ── Host Peer Initialization ──────────────────────────────────

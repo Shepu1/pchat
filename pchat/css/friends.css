@@ -850,13 +850,12 @@
   margin-bottom: 4px;
   border-radius: 10px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.035) 25%, rgba(255, 255, 255, 0.07) 37%, rgba(255, 255, 255, 0.035) 63%);
-  background-size: 400% 100%;
-  animation: friends-shimmer 1.3s ease infinite;
+  animation: friends-shimmer 1.3s ease-in-out infinite;
 }
 
 @keyframes friends-shimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 /* ── Accessibility ─────────────────────────────────────────────── */

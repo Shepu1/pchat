@@ -35,9 +35,12 @@
   window.PchatAnalytics = { isReady: false, logEvent: track };
 
   async function startAnalytics() {
-    const [appMod, analyticsMod] = await Promise.all([
+    const [appMod, analyticsMod, appCheckMod] = await Promise.all([
       import(CDN + '/firebase-app.js'),
       import(CDN + '/firebase-analytics.js'),
+      String(window.FIREBASE_APPCHECK_SITE_KEY || '').trim()
+        ? import(CDN + '/firebase-app-check.js')
+        : Promise.resolve(null),
     ]);
 
     // Analytics is not supported in every browser/context (for example some
@@ -47,6 +50,9 @@
     const app = appMod.getApps().length
       ? appMod.getApp()
       : appMod.initializeApp(config);
+    if (window.ensurePchatAppCheck) {
+      await window.ensurePchatAppCheck(app, appCheckMod);
+    }
     const analytics = analyticsMod.getAnalytics(app);
 
     analyticsInstance = analytics;

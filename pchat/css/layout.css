@@ -36,7 +36,7 @@
   content: '';
   position: absolute;
   border-radius: 50%;
-  filter: blur(120px);
+  filter: blur(96px);
   opacity: 0.15;
 }
 
@@ -44,14 +44,12 @@
   width: 700px; height: 700px;
   background: radial-gradient(circle, #6c63ff 0%, transparent 70%);
   top: -200px; left: -200px;
-  animation: float 8s ease-in-out infinite;
 }
 
 .bg-mesh::after {
   width: 600px; height: 600px;
   background: radial-gradient(circle, #8f49d4 0%, transparent 70%);
   bottom: -150px; right: -150px;
-  animation: float 10s ease-in-out infinite reverse;
 }
 
 /* ── Container ──────────────────────────────────────────────────── */

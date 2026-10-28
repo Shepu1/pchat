@@ -3268,27 +3268,7 @@ const Chat = (() => {
     _voiceEnhanced = false;
     const card = _voiceCardEl();
     if (card) card.classList.remove('is-enhancing', 'is-enhanced');
-    _voiceSparks(false);
     _voiceEnhanceIdle();
-  }
-
-  // Light particles that drift up through the card while a take is being
-  // processed. Created per run so their paths differ every time.
-  function _voiceSparks(on, count = 18) {
-    const layer = document.getElementById('voice-rec-sparks');
-    if (!layer) return;
-    layer.innerHTML = '';
-    if (!on) return;
-    for (let i = 0; i < count; i++) {
-      const dot = document.createElement('i');
-      if (i % 3 === 0) dot.className = 'alt';
-      dot.style.setProperty('--x', (4 + Math.random() * 92).toFixed(1) + '%');
-      dot.style.setProperty('--s', (1.6 + Math.random() * 3).toFixed(1) + 'px');
-      dot.style.setProperty('--d', (Math.random() * 1.6).toFixed(2) + 's');
-      dot.style.setProperty('--t', (1.2 + Math.random() * 1.3).toFixed(2) + 's');
-      dot.style.setProperty('--dx', ((Math.random() - 0.5) * 46).toFixed(1) + 'px');
-      layer.appendChild(dot);
-    }
   }
 
   async function _runVoiceEnhance() {
@@ -3311,8 +3291,6 @@ const Chat = (() => {
     if (els.label) els.label.textContent = 'Enhancing';
     if (els.send) els.send.disabled = true;
     if (els.play) els.play.disabled = true;
-    _voiceSparks(true);
-
     // Real DSP progress drives the ring, but short takes finish the actual
     // work in well under a second. Pace the visible run so the ring and the
     // stage label move smoothly instead of blinking past.
@@ -3375,7 +3353,6 @@ const Chat = (() => {
       };
       _voiceEnhanced = true;
       _voiceCardPreview(_pendingAttachment.dataUrl, _pendingAttachment.durationSec);
-      _voiceSparks(false);
       els.card?.classList.remove('is-enhancing');
       els.card?.classList.add('is-enhanced');
       setTimeout(() => els.card?.classList.remove('is-enhanced'), 1300);
@@ -3395,7 +3372,6 @@ const Chat = (() => {
       UI.toast('success', 'Enhanced with Shepu AI', 'Noise reduced, voice lifted, volume evened out.');
     } catch (err) {
       if (runId !== _voiceEnhanceRun) return;   // discarded mid-run
-      _voiceSparks(false);
       els.card?.classList.remove('is-enhancing');
       if (els.btn) {
         els.btn.classList.remove('is-working');
@@ -5276,5 +5252,3 @@ const Chat = (() => {
 
 window.Chat = Chat;
 
-
-  

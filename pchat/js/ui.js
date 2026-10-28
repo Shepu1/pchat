@@ -5,9 +5,28 @@
 
 const UI = {
   // ── Toast ─────────────────────────────────────────────────────
-  toast(type = 'info', title = '', message = '', duration = 4000) {
+  _isPhone() {
+    try {
+      return (
+        (window.matchMedia &&
+          (window.matchMedia('(max-width: 768px)').matches ||
+            window.matchMedia('(pointer: coarse)').matches)) ||
+        window.innerWidth <= 768
+      );
+    } catch {
+      return false;
+    }
+  },
+
+  _toastFloorMs() {
+    return UI._isPhone() ? 2000 : 0;
+  },
+
+  toast(type = 'info', title = '', message = '', duration) {
     const container = document.getElementById('toast-container');
     if (!container) return;
+    const isPhone = UI._isPhone();
+    const ms = isPhone ? 2000 : (Number(duration) > 0 ? Number(duration) : 4000);
 
     // Flood guard: identical toasts refresh instead of stacking, and at most
     // 3 are ever visible — busy rooms used to bury the chat under a wall.
@@ -18,7 +37,7 @@ const UI = {
       );
       if (dup) {
         clearTimeout(dup._toastTimer);
-        dup._toastTimer = setTimeout(() => UI._dismissToast(dup), duration);
+        dup._toastTimer = setTimeout(() => UI._dismissToast(dup), ms);
         return dup.id;
       }
       while (container.querySelectorAll('.toast').length >= 3) {
@@ -51,7 +70,7 @@ const UI = {
     container.appendChild(el);
 
     // Auto-dismiss
-    el._toastTimer = setTimeout(() => UI._dismissToast(el), duration);
+    el._toastTimer = setTimeout(() => UI._dismissToast(el), ms);
 
     return id;
   },

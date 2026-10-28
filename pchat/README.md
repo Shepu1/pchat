@@ -48,8 +48,13 @@ npx firebase-tools deploy --only firestore
 ```
 
 7. Set `FRIENDS_ENABLED: true` and `PRESENCE_ENABLED: true` in `js/config.js` (already the default).
+8. **Enable Firebase App Check for the web app (recommended):**
+   - Register the production domain in the [reCAPTCHA Admin Console](https://www.google.com/recaptcha/admin) as a reCAPTCHA v3 site and copy its **site key** (public key).
+   - In Firebase Console → **Security → App Check → Apps**, register the matching web app with reCAPTCHA v3 and enter the corresponding **secret key** there. Never put that secret in this repository.
+   - Put the site key in `window.FIREBASE_APPCHECK_SITE_KEY` in `js/firebase-config.js`. The client initializes App Check before Firestore/Auth/Analytics and automatically refreshes its token. Leave the field empty only if you have not registered App Check yet; until configured, the app sends no App Check token.
+   - Deploy the site, then use Firebase Console → **Security → App Check → Cloud Firestore** metrics to observe legitimate traffic before enabling Firestore enforcement. Once enforced, unregistered clients are rejected. App Check is not a substitute for Firestore Security Rules and does not protect the separate, public Apps Script room endpoints.
 
-> **Kill switch:** set either flag to `false` in `js/config.js` to disable the social layer without removing script tags. Chat is never affected.
+> **Kill switch:** set either `FRIENDS_ENABLED` or `PRESENCE_ENABLED` to `false` in `js/config.js` to disable that social feature without removing script tags. Chat is never affected.
 
 ---
 
@@ -232,7 +237,7 @@ If the Apps Script API is blocked (requires Google Workspace or specific Cloud p
 - **Guests never access the Google Sheet directly** — all operations go through the Apps Script web app endpoint
 - **The Apps Script web app executes as the room owner** — it has authority to read/write the Sheet
 - **Guests authenticate with a session token** — issued at join time, stored in localStorage
-- **Rate limiting** — 20 messages per 10 seconds per member
+- **Rate limiting** — Apps Script applies bounded per-action and aggregate room-wide request limits, with a per-member message cap; these are abuse/quota guards, not per-IP WAF protection (Apps Script does not expose a reliable client IP)
 - **Soft delete** — messages are marked deleted, not permanently removed
 - **Room controls** — owner can lock (read-only), disable (no new messages), or delete the room
 - **Member moderation** — owner can remove or ban members

@@ -1255,8 +1255,10 @@
   width: 45%;
   background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%);
   transform: translateX(-180%);
-  animation: vreSheen 4.2s ease-in-out infinite;
   pointer-events: none;
+}
+@media (hover: hover) {
+  .voice-rec-enhance:hover::after { animation: vreSheen 0.75s ease-out 1; }
 }
 .voice-rec-enhance:disabled { cursor: default; }
 .vre-ico {
@@ -1321,29 +1323,18 @@
 .vre-eq i:nth-child(1) { height: 5px; animation-delay: -0.34s; }
 .vre-eq i:nth-child(2) { height: 11px; animation-delay: -0.12s; }
 .vre-eq i:nth-child(3) { height: 7px; animation-delay: -0.52s; }
-/* Working: a flowing energy fill, a breathing halo and live EQ bars.
-   A stable min-width keeps the pill from jittering as stage labels change. */
+/* Keep the processing state stable; progress is shown by the ring, without
+   stacking background, shadow and halo animations on a small control. */
 .voice-rec-enhance.is-working {
   min-width: 10.5rem;
   border-color: rgba(167, 139, 250, 0.62);
-  background:
-    linear-gradient(100deg, rgba(59, 130, 246, 0.42) 0%, rgba(167, 139, 250, 0.58) 35%, rgba(14, 165, 233, 0.46) 65%, rgba(59, 130, 246, 0.42) 100%);
-  background-size: 320% 100%;
-  animation: vreFlowBg 1.7s linear infinite, vrePillPulse 1.15s ease-in-out infinite;
+  background: linear-gradient(100deg, rgba(59, 130, 246, 0.38), rgba(139, 92, 246, 0.48));
+  animation: none;
 }
 .voice-rec-enhance.is-working .vre-ring { opacity: 1; }
-.voice-rec-enhance.is-working .vre-eq { display: inline-flex; }
-.voice-rec-enhance.is-working .vre-ico { animation: vreIcoGlow 1.15s ease-in-out infinite; }
-.voice-rec-enhance.is-working .vre-ico::before {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(192, 132, 252, 0.55) 0%, rgba(96, 165, 250, 0.25) 45%, rgba(96, 165, 250, 0) 72%);
-  animation: vreHalo 1.15s ease-in-out infinite;
-  pointer-events: none;
-}
-.voice-rec-enhance.is-working::after { width: 62%; animation-duration: 1s; }
+.voice-rec-enhance.is-working .vre-eq { display: none; }
+.voice-rec-enhance.is-working .vre-ico { animation: none; }
+.voice-rec-enhance.is-working::after { display: none; }
 /* Done: a calm success badge. There is nothing left to tap. */
 .voice-rec-enhance.is-done {
   --p: 1;
@@ -1365,31 +1356,6 @@
 .voice-rec-enhance.is-done .vre-eq { display: none; }
 .voice-rec-enhance.is-done::after { display: none; }
 
-/* Floating sparks — spawned per run from chat.js, so each enhancement
-   visibly "gathers" light while it works. */
-.voice-rec-sparks {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
-.voice-rec.is-enhancing .voice-rec-sparks { opacity: 1; }
-.voice-rec-sparks i {
-  position: absolute;
-  bottom: -6px;
-  left: var(--x, 50%);
-  width: var(--s, 3px);
-  height: var(--s, 3px);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(224, 231, 255, 0.95) 0%, rgba(129, 140, 248, 0.55) 45%, rgba(96, 165, 250, 0) 72%);
-  animation: vreSpark var(--t, 1.4s) cubic-bezier(0.25, 0.6, 0.35, 1) var(--d, 0s) infinite;
-}
-.voice-rec-sparks i.alt {
-  background: radial-gradient(circle, rgba(233, 213, 255, 0.95) 0%, rgba(192, 132, 252, 0.55) 45%, rgba(139, 92, 246, 0) 72%);
-}
-
 /* Card-wide feedback while the take is processed */
 .voice-rec.is-enhancing {
   border-color: rgba(129, 161, 255, 0.45);
@@ -1405,7 +1371,7 @@
     radial-gradient(130% 160% at 92% 50%, rgba(167, 139, 250, 0.3), transparent 60%),
     radial-gradient(90% 120% at 50% 120%, rgba(14, 165, 233, 0.22), transparent 65%);
   background-size: 200% 200%;
-  animation: vreGlow 1.7s ease-in-out infinite, vreAurora 3.4s linear infinite;
+  animation: none;
 }
 .voice-rec.is-enhancing::after {
   content: '';
@@ -1416,37 +1382,20 @@
   width: 30%;
   background: linear-gradient(100deg, transparent 0%, rgba(191, 219, 254, 0.18) 45%, rgba(167, 139, 250, 0.3) 60%, transparent 100%);
   filter: blur(1px);
-  animation: vreScan 1.3s ease-in-out infinite;
+  display: none;
   pointer-events: none;
 }
 .voice-rec.is-enhancing .voice-rec-bar {
-  animation: vreFlow 0.85s ease-in-out infinite alternate;
+  animation: none;
 }
 .voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 1) { animation-delay: 0s; }
 .voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 2) { animation-delay: 0.09s; }
 .voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 3) { animation-delay: 0.18s; }
 .voice-rec.is-enhancing .voice-rec-bar:nth-child(4n + 4) { animation-delay: 0.27s; }
-.voice-rec.is-enhanced { animation: vreSuccess 1.15s ease-out; }
-/* Success sweep: one green pass across the card after the take is ready. */
-.voice-rec.is-enhanced::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 70%;
-  background: linear-gradient(100deg, transparent 0%, rgba(110, 231, 183, 0.24) 50%, transparent 100%);
-  filter: blur(1px);
-  pointer-events: none;
-  animation: vreDoneSweep 0.95s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
+.voice-rec.is-enhanced { animation: none; }
 @keyframes vreSheen {
   0%, 55% { transform: translateX(-180%); }
   88%, 100% { transform: translateX(340%); }
-}
-@keyframes vreHalo {
-  0%, 100% { opacity: 0.12; }
-  50% { opacity: 0.72; }
 }
 @keyframes vreEq {
   from { transform: scaleY(0.35); opacity: 0.55; }
@@ -1456,57 +1405,10 @@
   from { stroke-dashoffset: 24; opacity: 0; }
   to { stroke-dashoffset: 0; opacity: 1; }
 }
-@keyframes vreDoneSweep {
-  0% { transform: translateX(-110%); opacity: 0; }
-  18% { opacity: 1; }
-  100% { transform: translateX(230%); opacity: 0; }
-}
-@keyframes vreIcoGlow {
-  0%, 100% { opacity: 0.78; filter: drop-shadow(0 0 4px rgba(129, 140, 248, 0.45)); }
-  50% { opacity: 1; filter: drop-shadow(0 0 9px rgba(167, 139, 250, 0.85)); }
-}
-@keyframes vreGlow {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-@keyframes vreAurora {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-@keyframes vreFlowBg {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 300% 50%; }
-}
-@keyframes vrePillPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.35); }
-  50% { box-shadow: 0 0 14px 1px rgba(139, 92, 246, 0.5); }
-}
-@keyframes vreScan {
-  0% { transform: translateX(-110%) skewX(-12deg); opacity: 0; }
-  15% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { transform: translateX(340%) skewX(-12deg); opacity: 0; }
-}
-@keyframes vreSpark {
-  0% { transform: translate3d(0, 0, 0) scale(0.35); opacity: 0; }
-  12% { opacity: 1; }
-  70% { opacity: 0.9; }
-  100% { transform: translate3d(var(--dx, 0px), -84px, 0) scale(1.15); opacity: 0; }
-}
-@keyframes vreFlow {
-  from { transform: scaleY(0.4); filter: brightness(1.05); }
-  to   { transform: scaleY(1.06); filter: brightness(1.55); }
-}
 @keyframes vreDoneGlow {
   0% { box-shadow: 0 8px 22px -16px rgba(16, 185, 129, 0); }
   40% { box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.18), 0 0 20px 1px rgba(16, 185, 129, 0.28); }
   100% { box-shadow: 0 8px 22px -16px rgba(16, 185, 129, 0.9); }
-}
-@keyframes vreSuccess {
-  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-  35%  { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22), 0 0 34px rgba(16, 185, 129, 0.4); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .voice-rec-enhance::after,
@@ -1514,16 +1416,12 @@
   .voice-rec.is-enhancing::after,
   .voice-rec.is-enhanced::after,
   .voice-rec.is-enhancing .voice-rec-bar,
-  .voice-rec-sparks i,
   .voice-rec.is-enhanced,
   .voice-rec-enhance.is-working,
   .voice-rec-enhance.is-working .vre-ico,
-  .voice-rec-enhance.is-working .vre-ico::before,
-  .voice-rec-enhance.is-working .vre-eq i,
   .voice-rec-enhance.is-done,
   .voice-rec-enhance.is-done .vre-ico-check { animation: none; }
   .voice-rec-enhance .vre-ring-fill { transition: none; }
-  .voice-rec-sparks { display: none; }
 }
 
 /* Google Sheet Action Button */
@@ -2697,8 +2595,7 @@ img.custom-emoji-picker {
   justify-content: center;
   gap: 0.65rem;
   background: linear-gradient(100deg, rgba(255,255,255,0.04) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.04) 70%);
-  background-size: 200% 100%;
-  animation: mediaShimmer 1.3s linear infinite;
+  animation: mediaShimmer 1.3s ease-in-out infinite;
 }
 .msg-media-ai .msg-media-shimmer::before {
   content: '';
@@ -2747,8 +2644,8 @@ img.custom-emoji-picker {
   opacity: 0.9;
 }
 @keyframes mediaShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0%, 100% { opacity: 0.58; }
+  50% { opacity: 1; }
 }
 @keyframes mediaSpin {
   to { transform: rotate(360deg); }
@@ -3537,12 +3434,8 @@ img.custom-emoji-picker {
 }
 .status-dot.online { box-shadow: none; }
 
-/* ── Sending state: gentle pulse ─────────────────────────────── */
-.msg-optimistic .msg-bubble { animation: sendingPulse 1.4s ease-in-out infinite; }
-@keyframes sendingPulse {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 0.95; }
-}
+/* A steady, muted bubble makes the pending-send state clear without pulsing. */
+.msg-optimistic .msg-bubble { opacity: 0.75; }
 
 /* ── Empty state icon glow ───────────────────────────────────── */
 .empty-state-icon {

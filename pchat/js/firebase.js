@@ -32,6 +32,7 @@ const Firebase = (() => {
   let app = null;
   let auth = null;
   let db = null;
+  let appCheck = null;
   let mods = null;
   let lastError = null;
   let emulator = false;
@@ -98,14 +99,21 @@ const Firebase = (() => {
 
     loadPromise = Promise.race([
       (async () => {
-        const [appMod, authMod, fsMod] = await Promise.all([
+        const siteKey = String(window.FIREBASE_APPCHECK_SITE_KEY || '').trim();
+        const [appMod, authMod, fsMod, appCheckMod] = await Promise.all([
           import(CDN + '/firebase-app.js'),
           import(CDN + '/firebase-auth.js'),
           import(CDN + '/firebase-firestore.js'),
+          siteKey ? import(CDN + '/firebase-app-check.js') : Promise.resolve(null),
         ]);
-        mods = { appMod, authMod, fsMod };
+        mods = { appMod, authMod, fsMod, appCheckMod };
 
         app = appMod.getApps().length ? appMod.getApp() : appMod.initializeApp(window.FIREBASE_CONFIG);
+        // The shared bootstrap also awaits in-flight Analytics initialization,
+        // preventing two page modules from initializing App Check concurrently.
+        appCheck = window.ensurePchatAppCheck
+          ? await window.ensurePchatAppCheck(app, appCheckMod)
+          : null;
         auth = authMod.getAuth(app);
 
         // Persistent cache: free cache reads, cheaper reconnects, instant UI.
@@ -126,7 +134,7 @@ const Firebase = (() => {
           fsMod.connectFirestoreEmulator(db, 'localhost', 8081);
         }
 
-        return { app, auth, db, ...mods };
+        return { app, auth, db, appCheck, ...mods };
       })(),
       new Promise((_, reject) =>
         setTimeout(() => reject(timeoutErr()), LOAD_TIMEOUT_MS)
@@ -303,13 +311,14 @@ const Firebase = (() => {
   // Raw SDK access for the friends/invites/presence modules.
   async function sdk() {
     const m = await load();
-    return { app, auth, db, ...m };
+    return { app, auth, db, appCheck, ...m };
   }
 
   async function debug() {
     return {
       configured: isConfigured(),
       initialized: isInitialized(),
+      appCheckEnabled: !!appCheck,
       emulator: emulator || wantsEmulator(),
       projectId: (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.projectId) || null,
       uid: getUid(),

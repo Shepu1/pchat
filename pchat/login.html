@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss:; frame-src 'self' https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Sign in — Pchat shepu</title>
   <meta name="description" content="Sign in with your Google account to create and manage private chat rooms stored in your Google Drive." />
   <meta name="theme-color" content="#090d16" />
   <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
   <link rel="manifest" href="manifest.json?v=20261025b" />
-  <link rel="stylesheet" href="css/base.css?v=20261025b" />
-  <link rel="stylesheet" href="css/layout.css?v=20261026d" />
-  <link rel="stylesheet" href="css/components.css?v=20261025b" />
+  <link rel="stylesheet" href="css/base.css?v=20261028a" />
+  <link rel="stylesheet" href="css/layout.css?v=20261028a" />
+  <link rel="stylesheet" href="css/components.css?v=20261028a" />
   <link rel="stylesheet" href="css/responsive.css?v=20261025b" />
   <script src="js/icons.js?v=20261025b"></script>
   <style>
@@ -39,13 +39,63 @@
     }
 
     .login-card {
+      position: relative;
       background: var(--surface);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
       border: 1px solid var(--border);
       border-radius: 24px;
-      padding: 2.5rem 2rem;
+      padding: 2.25rem 2rem;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(37, 99, 235, 0.08);
+    }
+    .login-close {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      color: var(--text-2);
+      transition: background var(--t-fast), color var(--t-fast);
+    }
+    .login-close:hover { background: var(--surface-2); color: var(--text); }
+    .login-close:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+    .login-skip {
+      display: block;
+      margin-top: 1rem;
+      color: var(--accent-2);
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-align: center;
+    }
+    .login-skip:hover { text-decoration: underline; }
+
+    .login-options {
+      margin-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+    .login-options summary {
+      color: var(--text-2);
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-align: center;
+      list-style: none;
+      padding: 0.5rem;
+    }
+    .login-options summary::-webkit-details-marker { display: none; }
+    .login-options summary::after { content: '＋'; margin-left: 0.5rem; color: var(--accent-2); }
+    .login-options[open] summary::after { content: '−'; }
+    .login-options-body { padding-top: 0.75rem; }
+    .login-options-body > p { font-size: 0.78rem; line-height: 1.5; text-align: center; margin-bottom: 0.75rem; }
+    .login-room-note { font-size: 0.78rem; color: var(--muted); line-height: 1.5; text-align: center; margin: 1.25rem 0 0; }
+
+    @media (max-width: 480px) {
+      .login-container { padding: 1rem; }
+      .login-card { padding: 1.75rem 1.25rem; border-radius: 20px; }
     }
 
     .brand-logo-hero {
@@ -84,60 +134,25 @@
       transform: translateY(0);
     }
 
-    .divider-text {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      color: var(--muted);
-      font-size: 0.8rem;
-      margin: 1.5rem 0;
-    }
-    .divider-text::before,
-    .divider-text::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .drive-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      color: var(--success);
-      padding: 0.25rem 0.75rem;
-      border-radius: var(--r-full);
-      font-size: 0.75rem;
-      font-weight: 600;
-      margin-top: 0.5rem;
-    }
   </style>
-  <script src="js/firebase-config.js?v=20261025c"></script>
-  <script src="js/analytics.js?v=20261026a"></script>
+  <script src="js/firebase-config.js?v=20261028a"></script>
+  <script src="js/analytics.js?v=20261028a"></script>
 </head>
 <body>
 
 <div class="login-container">
   <div class="login-card">
+    <a class="login-close" href="index.html" aria-label="Close sign in and return to Pchat" title="Close and return to Pchat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"></path></svg>
+    </a>
 
     <!-- Brand Header -->
-    <div style="text-align:center;margin-bottom:2rem;">
+    <div style="text-align:center;margin-bottom:1.75rem;">
       <img src="assets/icons/icon.png?v=20261025b" alt="Pchat" class="brand-logo-hero" />
-      <h1 style="font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;margin:0 0 0.25rem;">
-        Pchat
-      </h1>
-      <p style="font-size:0.75rem;color:var(--accent-2);margin:0 0 0.5rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">
-        Private &amp; On-Device Encrypted
+      <h1 style="font-size:1.6rem;font-weight:800;letter-spacing:-0.02em;margin:0 0 0.4rem;">Welcome to Pchat</h1>
+      <p style="font-size:0.875rem;color:var(--text-2);line-height:1.5;">
+        Sign in with Google to save rooms to your Drive.
       </p>
-      <p style="font-size:0.875rem;color:var(--text-2);margin:0 0 0.5rem;line-height:1.4;">
-        Choose how to continue. Google login unlocks saving rooms in your Drive & Sheets.
-      </p>
-      <div class="drive-badge">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-        <span>Chats stored in your own Google Drive</span>
-      </div>
     </div>
 
     <!-- Reason notification (if redirected) -->
@@ -148,7 +163,7 @@
     <!-- Main Login View -->
     <div id="login-form-view">
 
-      <!-- Official Google Sign-In Button -->
+      <!-- Primary sign-in action -->
       <button type="button" class="btn-google-modern" id="google-signin-btn">
         <svg width="20" height="20" viewBox="0 0 24 24">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -158,39 +173,37 @@
         </svg>
         <span>Continue with Google</span>
       </button>
-      <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin:0.75rem 0 0;line-height:1.4;">
-        Sign in to sync your rooms and friends across devices.
+      <p style="font-size:0.78rem;color:var(--muted);text-align:center;margin:0.75rem 0 0;line-height:1.5;">
+        Google is only needed to save your own rooms.
       </p>
+      <a class="login-skip" href="index.html">Skip sign-in and return to Pchat</a>
 
-      <div class="divider-text">or continue with a nickname / email</div>
-
-      <!-- Direct Nickname / Email Form -->
-      <form id="email-signin-form" style="display:flex;flex-direction:column;gap:0.75rem;">
-        <div>
-          <input 
-            type="text" 
-            id="user-gmail-input" 
-            class="form-input" 
-            placeholder="Your nickname or email (e.g. Alex)" 
-            required 
-            autocomplete="username" 
-            style="font-size:0.95rem;padding:0.75rem 1rem;" 
-          />
+      <details class="login-options">
+        <summary>Continue without Google</summary>
+        <div class="login-options-body">
+          <p>Use a nickname for a profile saved only on this device.</p>
+          <form id="email-signin-form" style="display:flex;flex-direction:column;gap:0.75rem;">
+            <label class="sr-only" for="user-gmail-input">Your nickname or email</label>
+            <input
+              type="text"
+              id="user-gmail-input"
+              class="form-input"
+              placeholder="Your nickname or email"
+              required
+              autocomplete="username"
+              style="font-size:0.95rem;padding:0.75rem 1rem;"
+            />
+            <button type="submit" class="btn btn-primary btn-full" style="padding:0.75rem;font-weight:700;font-size:0.95rem;">
+              Continue with nickname
+            </button>
+          </form>
+          <div style="text-align:center;margin-top:0.5rem;">
+            <button type="button" class="btn btn-ghost btn-sm" id="demo-signin-btn" style="color:var(--text-2);font-size:0.8rem;">
+              Continue as guest
+            </button>
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-full" style="padding:0.75rem;font-weight:700;font-size:0.95rem;">
-          Continue without Google &rarr;
-        </button>
-        <p style="font-size:0.74rem;color:var(--muted);text-align:center;margin:0;line-height:1.4;">
-          Creates a local profile on this device. Google sign-in is required only if you want to save rooms to your Drive.
-        </p>
-      </form>
-
-      <!-- 1-Click Guest sign in -->
-      <div style="margin-top:1rem;text-align:center;">
-        <button type="button" class="btn btn-ghost btn-sm" id="demo-signin-btn" style="color:var(--text-2);font-size:0.8rem;display:inline-flex;align-items:center;gap:6px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);"><circle cx="12" cy="12" r="10"></circle><path d="m10 15 5-3-5-3v6z"></path></svg> Quick Guest Sign-in
-        </button>
-      </div>
+      </details>
 
       <!-- Error Box -->
       <div id="login-error" style="display:none;background:rgba(244, 63, 94, 0.12);border:1px solid rgba(244, 63, 94, 0.3);padding:0.85rem 1rem;border-radius:12px;margin-top:1.25rem;">
@@ -231,11 +244,7 @@
         </div>
       </div>
 
-      <!-- Guest Note -->
-      <p style="font-size:0.75rem;color:var(--muted);text-align:center;margin:1.25rem 0 0;line-height:1.4;display:flex;align-items:center;justify-content:center;gap:4px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <span>Joining a friend's room? You don't need to sign in &mdash; just open the invite link or scan the QR code.</span>
-      </p>
+      <p class="login-room-note">Joining a friend's room? Open their invite link — no sign-in needed.</p>
 
     </div>
 
@@ -254,7 +263,7 @@
 <!-- Scripts -->
 <script src="js/config.js?v=20261025b"></script>
 <script src="js/storage.js?v=20261025b"></script>
-<script src="js/ui.js?v=20261025b"></script>
+<script src="js/ui.js?v=20261028a"></script>
 <script src="js/auth.js?v=20261026a"></script>
 <script>
 // ?redirect= must only ever navigate to a same-origin relative page. This

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script src="js/firebase-config.js?v=20261025c"></script>
-  <script src="js/analytics.js?v=20261026a"></script>
+  <script src="js/firebase-config.js?v=20261028a"></script>
+  <script src="js/analytics.js?v=20261028a"></script>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://apis.google.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss: https://*.googleapis.com https://*.firebaseio.com; frame-src 'self' https://pchat-shepu.firebaseapp.com https://accounts.google.com http://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/ https://apis.google.com https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob: data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https: wss: https://*.googleapis.com https://*.firebaseio.com; frame-src 'self' https://pchat-shepu.firebaseapp.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/ https://accounts.google.com http://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Settings — Pchat shepu</title>
   <meta name="description" content="Pchat shepu account and application preferences." />
   <meta name="theme-color" content="#090d16" />
   <link rel="icon" href="assets/icons/icon.png?v=20261025b" type="image/png" />
-  <link rel="stylesheet" href="css/base.css?v=20261025b" />
-  <link rel="stylesheet" href="css/layout.css?v=20261026d" />
-  <link rel="stylesheet" href="css/components.css?v=20261025b" />
+  <link rel="stylesheet" href="css/base.css?v=20261028a" />
+  <link rel="stylesheet" href="css/layout.css?v=20261028a" />
+  <link rel="stylesheet" href="css/components.css?v=20261028a" />
   <link rel="stylesheet" href="css/invites.css?v=20261025b" />
   <link rel="stylesheet" href="css/responsive.css?v=20261025b" />
 </head>
@@ -361,15 +361,62 @@
         <!-- Relay -->
         <section class="settings-section" id="section-relay">
           <div class="panel">
-            <h3 style="margin-bottom:1.25rem;">Message Delivery Servers</h3>
+            <h3 style="margin-bottom:1.25rem;">WebRTC Call Relays (TURN)</h3>
             <p style="font-size:0.875rem;color:var(--text-2);margin-bottom:1.25rem;">
-              Real-time messages across devices are delivered through these secure servers with automatic backup.
-              The default settings work automatically for everyone. You only need to edit these if messages
-              are blocked on your local network or Wi-Fi.
+              TURN relays can help calls connect across mobile networks, CGNAT, and restrictive firewalls.
+              STUN is included automatically, but it cannot relay media when direct connections fail.
             </p>
 
             <div style="display:flex;flex-direction:column;gap:0.875rem;">
               <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:600;margin-bottom:0.35rem;">Metered Open Relay (recommended free starting point)</div>
+                <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.75rem;">
+                  Metered currently advertises 20 GB of free TURN traffic per month and UDP/TCP/TLS on fallback ports 80/443.
+                  Create a free account at <a href="https://www.metered.ca/tools/openrelay/" target="_blank" rel="noopener">Metered Open Relay</a>,
+                  then enter the Metered app name and its TURN credentials API key below. This key is sent to browsers and is not a secret;
+                  never enter your Metered account Secret Key. Free limits and service availability can change.
+                </p>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.6rem;">
+                  <label style="font-size:0.8rem;">Metered app name
+                    <input id="turn-metered-app" class="form-input" type="text" autocomplete="off" placeholder="yourappname" style="margin-top:0.25rem;" />
+                  </label>
+                  <label style="font-size:0.8rem;">TURN credentials API key (browser-visible)
+                    <input id="turn-metered-key" class="form-input" type="password" autocomplete="off" placeholder="Metered TURN API key" style="margin-top:0.25rem;" />
+                  </label>
+                </div>
+              </div>
+
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:600;margin-bottom:0.35rem;">Additional TURN providers (optional)</div>
+                <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.6rem;">
+                  Add another provider's browser-ready ICE server array as JSON for extra route options. Only paste credentials intended for browser use
+                  (prefer short-lived credentials); never paste account/API secrets. Each device stores its own settings.
+                </p>
+                <textarea id="turn-custom-ice-input" rows="5" spellcheck="false" placeholder='[{"urls":"turn:turn.example:3478?transport=udp","username":"short-lived-user","credential":"short-lived-password"}]'
+                  style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.78rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem;color:var(--text);"></textarea>
+              </div>
+
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                  TURN relay health
+                  <span id="turn-status-badge" class="badge">not tested</span>
+                </div>
+                <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.6rem;">
+                  The test forces relay-only ICE and succeeds only if this device gathers a real TURN relay candidate. It checks this network, not every user's network.
+                </p>
+                <pre id="turn-report" style="font-size:0.75rem;white-space:pre-wrap;margin-bottom:0.6rem;">No TURN relay is configured. Calls may still connect directly on NAT-friendly networks.</pre>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                  <button class="btn btn-secondary btn-sm" id="turn-test-btn">Test TURN relay</button>
+                  <button class="btn btn-primary btn-sm" id="turn-save-btn">Save TURN settings</button>
+                  <button class="btn btn-ghost btn-sm" id="turn-reset-btn">Clear TURN settings</button>
+                </div>
+                <p style="font-size:0.75rem;color:var(--text-2);margin:0.65rem 0 0;">
+                  A free tier is not a forever-free guarantee. TURN carries the actual audio/video traffic and may be quota-limited or billed if your provider's terms change.
+                </p>
+              </div>
+              <div style="padding:0.875rem;background:var(--surface-2);border-radius:var(--r-md);">
+                <div style="font-weight:600;margin-bottom:0.35rem;">Cross-device message relay (ntfy)</div>
+                <p style="font-size:0.8rem;color:var(--text-2);margin-bottom:0.6rem;">This separate relay carries chat synchronization; changing it does not configure WebRTC calls.</p>
                 <div style="font-weight:500;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                   Delivery Server List
                   <span id="relay-status-badge" class="badge">checking…</span>
@@ -517,11 +564,11 @@
 
 <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-<script src="js/config.js?v=20261025b"></script>
+<script src="js/config.js?v=20261028a"></script>
 <script src="js/storage.js?v=20261025b"></script>
-<script src="js/ui.js?v=20261025b"></script>
+<script src="js/ui.js?v=20261028a"></script>
 <script src="js/auth.js?v=20261026a"></script>
-<script src="js/firebase.js?v=20261025b"></script>
+<script src="js/firebase.js?v=20261028a"></script>
 <script src="js/friends.js?v=20261025b"></script>
 <script src="js/invites.js?v=20261025b"></script>
 <script src="js/instant-security.js?v=20261025b"></script>
@@ -735,6 +782,101 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         UI.toast('info', 'Note', 'IndexedDB storage not initialized.');
       }
+    });
+  }
+
+  // ── WebRTC TURN relay settings and relay-only health test ──────
+  const turnAppInput = document.getElementById('turn-metered-app');
+  const turnKeyInput = document.getElementById('turn-metered-key');
+  const turnCustomInput = document.getElementById('turn-custom-ice-input');
+  const turnReport = document.getElementById('turn-report');
+  const turnBadge = document.getElementById('turn-status-badge');
+  if (turnAppInput && turnKeyInput && turnCustomInput && window.CONFIG) {
+    const savedTurn = CONFIG.getMeteredTurnConfig();
+    turnAppInput.value = savedTurn.appName;
+    turnKeyInput.value = savedTurn.apiKey;
+    const customIceServers = CONFIG.getCustomIceServers();
+    turnCustomInput.value = JSON.stringify(customIceServers, null, 2);
+    const hasConfiguredTurn = !!(savedTurn.appName && savedTurn.apiKey) || customIceServers.some(server =>
+      (Array.isArray(server.urls) ? server.urls : [server.urls]).some(url => /^turns?:/i.test(url)));
+    if (turnBadge) {
+      turnBadge.textContent = hasConfiguredTurn ? 'configured — not tested' : 'No TURN configured';
+      turnBadge.style.background = hasConfiguredTurn ? 'rgba(250,204,21,0.15)' : 'rgba(248,113,113,0.15)';
+      turnBadge.style.color = hasConfiguredTurn ? '#facc15' : '#f87171';
+      turnBadge.style.borderColor = 'transparent';
+    }
+    if (!hasConfiguredTurn && turnReport) {
+      turnReport.textContent = 'Warning: no TURN relay is configured. Calls may only work when a direct peer-to-peer route is available.';
+    }
+
+    const showTurnResult = (result) => {
+      if (turnBadge) {
+        turnBadge.textContent = result.ok ? 'TURN reachable' : 'TURN unavailable';
+        turnBadge.style.background = result.ok ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)';
+        turnBadge.style.color = result.ok ? '#34d399' : '#f87171';
+        turnBadge.style.borderColor = 'transparent';
+      }
+      if (turnReport) {
+        const elapsed = result.elapsedMs != null ? ' (' + (result.elapsedMs / 1000).toFixed(1) + 's)' : '';
+        turnReport.textContent = result.ok
+          ? result.relayCandidates + ' relay candidate(s) gathered' + elapsed + '. TURN works from this device/network.'
+          : result.error + ' Calls can still work if a direct peer-to-peer route is available.';
+      }
+    };
+
+    document.getElementById('turn-save-btn').addEventListener('click', () => {
+      const appName = turnAppInput.value.trim();
+      const apiKey = turnKeyInput.value.trim();
+      if (!!appName !== !!apiKey) {
+        UI.toast('error', 'Incomplete Metered settings', 'Enter both the app name and TURN credentials API key, or leave both empty.');
+        return;
+      }
+      let customServers;
+      try {
+        customServers = turnCustomInput.value.trim() ? JSON.parse(turnCustomInput.value) : [];
+        if (!Array.isArray(customServers)) throw new Error('Expected a JSON array.');
+        if (turnCustomInput.value.trim() && !customServers.length) throw new Error('Add at least one server object or clear the field.');
+        if (!customServers.every(server => {
+          if (!server || typeof server !== 'object' || !server.urls) return false;
+          const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+          if (!urls.length || !urls.every(url => typeof url === 'string' && /^(stun|turn|turns):/i.test(url))) return false;
+          const includesTurn = urls.some(url => /^turns?:/i.test(url));
+          return !includesTurn || (typeof server.username === 'string' && typeof server.credential === 'string');
+        })) {
+          throw new Error('Use stun:, turn:, or turns: URLs; TURN entries must include username and credential.');
+        }
+      } catch (error) {
+        UI.toast('error', 'Invalid ICE server JSON', error.message || 'Check the JSON array and try again.');
+        return;
+      }
+      if (!CONFIG.setMeteredTurnConfig({ appName, apiKey }) || !CONFIG.setCustomIceServers(customServers)) {
+        UI.toast('error', 'Could not save', 'This browser could not save TURN settings in local storage.');
+        return;
+      }
+      UI.toast('success', 'TURN settings saved', 'Reload the room tab to apply these ICE servers to new calls.');
+      turnBadge.textContent = 'saved — not tested';
+      turnBadge.style.background = 'rgba(250,204,21,0.15)';
+      turnBadge.style.color = '#facc15';
+      turnReport.textContent = 'Settings saved. Test the TURN relay from this device/network.';
+    });
+
+    document.getElementById('turn-test-btn').addEventListener('click', async () => {
+      turnBadge.textContent = 'testing…';
+      turnReport.textContent = 'Fetching ICE settings and gathering relay-only candidates…';
+      const result = await CONFIG.testTurn();
+      showTurnResult(result);
+      UI.toast(result.ok ? 'success' : 'error', result.ok ? 'TURN reachable' : 'TURN unavailable',
+        result.ok ? result.relayCandidates + ' relay candidate(s) gathered from this network.' : result.error);
+    });
+
+    document.getElementById('turn-reset-btn').addEventListener('click', () => {
+      CONFIG.clearTurnConfig();
+      turnAppInput.value = '';
+      turnKeyInput.value = '';
+      turnCustomInput.value = '[]';
+      turnBadge.textContent = 'not configured';
+      turnReport.textContent = 'No TURN relay is configured. Calls may still connect directly on NAT-friendly networks.';
+      UI.toast('info', 'TURN settings cleared', 'Reload the room tab to remove these TURN servers from new calls.');
     });
   }
 

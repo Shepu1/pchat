@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>webrtc-test</title><body><pre id="out">running</pre><script>
+(async () => {
+  const out = document.getElementById('out');
+  const pc1 = new RTCPeerConnection({ iceServers: [] });
+  const pc2 = new RTCPeerConnection({ iceServers: [] });
+  const cands = [];
+  pc1.onicecandidate = e => { if (e.candidate) { cands.push('1:'+e.candidate.candidate); pc2.addIceCandidate(e.candidate).catch(()=>{}); } };
+  pc2.onicecandidate = e => { if (e.candidate) { cands.push('2:'+e.candidate.candidate); pc1.addIceCandidate(e.candidate).catch(()=>{}); } };
+  const dc = pc1.createDataChannel('t');
+  const opened = new Promise(res => { dc.onopen = () => res('open'); });
+  const offer = await pc1.createOffer(); await pc1.setLocalDescription(offer); await pc2.setRemoteDescription(offer);
+  const answer = await pc2.createAnswer(); await pc2.setLocalDescription(answer); await pc1.setRemoteDescription(answer);
+  const result = await Promise.race([opened, new Promise(r => setTimeout(() => r('timeout'), 5000))]);
+  out.textContent = JSON.stringify({ result, pc1: pc1.iceConnectionState, pc2: pc2.iceConnectionState, cands });
+})();
+</script></body>

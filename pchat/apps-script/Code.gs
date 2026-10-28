@@ -27,6 +27,14 @@ function errorResponse(msg, code) {
 function doGet(e) {
   try {
     var action = (e.parameter && e.parameter.action) || 'messages';
+    // One script serves ONE room, so these buckets are per-room. The client
+    // polls messages every 2 s (30/min), so the old 300/min cap throttled real
+    // users at ~10 people per room. Sized for ~40 concurrent clients — Apps
+    // Script's own execution concurrency is the natural ceiling below this.
+    var limits = { messages: 1200, members: 300, room: 180 };
+    if (!Object.prototype.hasOwnProperty.call(limits, action)) return errorResponse('Unknown action', 'NOT_FOUND');
+    if (!checkRateLimit('get_global', 2400, 60)) return errorResponse('Room is busy — try again shortly', 'RATE_LIMITED');
+    if (!checkRateLimit('get_' + action, limits[action], 60)) return errorResponse('Too many requests — try again shortly', 'RATE_LIMITED');
     if (action === 'messages') return handleGetMessages(e);
     if (action === 'room')     return handleGetRoom(e);
     if (action === 'members')  return handleGetMembers(e);
@@ -39,8 +47,26 @@ function doGet(e) {
 // ── doPost ───────────────────────────────────────────────────────
 function doPost(e) {
   try {
-    var body   = JSON.parse(e.postData.contents);
+    // Apply the room-wide cap before parsing/processing caller-controlled JSON.
+    if (!checkRateLimit('post_global', 2400, 60)) return errorResponse('Room is busy — try again shortly', 'RATE_LIMITED');
+
+    var raw = e && e.postData && e.postData.contents;
+    if (typeof raw !== 'string' || raw.length > 52000 || Utilities.newBlob(raw).getBytes().length > 52000) {
+      return errorResponse('Request is too large', 'TOO_LARGE');
+    }
+    var body = JSON.parse(raw);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return errorResponse('Invalid request', 'INVALID');
+
     var action = body.action;
+    // Per-action room caps: generous enough for ~40 active clients (presence
+    // heartbeats every 20 s = 3/min each), still low enough that a flood
+    // cannot burn the room's Apps Script quota in seconds. message is further
+    // capped at 30/min per member below.
+    var limits = { join: 120, message: 900, edit: 300, delete: 300, presence: 600, leave: 300, room_op: 120 };
+    if (typeof action !== 'string' || !Object.prototype.hasOwnProperty.call(limits, action)) {
+      return errorResponse('Unknown action', 'NOT_FOUND');
+    }
+    if (!checkRateLimit('post_' + action, limits[action], 60)) return errorResponse('Too many requests — try again shortly', 'RATE_LIMITED');
 
     if (action === 'join')     return handleJoin(body);
     if (action === 'message')  return handleSendMessage(body);
@@ -146,17 +172,32 @@ function getMemberRow(memberId) {
 // in-memory object did not, so floods from fresh memberIds sailed through).
 // Caps normal use generously; only automated floods trip it.
 function checkRateLimit(scope, limit, windowSec) {
+  var lock = LockService.getScriptLock();
+  // Fail closed on lock/cache failures: allowing uncounted requests would
+  // turn a quota-service problem into an unlimited-write path.
+  if (!lock.tryLock(2500)) return false;
   try {
     var cache = CacheService.getScriptCache();
-    var bucket = Math.floor(Date.now() / 1000 / (windowSec || 60));
-    var key = 'rl_' + String(scope || 'anon').substring(0, 60) + '_' + bucket;
+    var seconds = windowSec || 60;
+    var bucket = Math.floor(Date.now() / 1000 / seconds);
+    var key = 'rl_' + String(scope || 'anon').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 60) + '_' + bucket;
     var n = parseInt(cache.get(key) || '0', 10) || 0;
     if (n >= (limit || 30)) return false;
-    cache.put(key, String(n + 1), (windowSec || 60) + 5);
+    cache.put(key, String(n + 1), seconds + 5);
     return true;
   } catch (e) {
-    return true; // fail-open: never lock out real users on cache errors
+    return false;
+  } finally {
+    lock.releaseLock();
   }
+}
+
+// Spreadsheet cells have a 50,000-character limit. Keep a little headroom
+// and ensure user-controlled text is stored as text, never as a formula.
+function sheetText(value) {
+  var text = String(value == null ? '' : value);
+  var first = text.trimStart().charAt(0);
+  return '=+@-'.indexOf(first) !== -1 ? "'" + text : text;
 }
 
 // ── GET /room ─────────────────────────────────────────────────────
@@ -179,9 +220,11 @@ function handleGetRoom(e) {
 // ── GET /members ──────────────────────────────────────────────────
 function handleGetMembers(e) {
   var sheet = getSheet('members');
-  var data  = sheet.getDataRange().getValues();
+  var lastRow = sheet.getLastRow();
+  var startRow = Math.max(2, lastRow - 199);
+  var data = lastRow >= 2 ? sheet.getRange(startRow, 1, lastRow - startRow + 1, 9).getValues() : [];
   var members = [];
-  for (var i = 1; i < data.length; i++) {
+  for (var i = 0; i < data.length; i++) {
     var row = data[i];
     if (!row[0]) continue;
     if (row[6] === true || row[6] === 'TRUE') continue;
@@ -199,9 +242,8 @@ function handleGetMembers(e) {
 
 // ── POST join ─────────────────────────────────────────────────────
 function handleJoin(body) {
-  var displayName   = String(body.displayName || '').trim().substring(0, 50);
+  var displayName   = sheetText(String(body.displayName || '').trim().substring(0, 50));
   var memberId      = body.memberId;
-  var existingToken = body.sessionToken;
 
   if (!displayName) return errorResponse('Display name required', 'INVALID');
 
@@ -248,8 +290,10 @@ function handleJoin(body) {
 
 // ── GET /messages ─────────────────────────────────────────────────
 function handleGetMessages(e) {
-  var afterRow = parseInt(e.parameter && e.parameter.afterRow) || 0;
-  var limit    = Math.min(parseInt(e.parameter && e.parameter.limit) || 50, 100);
+  var afterRow = parseInt(e.parameter && e.parameter.afterRow, 10);
+  if (!isFinite(afterRow) || afterRow < 0) afterRow = 0;
+  var requestedLimit = parseInt(e.parameter && e.parameter.limit, 10);
+  var limit = (!isFinite(requestedLimit) || requestedLimit < 1) ? 50 : Math.min(requestedLimit, 50);
 
   var sheet   = getSheet('messages');
   var lastRow = sheet.getLastRow();
@@ -259,7 +303,9 @@ function handleGetMessages(e) {
   var startRow = Math.max(2, afterRow > 0 ? afterRow + 1 : Math.max(2, lastRow - limit + 1));
   if (startRow > lastRow) return corsResponse({ success: true, messages: [], lastRow: lastRow });
 
-  var numRows = lastRow - startRow + 1;
+  // Bound both the sheet read and response. Return the page cursor, not the
+  // sheet's final row, so clients can fetch subsequent pages without skips.
+  var numRows = Math.min(limit, lastRow - startRow + 1);
   var data    = sheet.getRange(startRow, 1, numRows, 9).getValues();
 
   var messages = [];
@@ -281,16 +327,16 @@ function handleGetMessages(e) {
     });
   }
 
-  return corsResponse({ success: true, messages: messages, lastRow: lastRow });
+  return corsResponse({ success: true, messages: messages, lastRow: startRow + numRows - 1 });
 }
 
 // ── POST message ──────────────────────────────────────────────────
 function handleSendMessage(body) {
   var memberId     = body.memberId;
   var sessionToken = body.sessionToken;
-  var messageId    = body.messageId;
+  var messageId    = String(body.messageId || '').substring(0, 128);
   var message      = String(body.message || '').trim();
-  var replyTo      = body.replyTo || '';
+  var replyTo      = String(body.replyTo || '').substring(0, 128);
   var messageType  = (body.messageType === 'image' || body.messageType === 'file' || body.messageType === 'audio') ? body.messageType : 'text';
 
   if (!validateSession(memberId, sessionToken)) {
@@ -315,6 +361,7 @@ function handleSendMessage(body) {
   }
   if (!message) return errorResponse('Message cannot be empty', 'INVALID');
   if (messageType === 'text' && message.length > 4000) return errorResponse('Message too long', 'TOO_LONG');
+  if (message.length > 45000) return errorResponse('Message/attachment exceeds the safe spreadsheet cell limit', 'TOO_LARGE');
 
   var cfg = getRoomConfig();
   if (cfg.room_status === 'disabled') return errorResponse('Room is disabled', 'DISABLED');
@@ -333,7 +380,7 @@ function handleSendMessage(body) {
   var displayName = memberRow ? memberRow.data[1] : 'Unknown';
   var msgId       = messageId || generateId('m');
 
-  msgSheet.appendRow([msgId, now(), memberId, displayName, messageType, message, replyTo, 'FALSE', 'FALSE']);
+  msgSheet.appendRow([sheetText(msgId), now(), sheetText(memberId), sheetText(displayName), messageType, sheetText(message), sheetText(replyTo), 'FALSE', 'FALSE']);
 
   if (memberRow) {
     getSheet('members').getRange(memberRow.row, 4).setValue(now());
@@ -351,6 +398,7 @@ function handleEditMessage(body) {
 
   if (!validateSession(memberId, sessionToken)) return errorResponse('Invalid session', 'UNAUTHORIZED');
   if (!newMessage) return errorResponse('Message cannot be empty', 'INVALID');
+  if (newMessage.length > 4000) return errorResponse('Message too long', 'TOO_LONG');
 
   var sheet = getSheet('messages');
   var data  = sheet.getDataRange().getValues();
@@ -359,7 +407,7 @@ function handleEditMessage(body) {
     if (data[i][0] === messageId) {
       if (data[i][2] !== memberId) return errorResponse('Not your message', 'FORBIDDEN');
       if (data[i][8] === true || data[i][8] === 'TRUE') return errorResponse('Message is deleted', 'DELETED');
-      sheet.getRange(i + 1, 6).setValue(newMessage);
+      sheet.getRange(i + 1, 6).setValue(sheetText(newMessage));
       sheet.getRange(i + 1, 8).setValue('TRUE');
       return corsResponse({ success: true, messageId: messageId });
     }
