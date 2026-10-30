@@ -748,7 +748,13 @@ const Chat = (() => {
     let spCount = 0;
     try {
       if (isEmojiMsg && typeof SpecialEmoji !== 'undefined' && SpecialEmoji.countShortcodes) {
-        spCount = SpecialEmoji.countShortcodes(rawText) || 0;
+        spCount += SpecialEmoji.countShortcodes(rawText) || 0;
+      }
+    } catch {}
+    // CustomEmoji pchat shortcodes also count toward big-bubble sizing
+    try {
+      if (isEmojiMsg && typeof CustomEmoji !== 'undefined' && CustomEmoji.countShortcodes) {
+        spCount += CustomEmoji.countShortcodes(rawText) || 0;
       }
     } catch {}
 
@@ -1054,12 +1060,20 @@ const Chat = (() => {
 
   // ── Emoji detection helpers ───────────────────────────────────
   function _stripSpecialCodes(text) {
+    let out = String(text || '');
+    // Strip SpecialEmoji shortcodes (:sp_xxx:)
     try {
       if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.stripShortcodes) {
-        return SpecialEmoji.stripShortcodes(text);
+        out = SpecialEmoji.stripShortcodes(out);
       }
     } catch {}
-    return String(text || '').replace(/:sp_[A-Za-z0-9_-]{1,48}:/g, '');
+    // Strip CustomEmoji pchat shortcodes (:a1b2c:)
+    try {
+      if (typeof CustomEmoji !== 'undefined' && CustomEmoji.stripShortcodes) {
+        out = CustomEmoji.stripShortcodes(out);
+      }
+    } catch {}
+    return out;
   }
   function _isEmojiOnly(text) {
     if (!text || !text.trim()) return false;
@@ -1079,6 +1093,7 @@ const Chat = (() => {
       .replace(/\s/g, '');                            // whitespace
     return stripped.length === 0;
   }
+
 
   // True if the text contains ANY emoji (system or custom-mapped).
   // Used for the emoji sound effect: "keu emoji dile play korbe".
@@ -1107,9 +1122,10 @@ const Chat = (() => {
     return m ? m.length : 0;
   }
 
-  // ── Text rendering (custom emoji + linkify) ───────────────────
+  // \u2500\u2500 Text rendering (custom emoji + linkify) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   // Outside unicode emojis are auto-replaced with the custom set
   // (assets/emoji maps) so the whole chat renders consistently.
+
   function _renderText(text) {
     if (!text) return '';
     let t = escapeHtml(text);
@@ -1123,13 +1139,16 @@ const Chat = (() => {
     // Linkify URLs
     t = t.replace(/(https?:\/\/[^\s<>"]+)/gi,
       '<a href="$1" target="_blank" rel="noopener noreferrer" class="msg-link">$1</a>');
-    // Special-emoji shortcodes → inline <img>. MUST run after linkify:
-    // the pass emits absolute blob: URLs and linkify would shred them.
-    // (Shortcodes themselves contain no URL prefix, so linkify never
-    // matches them first.)
+    // Special-emoji shortcodes -> inline <img>. MUST run after linkify.
     try {
       if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.emojifyShortcodes) {
         t = SpecialEmoji.emojifyShortcodes(t);
+      }
+    } catch { /* leave shortcodes as text */ }
+    // CustomEmoji pchat shortcodes (:a1b2c:) -> inline <img>
+    try {
+      if (typeof CustomEmoji !== 'undefined' && CustomEmoji.emojifyShortcodes) {
+        t = CustomEmoji.emojifyShortcodes(t);
       }
     } catch { /* leave shortcodes as text */ }
     // Line breaks
@@ -1137,14 +1156,16 @@ const Chat = (() => {
     return t;
   }
 
-  // Escape + custom-emoji swap for short inline snippets (names, quotes)
   function _escEmo(text) {
     const e = escapeHtml(text || '');
     try {
       if (typeof CustomEmoji !== 'undefined' && CustomEmoji.isLoaded && CustomEmoji.isLoaded()) {
-        const c = CustomEmoji.emojifyEscaped(e);
+        let c = CustomEmoji.emojifyEscaped(e);
         if (typeof SpecialEmoji !== 'undefined' && SpecialEmoji.emojifyShortcodes) {
-          return SpecialEmoji.emojifyShortcodes(c);
+          c = SpecialEmoji.emojifyShortcodes(c);
+        }
+        if (typeof CustomEmoji !== 'undefined' && CustomEmoji.emojifyShortcodes) {
+          c = CustomEmoji.emojifyShortcodes(c);
         }
         return c;
       }

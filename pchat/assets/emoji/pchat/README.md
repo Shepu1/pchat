@@ -8,6 +8,7 @@ moto: `:a7k2p:` — message e code ta pathalei seta image hoye dekhay.
 |---|---|---|
 | `:a88vn:` | smug_glossy_balloon.png | smug glossy balloon |
 | `:cpwx5:` | red_checkered_gamcha.png | red checkered gamcha |
+| `:csqm7:` | ornate_gold_banded_cigar.png | ornate gold banded cigar |
 | `:d4qpq:` | defiant_middle_finger.png | defiant middle finger |
 | `:esvj8:` | guava_mascot.png | guava mascot |
 | `:gk0xy:` | samosa_mascot.png | samosa mascot |
@@ -18,6 +19,7 @@ moto: `:a7k2p:` — message e code ta pathalei seta image hoye dekhay.
 | `:q6ag3:` | glossy_sun.png | glossy sun |
 | `:qk8ja:` | battery_tired_face.png | battery tired face |
 | `:rbhyo:` | rightwards_hand.png | rightwards hand |
+| `:rf1my:` | cheeky_blue_wrapper_mascot.png | cheeky blue wrapper mascot |
 | `:s3qlw:` | confused_popping_brain.png | confused popping brain |
 | `:thzp8:` | split_personality_face.png | split personality face |
 | `:tzb9s:` | mind_blown_explosion.png | mind blown explosion |

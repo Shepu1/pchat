@@ -13,7 +13,7 @@ const CustomEmoji = (() => {
   const CATEGORY_ORDER = [
     'face', 'animal', 'drinks', 'festival', 'fruit', 'love', 'medical',
     'music&games', 'nature', 'people', 'romantic', 'rood',
-    'symbol', 'technology', 'vehicle', 'hand', 'pchat',
+    'symbol', 'technology', 'vehicle', 'hand', 'Horror', 'Herro', 'pchat',
   ];
 
   // ── Pick order ────────────────────────────────────────────────
@@ -128,11 +128,20 @@ const CustomEmoji = (() => {
       ['Clap & pray', /clapping|folded/],
       ['Rude', /middle/],
     ],
+    Horror: [
+      ['Creatures', /creature|demon|ghoul|phantom|wraith|fiend|monster|beast|abyss|tentacle|pumpkin/],
+    ],
+    Herro: [
+      ['Chibi heroes', /chibi|neon|cute|mini/],
+      ['Warriors', /warrior|ranger|guardian|owl|golem|brute/],
+      ['Agents & mages', /ninja|magician|jester|navigator|pilot|engineer|dancer|sentinel|robot/],
+    ],
     pchat: [
       ['Food & culture', /tea|jalebi|jhal|pani|samosa|guava|lungi|gamcha/],
-      ['Reactions', /face|brain|zipper|blown|noodle|split|smug|tooth|middle/],
+      ['Reactions', /face|brain|zipper|blown|noodle|split|smug|tooth|middle|panicked|shards/],
+      ['Objects & mascots', /wrapper|mascot|balloon|cigar/],
       ['Hands', /hand/],
-      ['Objects & status', /megaphone|sun|status|light|balloon/],
+      ['Status', /status|light|megaphone|sun/],
     ],
   };
 
@@ -377,6 +386,34 @@ const CustomEmoji = (() => {
     });
   }
 
+  // Pchat shortcode regex: :a1b2c: — 1 letter + 4 alphanumeric (same as pchatShortcode output)
+  const PCHAT_CODE_RE = /:[a-z][a-z0-9]{4}:/g;
+
+  // Strip all pchat shortcodes from text (used by chat.js _isEmojiOnly check)
+  function stripShortcodes(text) {
+    return String(text || '').replace(PCHAT_CODE_RE, '');
+  }
+
+  // Count pchat shortcodes in text (used by chat.js _countEmojis for bubble sizing)
+  function countShortcodes(text) {
+    if (!text) return 0;
+    const m = String(text).match(PCHAT_CODE_RE);
+    return m ? m.length : 0;
+  }
+
+  // Replace pchat shortcodes in ESCAPED html text with <img> tags.
+  // Input must already be HTML-escaped. Shortcodes that are not in the
+  // loaded set are left as-is (plain text :code:).
+  function emojifyShortcodes(escaped) {
+    if (!escaped || typeof escaped !== 'string' || !_loaded) return escaped || '';
+    return escaped.replace(PCHAT_CODE_RE, (match) => {
+      const it = _byUnicode.get(match);
+      if (!it) return match;
+      const label = it.name.replace(/"/g, '&quot;');
+      return `<img src="${it.src}" alt="${match}" title="${label}" class="custom-emoji" loading="lazy" draggable="false" onerror="this.replaceWith(document.createTextNode(this.alt))" />`;
+    });
+  }
+
   return {
     load,
     categories,
@@ -385,8 +422,11 @@ const CustomEmoji = (() => {
     search,
     lookup,
     emojifyEscaped,
+    emojifyShortcodes,
     twemojifyEscaped,
     pchatShortcode,
+    stripShortcodes,
+    countShortcodes,
     isLoaded: () => _loaded,
     count: () => _items.length,
   };
